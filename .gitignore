@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+
+# Local/dev runtime state
+data/runtime-storage.json
+*.log
+
+# Local exports and large docs (not needed to run app)
+meal_database.numbers
+meal_database.xlsx
+.vite-from-truth-unites/
