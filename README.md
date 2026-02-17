@@ -16,6 +16,20 @@ npm run dev
   - `data/runtime-storage.json`
 - Production uses `/api/storage/[key]` backed by Upstash Redis (via Vercel).
 
+## Backend Database Pack (Architecture + Meals)
+
+Generate the review pack:
+
+```bash
+npm run db:pack
+```
+
+Outputs:
+- `database/schema_v1.sql` (canonical relational schema)
+- `database/architecture_v1.md` (system design notes)
+- `database/seeds/meal_catalog_v1.json` (normalized central meal catalog)
+- `exports/meal_database_architecture_v1.xlsx` (Excel workbook for review/edit planning)
+
 ## Deploy To Vercel (Production)
 
 1. Push this folder to a GitHub repository.

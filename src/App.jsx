@@ -1,10 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Check, TrendingUp, X, Edit3 } from 'lucide-react';
 import { mealDatabase } from './data/mealDatabase';
+import {
+  CORE_MEAL_TYPES,
+  getMealsForType as plannerGetMealsForType,
+  createDefaultPlan as plannerCreateDefaultPlan,
+  generatePlanForDate as plannerGeneratePlanForDate,
+  normalizePreferences as plannerNormalizePreferences
+} from './lib/plannerGenerator';
+import {
+  createMealEvent,
+  normalizeMealEvents,
+  derivePreferencesFromEvents,
+  getUndoTargetsForSlots,
+  hasPreferenceSignals,
+  getCustomMealOccurrenceCount,
+  getCustomMealCandidates
+} from './lib/mealEvents';
 
 const MealPlannerApp = () => {
   const IST_TIME_ZONE = 'Asia/Kolkata';
   const STORAGE_API_BASE = '/api/storage';
+  const DEFAULT_USER_CATALOG = { breakfast: [], lunchDinner: [], snack: [] };
 
   const [expandedMeals, setExpandedMeals] = useState({});
   const [showWeekly, setShowWeekly] = useState(false);
@@ -18,6 +35,7 @@ const MealPlannerApp = () => {
   const [manualEditText, setManualEditText] = useState('');
   const [notification, setNotification] = useState('');
   const [loading, setLoading] = useState(true);
+  const [userMealCatalog, setUserMealCatalog] = useState(DEFAULT_USER_CATALOG);
   const todayDate = new Date().toLocaleDateString('en-IN', { 
     timeZone: IST_TIME_ZONE,
     weekday: 'long',
@@ -53,12 +71,18 @@ const MealPlannerApp = () => {
       { name: "Jowar roti (millet)", cal: 125, p: 2.7, c: 24, f: 1.3, perUnit: true },
       { name: "Rice noodles", cal: 110, p: 2, c: 25, f: 0.2, per100g: true },
       { name: "Pasta", cal: 131, p: 5, c: 25, f: 1.1, per100g: true },
+      { name: "Spaghetti aglio e olio (small portion)", cal: 185, p: 4.5, c: 29, f: 6.2, per100g: true },
+      { name: "Garlic rice (small portion)", cal: 150, p: 3, c: 28, f: 3, per100g: true },
       { name: "Whole wheat toast", cal: 80, p: 4, c: 15, f: 1, perUnit: true },
       { name: "Poha", cal: 180, p: 6, c: 38, f: 1, per100g: true },
       { name: "No carb", cal: 0, p: 0, c: 0, f: 0, per100g: true }
     ],
     vegetable: [
       { name: "Mixed salad", cal: 20, p: 1.3, c: 3.3, f: 0, per100g: true },
+      { name: "Mixed greens salad", cal: 18, p: 1.5, c: 3.2, f: 0.2, per100g: true },
+      { name: "Pumpkin salad", cal: 95, p: 2.2, c: 12, f: 4, per100g: true },
+      { name: "Smoked chicken + avocado salad", cal: 165, p: 12, c: 6, f: 10, per100g: true },
+      { name: "Smoked salmon salad", cal: 145, p: 10, c: 5, f: 8, per100g: true },
       { name: "Sautéed spinach", cal: 35, p: 3, c: 4, f: 1, per100g: true },
       { name: "Sautéed broccoli", cal: 55, p: 4, c: 7, f: 2, per100g: true },
       { name: "Cauliflower", cal: 25, p: 2, c: 5, f: 0.3, per100g: true },
@@ -99,11 +123,66 @@ const MealPlannerApp = () => {
     ]
   };
 
-  const createDefaultPlan = () => ({
-    breakfast: mealDatabase.breakfast[0],
-    lunch: mealDatabase.lunch[0],
-    dinner: mealDatabase.dinner[0]
+  const slugifyMealId = (text = '') =>
+    String(text)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+  const normalizeUserMealCatalog = (value = {}) => ({
+    breakfast: Array.isArray(value.breakfast) ? value.breakfast : [],
+    lunchDinner: Array.isArray(value.lunchDinner) ? value.lunchDinner : [],
+    snack: Array.isArray(value.snack) ? value.snack : []
   });
+
+  const mergeMealsUniqueByCanonicalName = (baseMeals = [], extraMeals = []) => {
+    const seen = new Set();
+    const merged = [];
+
+    for (const meal of [...baseMeals, ...extraMeals]) {
+      const key = String(meal?.canonical_name || meal?.name || '').toLowerCase().trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(meal);
+    }
+
+    return merged;
+  };
+
+  const normalizeCandidateKey = (value = '') =>
+    String(value)
+      .toLowerCase()
+      .replace(/[^a-z0-9\s+]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const getCandidateTargetLabel = (targetMealType) => {
+    if (targetMealType === 'breakfast') return 'Breakfast';
+    if (targetMealType === 'snack') return 'Snack';
+    return 'Lunch/Dinner';
+  };
+
+  const mergedMealDatabase = useMemo(
+    () => ({
+      breakfast: mergeMealsUniqueByCanonicalName(mealDatabase.breakfast || [], userMealCatalog.breakfast || []),
+      lunchDinner: mergeMealsUniqueByCanonicalName(mealDatabase.lunchDinner || [], userMealCatalog.lunchDinner || []),
+      snack: mergeMealsUniqueByCanonicalName(mealDatabase.snack || [], userMealCatalog.snack || [])
+    }),
+    [userMealCatalog]
+  );
+
+  const allExistingMealNames = useMemo(
+    () =>
+      Object.values(mergedMealDatabase)
+        .flat()
+        .map((meal) => meal?.canonical_name || meal?.name || '')
+        .filter(Boolean),
+    [mergedMealDatabase]
+  );
+
+  const getMealsForType = (mealType) => plannerGetMealsForType(mergedMealDatabase, mealType);
+
+  const createDefaultPlan = () => plannerCreateDefaultPlan(mergedMealDatabase);
 
   const formatDateKeyFromUtcDate = (date) => {
     const year = String(date.getUTCFullYear());
@@ -172,205 +251,37 @@ const MealPlannerApp = () => {
       return formatDateKeyFromUtcDate(d);
     });
   };
+  
 
-
-  const DAILY_PROTEIN_TARGET = 105;
-  const MEAL_TYPES = ['breakfast', 'lunch', 'dinner'];
+  const getMealTypeOrder = (plan = {}, history = {}) =>
+    plan?.snack || history?.snack ? ['breakfast', 'lunch', 'snack', 'dinner'] : CORE_MEAL_TYPES;
 
 
   const hasLockedHistoryForDate = (dateKey, historyState) => {
     const day = historyState?.[dateKey] || {};
-    return MEAL_TYPES.some((mealType) => day[mealType]?.confirmed || day[mealType]?.skipped);
+    return CORE_MEAL_TYPES.some((mealType) => day[mealType]?.confirmed || day[mealType]?.skipped);
   };
 
   const isSamePlanByName = (a, b) => {
     if (!a || !b) return false;
-    return MEAL_TYPES.every((mealType) => a[mealType]?.name && b[mealType]?.name && a[mealType].name === b[mealType].name);
+    return CORE_MEAL_TYPES.every((mealType) => a[mealType]?.name && b[mealType]?.name && a[mealType].name === b[mealType].name);
   };
 
-  const hashString = (input) => {
-    let hash = 0;
-    for (let i = 0; i < input.length; i += 1) {
-      hash = (hash << 5) - hash + input.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash);
-  };
-
-  const getRecentMealCounts = (plans, dateKey, lookbackDays = 10) => {
-    const counts = {
-      breakfast: {},
-      lunch: {},
-      dinner: {}
-    };
-
-    for (let i = 1; i <= lookbackDays; i += 1) {
-      const key = shiftDateKey(dateKey, -i);
-      const dayPlan = plans[key];
-      if (!dayPlan) continue;
-
-      for (const mealType of MEAL_TYPES) {
-        const name = dayPlan[mealType]?.name;
-        if (!name) continue;
-        counts[mealType][name] = (counts[mealType][name] || 0) + 1;
-      }
-    }
-
-    return counts;
-  };
-
-  const getDayTheme = (dateKey) => {
-    const seed = hashString(dateKey);
-    return {
-      preferIndian: seed % 3 === 0,
-      preferLowCarb: seed % 4 === 0,
-      preferHighProtein: seed % 5 === 0
-    };
-  };
-
-  const pickMealForType = ({
-    mealType,
-    dateKey,
-    plans,
-    preferences,
-    partialPlan,
-    remainingProteinTarget,
-    recentCounts,
-    dayTheme,
-    yesterdayPlan
-  }) => {
-    const candidates = mealDatabase[mealType] || [];
-    const accepts = preferences?.accepts || {};
-    const avoids = preferences?.avoids || {};
-    const edits = preferences?.edits || {};
-
-    let bestMeal = candidates[0];
-    let bestScore = Number.NEGATIVE_INFINITY;
-
-    for (const meal of candidates) {
-      let score = 0;
-      const mealName = meal.name;
-
-      const repeatCount = recentCounts[mealType]?.[mealName] || 0;
-      score -= repeatCount * 2.4;
-
-      if (yesterdayPlan?.[mealType]?.name === mealName) {
-        score -= 6;
-      }
-
-      score += Math.min((accepts[mealName] || 0) * 0.8, 5);
-      score += Math.min((edits[mealName] || 0) * 0.35, 2);
-      score -= Math.min((avoids[mealName] || 0) * 0.95, 5);
-
-      const proteinNeed = Math.max(remainingProteinTarget, 0);
-      if (proteinNeed > 0) score += Math.min(meal.protein, proteinNeed) * 0.24;
-      score += meal.protein * 0.03;
-
-      if (mealType !== 'breakfast') {
-        score -= (meal.cal || 0) / 650;
-      }
-
-      const isLowCarb = meal.components?.carb === 'No carb';
-      if (dayTheme.preferLowCarb) score += isLowCarb ? 2.2 : -0.6;
-      if (dayTheme.preferIndian && meal.cuisine === 'indian') score += 1.8;
-      if (dayTheme.preferHighProtein && meal.protein >= 40) score += 1.4;
-
-      if (mealType === 'dinner' && partialPlan.lunch?.cuisine) {
-        if (meal.cuisine === partialPlan.lunch.cuisine) score -= 1.5;
-        else score += 0.8;
-      }
-
-      const tieKey = dateKey + '-' + mealType + '-' + mealName;
-      const tieBreaker = (hashString(tieKey) % 100) / 1000;
-      score += tieBreaker;
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestMeal = meal;
-      }
-    }
-
-    return bestMeal;
-  };
-
-  const generatePlanForDate = (dateKey, plans, preferences) => {
-    const dayTheme = getDayTheme(dateKey);
-    const recentCounts = getRecentMealCounts(plans, dateKey, 10);
-    const yesterdayPlan = plans[shiftDateKey(dateKey, -1)] || null;
-
-    let remainingProtein = DAILY_PROTEIN_TARGET;
-    const generated = {};
-
-    generated.breakfast = pickMealForType({
-      mealType: 'breakfast',
+  const generatePlanForDate = (dateKey, plans, preferences) =>
+    plannerGeneratePlanForDate({
       dateKey,
       plans,
       preferences,
-      partialPlan: generated,
-      remainingProteinTarget: Math.min(remainingProtein, 35),
-      recentCounts,
-      dayTheme,
-      yesterdayPlan
+      mealDatabase: mergedMealDatabase
     });
 
-    remainingProtein -= generated.breakfast?.protein || 0;
-
-    generated.lunch = pickMealForType({
-      mealType: 'lunch',
-      dateKey,
-      plans,
-      preferences,
-      partialPlan: generated,
-      remainingProteinTarget: Math.max(remainingProtein, 35),
-      recentCounts,
-      dayTheme,
-      yesterdayPlan
-    });
-
-    remainingProtein -= generated.lunch?.protein || 0;
-
-    generated.dinner = pickMealForType({
-      mealType: 'dinner',
-      dateKey,
-      plans,
-      preferences,
-      partialPlan: generated,
-      remainingProteinTarget: Math.max(remainingProtein, 25),
-      recentCounts,
-      dayTheme,
-      yesterdayPlan
-    });
-
-    if (
-      yesterdayPlan &&
-      MEAL_TYPES.every((mealType) => generated[mealType]?.name && generated[mealType]?.name === yesterdayPlan[mealType]?.name)
-    ) {
-      const lunchOptions = mealDatabase.lunch || [];
-      const currentIdx = lunchOptions.findIndex((m) => m.name === generated.lunch?.name);
-      if (currentIdx >= 0 && lunchOptions.length > 1) {
-        const altOffset = (hashString(dateKey) % (lunchOptions.length - 1)) + 1;
-        generated.lunch = lunchOptions[(currentIdx + altOffset) % lunchOptions.length];
-      }
-    }
-
-    return {
-      breakfast: generated.breakfast || mealDatabase.breakfast[0],
-      lunch: generated.lunch || mealDatabase.lunch[0],
-      dinner: generated.dinner || mealDatabase.dinner[0]
-    };
-  };
-
-  const normalizePreferences = (prefs = {}) => ({
-    accepts: prefs.accepts || {},
-    avoids: prefs.avoids || {},
-    edits: prefs.edits || {},
-    skips: prefs.skips || {}
-  });
+  const normalizePreferences = (prefs = {}) => plannerNormalizePreferences(prefs);
 
   const [selectedDateKey, setSelectedDateKey] = useState(getDateKey());
   const [mealPlans, setMealPlans] = useState({});
   const [mealHistory, setMealHistory] = useState({});
   const [preferences, setPreferences] = useState(() => normalizePreferences({}));
+  const [mealEvents, setMealEvents] = useState([]);
 
   const safeParseJson = (value, fallback = null) => {
     if (value == null) return fallback;
@@ -473,18 +384,41 @@ const MealPlannerApp = () => {
         const historyResult = await storageGet('meal-history');
         const prefsResult = await storageGet('meal-preferences');
         const plansResult = await storageGet('meal-plans');
+        const eventsResult = await storageGet('meal-events');
+        const userCatalogResult = await storageGet('meal-user-catalog');
 
         const parsedHistory = normalizeDateMap(safeParseJson(historyResult, historyResult) || {});
         const parsedPrefs = normalizePreferences(safeParseJson(prefsResult, prefsResult) || {});
         const parsedPlans = normalizeDateMap(safeParseJson(plansResult, plansResult) || {});
+        const parsedEventsRaw = safeParseJson(eventsResult, eventsResult);
+        const parsedUserCatalog = normalizeUserMealCatalog(safeParseJson(userCatalogResult, userCatalogResult) || {});
+        let parsedEvents = normalizeMealEvents(parsedEventsRaw || []);
+
+        if (!parsedEvents.length && hasPreferenceSignals(parsedPrefs)) {
+          parsedEvents = [
+            createMealEvent({
+              type: 'legacy_import',
+              dateKey: getDateKey(),
+              mealType: 'system',
+              importedPreferences: parsedPrefs,
+              note: 'Auto-migrated from legacy meal-preferences'
+            })
+          ];
+        }
+
+        const derivedPreferences = derivePreferencesFromEvents(parsedEvents);
 
         setMealHistory(parsedHistory);
-        setPreferences(parsedPrefs);
+        setPreferences(derivedPreferences);
         setMealPlans(parsedPlans);
+        setMealEvents(parsedEvents);
+        setUserMealCatalog(parsedUserCatalog);
 
         void saveToStorage('meal-history', parsedHistory);
-        void saveToStorage('meal-preferences', parsedPrefs);
+        void saveToStorage('meal-preferences', derivedPreferences);
         void saveToStorage('meal-plans', parsedPlans);
+        void saveToStorage('meal-events', parsedEvents);
+        void saveToStorage('meal-user-catalog', parsedUserCatalog);
       } catch (error) {
         console.log('No stored data', error);
       }
@@ -524,10 +458,22 @@ const MealPlannerApp = () => {
       setMealPlans(nextPlans);
       saveToStorage('meal-plans', nextPlans);
     }
-  }, [selectedDateKey, mealPlans, loading, preferences, mealHistory]);
+  }, [selectedDateKey, mealPlans, loading, preferences, mealHistory, mergedMealDatabase]);
+
+  useEffect(() => {
+    if (loading) return;
+    const nextPreferences = derivePreferencesFromEvents(mealEvents);
+    setPreferences(nextPreferences);
+    void saveToStorage('meal-events', mealEvents);
+    void saveToStorage('meal-preferences', nextPreferences);
+  }, [mealEvents, loading]);
 
   const selectedDayPlan = mealPlans[selectedDateKey] || createDefaultPlan();
   const selectedDayHistory = mealHistory[selectedDateKey] || {};
+  const customCandidates = useMemo(
+    () => getCustomMealCandidates(mealEvents, allExistingMealNames, { lookbackDays: 45, minCount: 3 }),
+    [mealEvents, allExistingMealNames]
+  );
 
   const updateSelectedPlan = (updater) => {
     setMealPlans((prev) => {
@@ -548,51 +494,88 @@ const MealPlannerApp = () => {
     setExpandedMeals((prev) => ({ ...prev, [meal]: !prev[meal] }));
   };
 
-  const applyPreferenceFeedback = (feedback = {}) => {
-    const { accepts = {}, avoids = {}, edits = {} } = feedback;
-    const hasChanges =
-      Object.keys(accepts).length > 0 ||
-      Object.keys(avoids).length > 0 ||
-      Object.keys(edits).length > 0;
+  const appendMealEvent = (payload) => {
+    const event = createMealEvent(payload);
+    setMealEvents((prev) => [...prev, event]);
+    return event;
+  };
 
-    if (!hasChanges) return;
+  const buildPromotedCustomMeal = (candidateName, targetMealType) => {
+    const canonicalName = String(candidateName || '').trim();
+    const label = canonicalName.length > 44 ? `${canonicalName.slice(0, 43)}…` : canonicalName;
+    const idSuffix = slugifyMealId(canonicalName);
+    const profileByType = {
+      breakfast: { p: 20, c: 30, f: 10, cal: 310 },
+      lunchDinner: { p: 24, c: 42, f: 14, cal: 450 },
+      snack: { p: 12, c: 20, f: 8, cal: 220 }
+    };
+    const profile = profileByType[targetMealType] || profileByType.lunchDinner;
 
-    setPreferences((prevRaw) => {
-      const prev = normalizePreferences(prevRaw);
-      const next = {
-        ...prev,
-        accepts: { ...prev.accepts },
-        avoids: { ...prev.avoids },
-        edits: { ...prev.edits }
-      };
+    return {
+      meal_id: `user_${targetMealType}_${idSuffix}`,
+      canonical_name: canonicalName,
+      display_name: label,
+      nutrition_source: 'User-promoted custom meal',
+      assumption_version: 'user_promoted_v1',
+      name: canonicalName,
+      protein: profile.p,
+      cal: profile.cal,
+      macros: { p: profile.p, c: profile.c, f: profile.f },
+      cuisine: 'custom',
+      isUserAdded: true
+    };
+  };
 
-      const applyDelta = (target, deltaMap) => {
-        for (const [name, delta] of Object.entries(deltaMap)) {
-          if (!name || !delta) continue;
-          const current = Number(target[name] || 0);
-          const updated = Math.max(0, current + Number(delta));
-          if (updated === 0) delete target[name];
-          else target[name] = Number(updated.toFixed(2));
-        }
-      };
+  const approveCustomCandidate = async (candidate) => {
+    if (!candidate?.displayName) return;
+    const normalizedKey = candidate.normalizedKey || normalizeCandidateKey(candidate.displayName);
+    const targetMealType = candidate.suggestedMealType || 'lunchDinner';
 
-      applyDelta(next.accepts, accepts);
-      applyDelta(next.avoids, avoids);
-      applyDelta(next.edits, edits);
+    const alreadyExists = allExistingMealNames.some((mealName) => normalizeCandidateKey(mealName) === normalizedKey);
+    if (alreadyExists) {
+      showNotification('⚠️ This meal is already in your database');
+      return;
+    }
 
-      saveToStorage('meal-preferences', next);
-      return next;
+    const promotedMeal = buildPromotedCustomMeal(candidate.displayName, targetMealType);
+    const nextCatalog = normalizeUserMealCatalog({
+      ...userMealCatalog,
+      [targetMealType]: [...(userMealCatalog[targetMealType] || []), promotedMeal]
     });
+
+    setUserMealCatalog(nextCatalog);
+    await saveToStorage('meal-user-catalog', nextCatalog);
+
+    appendMealEvent({
+      type: 'custom_promoted',
+      dateKey: selectedDateKey,
+      mealType: targetMealType,
+      customMealText: candidate.displayName,
+      promotedMealName: promotedMeal.name
+    });
+
+    showNotification(`✓ Added to meals: ${promotedMeal.display_name}`);
   };
 
   const handleSwap = (mealType) => {
     const currentMeal = selectedDayPlan[mealType];
-    const availableMeals = mealDatabase[mealType];
+    const availableMeals = getMealsForType(mealType);
+    if (!availableMeals.length) {
+      showNotification('⚠️ No alternatives available');
+      return;
+    }
     const currentIndex = availableMeals.findIndex((m) => m.name === currentMeal.name);
     const nextIndex = (currentIndex + 1) % availableMeals.length;
     const nextMeal = availableMeals[nextIndex];
 
     updateSelectedPlan((prev) => ({ ...prev, [mealType]: nextMeal }));
+    appendMealEvent({
+      type: 'swap',
+      dateKey: selectedDateKey,
+      mealType,
+      fromMealName: currentMeal?.name || '',
+      toMealName: nextMeal?.name || ''
+    });
     showNotification(`✓ Swapped to: ${nextMeal.name}`);
   };
 
@@ -614,7 +597,7 @@ const MealPlannerApp = () => {
     if (!q) return null;
 
     const tokens = q.split(' ').filter((t) => t.length > 1);
-    const candidates = mealDatabase[mealType] || [];
+    const candidates = getMealsForType(mealType);
 
     let best = null;
     let bestScore = 0;
@@ -678,6 +661,16 @@ const MealPlannerApp = () => {
         inferredFrom: inferredMeal?.name || null
       };
 
+      appendMealEvent({
+        type: 'edit',
+        dateKey: selectedDateKey,
+        mealType: currentModalMealType,
+        originalMealName: originalMealName || currentMeal?.name || '',
+        updatedMealName: inferredMeal?.name || null,
+        editedToMealName: manualText,
+        isManualEntry: true
+      });
+
       updateSelectedPlan((prev) => ({ ...prev, [currentModalMealType]: manualMeal }));
       setShowEditModal(false);
 
@@ -733,6 +726,15 @@ const MealPlannerApp = () => {
       }
     };
 
+    appendMealEvent({
+      type: 'edit',
+      dateKey: selectedDateKey,
+      mealType: currentModalMealType,
+      originalMealName,
+      updatedMealName: newMeal.name,
+      isManualEntry: false
+    });
+
     updateSelectedPlan((prev) => ({ ...prev, [currentModalMealType]: newMeal }));
     setShowEditModal(false);
     showNotification(`✓ Meal updated: ${newMeal.name}`);
@@ -749,9 +751,10 @@ const MealPlannerApp = () => {
       showNotification('⚠️ Please enter a meal description');
       return;
     }
+    const trimmedCustomText = customMealText.trim();
 
     const customMeal = {
-      name: `Custom: ${customMealText}`,
+      name: `Custom: ${trimmedCustomText}`,
       protein: 15,
       cal: 0,
       macros: { p: 15, c: 0, f: 0 },
@@ -767,18 +770,32 @@ const MealPlannerApp = () => {
 
     newHistory[selectedDateKey][currentModalMealType] = {
       planned: existingPlanned,
-      actual: customMealText,
-      meal: customMealText,
+      actual: trimmedCustomText,
+      meal: trimmedCustomText,
       protein: 15,
       confirmed: true,
       isCustom: true,
       timestamp: new Date().toISOString()
     };
 
+    const customEvent = appendMealEvent({
+      type: 'custom',
+      dateKey: selectedDateKey,
+      mealType: currentModalMealType,
+      originalMealName: existingPlanned,
+      customMealText: trimmedCustomText
+    });
+    const updatedEventStream = [...mealEvents, customEvent];
+    const customCount = getCustomMealOccurrenceCount(updatedEventStream, trimmedCustomText, 45);
+
     setMealHistory(newHistory);
     saveToStorage('meal-history', newHistory);
     setShowCustomModal(false);
-    showNotification(`✓ Custom meal recorded: ${customMealText}`);
+    if (customCount === 3) {
+      showNotification(`✓ Custom meal recorded: ${trimmedCustomText} (3x in 45 days, ready to add to database)`);
+    } else {
+      showNotification(`✓ Custom meal recorded: ${trimmedCustomText}`);
+    }
   };
 
   const handleConfirm = async (mealType) => {
@@ -799,7 +816,12 @@ const MealPlannerApp = () => {
     setMealHistory(newHistory);
     await saveToStorage('meal-history', newHistory);
 
-    applyPreferenceFeedback({ accepts: { [confirmedMeal.name]: 1 } });
+    appendMealEvent({
+      type: 'confirm',
+      dateKey: selectedDateKey,
+      mealType,
+      mealName: confirmedMeal.name
+    });
 
     showNotification(`✓ Confirmed: ${confirmedMeal.name}`);
   };
@@ -812,20 +834,17 @@ const MealPlannerApp = () => {
     }
 
     const nextDayHistory = { ...dayHistory };
-    const rollbackAccepts = {};
     let undoneCount = 0;
+    const affectedSlots = [];
 
-    for (const mealType of MEAL_TYPES) {
+    const mealTypesForDay = getMealTypeOrder(selectedDayPlan, dayHistory);
+    for (const mealType of mealTypesForDay) {
       const entry = nextDayHistory[mealType];
       if (!entry?.confirmed) continue;
 
-      const confirmedMealName = entry.meal || entry.actual || entry.planned;
-      if (confirmedMealName) {
-        rollbackAccepts[confirmedMealName] = (rollbackAccepts[confirmedMealName] || 0) - 1;
-      }
-
       delete nextDayHistory[mealType];
       undoneCount += 1;
+      affectedSlots.push(mealType);
     }
 
     if (!undoneCount) {
@@ -839,7 +858,15 @@ const MealPlannerApp = () => {
 
     setMealHistory(nextHistory);
     await saveToStorage('meal-history', nextHistory);
-    applyPreferenceFeedback({ accepts: rollbackAccepts });
+
+    const undoTargets = getUndoTargetsForSlots(mealEvents, selectedDateKey, affectedSlots);
+    appendMealEvent({
+      type: 'undo',
+      dateKey: selectedDateKey,
+      mealType: 'day',
+      undoTargets,
+      affectedSlots
+    });
 
     showNotification(`↩️ Undid ${undoneCount} confirmed meal${undoneCount > 1 ? 's' : ''}`);
   };
@@ -859,8 +886,9 @@ const MealPlannerApp = () => {
   };
 
   const processQuickAction = (action) => {
-    const lunchMeals = mealDatabase.lunch;
-    const dinnerMeals = mealDatabase.dinner;
+    const lunchMeals = getMealsForType('lunch');
+    const dinnerMeals = getMealsForType('dinner');
+    const snackMeals = getMealsForType('snack');
 
     const lunchConfirmed = selectedDayHistory?.lunch?.confirmed || selectedDayHistory?.lunch?.skipped;
     const dinnerConfirmed = selectedDayHistory?.dinner?.confirmed || selectedDayHistory?.dinner?.skipped;
@@ -880,42 +908,64 @@ const MealPlannerApp = () => {
         updateSelectedPlan((prev) => ({
           ...prev,
           lunch: lunchConfirmed ? prev.lunch : lightLunch || prev.lunch,
-          dinner: lunchConfirmed && !dinnerConfirmed ? lightDinner || prev.dinner : prev.dinner
+          dinner: dinnerConfirmed ? prev.dinner : lightDinner || prev.dinner
         }));
         showNotification('✓ Switched to light low-carb meals');
         break;
       }
       case 'indian': {
-        const indianLunch = lunchMeals.find((m) => m.cuisine === 'indian');
-        const indianDinner = dinnerMeals.find((m) => m.cuisine === 'indian');
+        const indianMeals = lunchMeals.filter((m) => m.cuisine === 'indian');
+        const indianLunch = indianMeals[0];
+        const indianDinner = indianMeals.find((m) => m.name !== indianLunch?.name) || indianMeals[0];
 
         updateSelectedPlan((prev) => ({
           ...prev,
           lunch: lunchConfirmed ? prev.lunch : indianLunch || prev.lunch,
-          dinner: lunchConfirmed && !dinnerConfirmed ? indianDinner || prev.dinner : prev.dinner
+          dinner: dinnerConfirmed ? prev.dinner : indianDinner || prev.dinner
         }));
         showNotification('✓ Indian cuisine selected');
         break;
       }
       case 'surprise':
         if (!lunchConfirmed) handleSwap('lunch');
-        if (lunchConfirmed && !dinnerConfirmed) handleSwap('dinner');
+        if (!dinnerConfirmed) handleSwap('dinner');
         showNotification('🎲 Surprised you with new meals!');
+        break;
+      case 'addsnack':
+        if (selectedDayPlan.snack) {
+          showNotification('⚠️ Snack already added for this day');
+          break;
+        }
+        if (!snackMeals.length) {
+          showNotification('⚠️ No snack options found');
+          break;
+        }
+        updateSelectedPlan((prev) => ({ ...prev, snack: snackMeals[0] }));
+        showNotification(`✓ Snack added: ${snackMeals[0].name}`);
         break;
       default:
         break;
     }
   };
 
-  const getTotalProtein = () => selectedDayPlan.breakfast.protein + selectedDayPlan.lunch.protein + selectedDayPlan.dinner.protein;
-  const getTotalCalories = () => selectedDayPlan.breakfast.cal + selectedDayPlan.lunch.cal + selectedDayPlan.dinner.cal;
+  const getTotalProtein = () => {
+    const mealTypes = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
+    return mealTypes.reduce((sum, mealType) => sum + (selectedDayPlan[mealType]?.protein || 0), 0);
+  };
+
+  const getTotalCalories = () => {
+    const mealTypes = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
+    return mealTypes.reduce((sum, mealType) => sum + (selectedDayPlan[mealType]?.cal || 0), 0);
+  };
 
   const getWeeklyStats = () => {
     const sortedDays = Object.keys(mealHistory).sort();
     const last7Days = sortedDays.slice(-7);
     const proteinTotals = last7Days.map((day) => {
       const dayData = mealHistory[day] || {};
-      return (dayData.breakfast?.protein || 0) + (dayData.lunch?.protein || 0) + (dayData.dinner?.protein || 0);
+      const plan = mealPlans[day] || {};
+      const mealTypesForDay = getMealTypeOrder(plan, dayData);
+      return mealTypesForDay.reduce((sum, mealType) => sum + (dayData[mealType]?.protein || 0), 0);
     });
 
     const avg = proteinTotals.reduce((a, b) => a + b, 0) / (proteinTotals.length || 1);
@@ -928,18 +978,22 @@ const MealPlannerApp = () => {
 
   const getDayCompletion = (dateKey) => {
     const dayData = mealHistory[dateKey] || {};
-    const confirmedCount = ['breakfast', 'lunch', 'dinner'].filter((m) => dayData[m]?.confirmed).length;
-    const protein = (dayData.breakfast?.protein || 0) + (dayData.lunch?.protein || 0) + (dayData.dinner?.protein || 0);
-    return { confirmedCount, protein };
+    const dayPlan = mealPlans[dateKey] || {};
+    const mealTypesForDay = getMealTypeOrder(dayPlan, dayData);
+    const confirmedCount = mealTypesForDay.filter((m) => dayData[m]?.confirmed).length;
+    const protein = mealTypesForDay.reduce((sum, mealType) => sum + (dayData[mealType]?.protein || 0), 0);
+    return { confirmedCount, protein, totalSlots: mealTypesForDay.length };
   };
 
   const copyTodaysPlan = () => {
     const b = selectedDayPlan.breakfast;
     const l = selectedDayPlan.lunch;
+    const s = selectedDayPlan.snack;
     const d = selectedDayPlan.dinner;
     const total = getTotalProtein();
+    const snackText = s ? `\n\n🥜 SNACK: ${s.name}\nProtein: ${s.protein}g` : '';
 
-    const text = `📅 MEAL PLAN (${formatDateLabel(selectedDateKey)})\n\n🍳 BREAKFAST: ${b.name}\nProtein: ${b.protein}g\n\n🍽️ LUNCH: ${l.name}\nProtein: ${l.protein}g\n\n🌙 DINNER: ${d.name}\nProtein: ${d.protein}g\n\n💪 TOTAL PROTEIN: ${total}g`;
+    const text = `📅 MEAL PLAN (${formatDateLabel(selectedDateKey)})\n\n🍳 BREAKFAST: ${b.name}\nProtein: ${b.protein}g\n\n🍽️ LUNCH: ${l.name}\nProtein: ${l.protein}g${snackText}\n\n🌙 DINNER: ${d.name}\nProtein: ${d.protein}g\n\n💪 TOTAL PROTEIN: ${total}g`;
 
     const copyWithTextareaFallback = () => {
       try {
@@ -1003,15 +1057,9 @@ const MealPlannerApp = () => {
       return;
     }
 
-    const preferenceBoost = normalizePreferences(preferences);
-    const chosenMealNames = [selectedDayPlan.breakfast?.name, selectedDayPlan.lunch?.name, selectedDayPlan.dinner?.name].filter(Boolean);
-
-    for (const mealName of new Set(chosenMealNames)) {
-      preferenceBoost.edits[mealName] = (preferenceBoost.edits[mealName] || 0) + 0.5;
-    }
-
-    setPreferences(preferenceBoost);
-    saveToStorage('meal-preferences', preferenceBoost);
+    const chosenMealNames = getMealTypeOrder(selectedDayPlan, selectedDayHistory)
+      .map((mealType) => selectedDayPlan[mealType]?.name)
+      .filter(Boolean);
 
     const nextPlans = { ...mealPlans };
     let regeneratedDays = 0;
@@ -1023,7 +1071,7 @@ const MealPlannerApp = () => {
         continue;
       }
 
-      nextPlans[dayKey] = generatePlanForDate(dayKey, nextPlans, preferenceBoost);
+      nextPlans[dayKey] = generatePlanForDate(dayKey, nextPlans, preferences);
       regeneratedDays += 1;
     }
 
@@ -1034,11 +1082,31 @@ const MealPlannerApp = () => {
 
     setMealPlans(nextPlans);
     saveToStorage('meal-plans', nextPlans);
+    appendMealEvent({
+      type: 'regen',
+      dateKey: selectedDateKey,
+      mealType: 'week',
+      regeneratedDays,
+      keptLockedDays,
+      contextMeals: Array.from(new Set(chosenMealNames))
+    });
 
     showNotification(`✓ Regenerated ${regeneratedDays} day(s)${keptLockedDays > 0 ? `, kept ${keptLockedDays} locked` : ''}`);
   };
   const todayKey = getDateKey();
   const weekDateKeys = getWeekDateKeys(selectedDateKey);
+  const selectedMealTypeOrder = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
+  const mealTypeLabels = {
+    breakfast: 'Breakfast',
+    lunch: 'Lunch',
+    snack: 'Snack',
+    dinner: 'Dinner'
+  };
+  const formatMealName = (mealOrName) => {
+    if (!mealOrName) return '';
+    const text = typeof mealOrName === 'string' ? mealOrName : mealOrName.display_name || mealOrName.name || '';
+    return text.length > 44 ? `${text.slice(0, 43)}…` : text;
+  };
 
   if (loading) {
     return (
@@ -1228,8 +1296,20 @@ const MealPlannerApp = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-4">
-          {['breakfast', 'lunch', 'dinner'].map((mealType) => {
-            const meal = selectedDayPlan[mealType];
+          {selectedMealTypeOrder.map((mealType) => {
+            const historyEntry = selectedDayHistory?.[mealType];
+            const meal =
+              selectedDayPlan[mealType] ||
+              (historyEntry
+                ? {
+                    name: historyEntry.meal || historyEntry.actual || historyEntry.planned || 'Logged meal',
+                    protein: historyEntry.protein || 0,
+                    cal: 0,
+                    macros: { p: historyEntry.protein || 0, c: 0, f: 0 }
+                  }
+                : null);
+
+            if (!meal) return null;
             const isConfirmed = selectedDayHistory?.[mealType]?.confirmed;
             const isSkipped = selectedDayHistory?.[mealType]?.skipped;
 
@@ -1237,8 +1317,8 @@ const MealPlannerApp = () => {
               <div key={mealType} className="mb-4 pb-4 border-b border-gray-200 last:border-0">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
-                    <span className="text-sm font-semibold text-gray-600">{mealType[0].toUpperCase()}:</span>
-                    <span className="ml-2 text-gray-800">{meal.name}</span>
+                    <span className="text-sm font-semibold text-gray-600">{mealTypeLabels[mealType]}:</span>
+                    <span className="ml-2 text-gray-800">{formatMealName(meal)}</span>
                     <span className="ml-3 text-blue-600 font-bold">P: {meal.protein}g</span>
                     {meal.orderOut && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">OO</span>}
                     {isConfirmed && <Check className="inline ml-2 text-green-500" size={16} />}
@@ -1260,7 +1340,7 @@ const MealPlannerApp = () => {
                   >
                     Swap
                   </button>
-                  {meal.components && (
+                  {mealType !== 'snack' && meal.components && (
                     <button
                       onClick={() => handleEdit(mealType)}
                       className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1270,25 +1350,29 @@ const MealPlannerApp = () => {
                       Edit
                     </button>
                   )}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setCurrentModalMealType(mealType);
-                      setShowOrderOutModal(true);
-                    }}
-                    className="text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isConfirmed || isSkipped}
-                  >
-                    Order out
-                  </button>
-                  <button
-                    onClick={() => handleCustom(mealType)}
-                    className="text-xs px-3 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isConfirmed || isSkipped}
-                  >
-                    Custom
-                  </button>
+                  {mealType !== 'snack' && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setCurrentModalMealType(mealType);
+                        setShowOrderOutModal(true);
+                      }}
+                      className="text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isConfirmed || isSkipped}
+                    >
+                      Order out
+                    </button>
+                  )}
+                  {mealType !== 'snack' && (
+                    <button
+                      onClick={() => handleCustom(mealType)}
+                      className="text-xs px-3 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isConfirmed || isSkipped}
+                    >
+                      Custom
+                    </button>
+                  )}
                 </div>
                 <button onClick={() => toggleExpand(mealType)} className="text-xs text-blue-600 flex items-center gap-1 hover:text-blue-800">
                   Details {expandedMeals[mealType] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -1306,7 +1390,7 @@ const MealPlannerApp = () => {
 
           <div className="mb-4 border-t border-gray-200 pt-4">
             <p className="text-xs font-semibold text-gray-700 mb-2">⚡ Quick Actions:</p>
-            <div className="grid grid-cols-3 gap-2 mb-2">
+            <div className="grid grid-cols-4 gap-2 mb-2">
               <button
                 onClick={() => processQuickAction('light')}
                 className="text-[11px] px-2 py-1.5 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors whitespace-nowrap"
@@ -1325,8 +1409,38 @@ const MealPlannerApp = () => {
               >
                 🎲 Surprise
               </button>
+              <button
+                onClick={() => processQuickAction('addsnack')}
+                className="text-[11px] px-2 py-1.5 bg-teal-100 text-teal-700 rounded-full hover:bg-teal-200 transition-colors whitespace-nowrap"
+              >
+                ➕ Snack
+              </button>
             </div>
           </div>
+
+          {customCandidates.length > 0 && (
+            <div className="mb-4 border-t border-gray-200 pt-4">
+              <p className="text-xs font-semibold text-gray-700 mb-2">🧠 Frequent custom meals:</p>
+              <div className="space-y-2">
+                {customCandidates.slice(0, 5).map((candidate) => (
+                  <div key={candidate.normalizedKey} className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-gray-800">{candidate.displayName}</div>
+                      <div className="text-[11px] text-amber-800">
+                        {candidate.count}x in 45 days • {getCandidateTargetLabel(candidate.suggestedMealType)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => approveCustomCandidate(candidate)}
+                      className="shrink-0 rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-300 transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 rounded-lg">
             <div className="flex justify-between items-center">
@@ -1392,7 +1506,9 @@ const MealPlannerApp = () => {
                     {parseDateKey(dateKey).toLocaleDateString('en-US', { weekday: 'short', timeZone: IST_TIME_ZONE })}
                   </div>
                   <div className="text-xs">{parseDateKey(dateKey).getUTCDate()}</div>
-                  <div className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>{completion.confirmedCount}/3</div>
+                  <div className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                    {completion.confirmedCount}/{completion.totalSlots}
+                  </div>
                   {isToday && <div className="text-[9px]">Today</div>}
                 </button>
               );
@@ -1461,12 +1577,17 @@ const MealPlannerApp = () => {
                       <button onClick={() => setSelectedDateKey(dateKey)} className="font-semibold text-gray-700 hover:text-blue-700">
                         {formatDateLabel(dateKey)}
                       </button>
-                      <span className="text-xs text-gray-600">{completion.confirmedCount}/3 confirmed</span>
+                      <span className="text-xs text-gray-600">
+                        {completion.confirmedCount}/{completion.totalSlots} confirmed
+                      </span>
                     </div>
                     <div className="text-xs space-y-1">
-                      {['breakfast', 'lunch', 'dinner'].map((mealType) => (
+                      {getMealTypeOrder(plan, dayData).map((mealType) => (
                         <div key={mealType} className="flex justify-between gap-2">
-                          <span className="text-gray-700 truncate">{mealType[0].toUpperCase()}: {plan[mealType]?.name}</span>
+                          <span className="text-gray-700 truncate">
+                            {mealTypeLabels[mealType]}:{' '}
+                            {formatMealName(plan[mealType] || dayData[mealType]?.meal || dayData[mealType]?.actual || 'Not set')}
+                          </span>
                           <span className="text-blue-600 font-semibold">{dayData[mealType]?.protein || plan[mealType]?.protein || 0}g</span>
                         </div>
                       ))}
