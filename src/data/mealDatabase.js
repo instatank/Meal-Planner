@@ -1,4 +1,4 @@
-export const mealDatabase = {
+const baseMealDatabase = {
   "breakfast": [
     {
       "meal_id": "breakfast_scrambled-eggs-toast",
@@ -826,3 +826,60 @@ export const mealDatabase = {
     }
   ]
 };
+
+const classifyProteinFamily = (meal = {}) => {
+  const text = [
+    meal.components?.protein,
+    meal.components?.veg,
+    meal.name,
+    meal.canonical_name,
+    meal.display_name
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  const hasChicken = /\bchicken\b/.test(text);
+  const hasFish = /\b(fish|salmon|tuna|prawn|shrimp|seafood|tilapia|cod)\b/.test(text);
+  const hasRedMeat = /\b(beef|steak|mutton|lamb|pork|ham|goat|keema)\b/.test(text);
+
+  const nonVegFamilyCount = [hasChicken, hasFish, hasRedMeat].filter(Boolean).length;
+  if (nonVegFamilyCount > 1) return 'mixed';
+  if (hasChicken) return 'chicken';
+  if (hasFish) return 'fish';
+  if (hasRedMeat) return 'red_meat';
+  return 'vegetarian';
+};
+
+const classifyMealWeightClass = (meal = {}) => {
+  const calories = Number(meal.cal || 0);
+  if (calories > 600) return 'heavy';
+  if (calories >= 350) return 'medium';
+  return 'light';
+};
+
+const classifyCarbLevel = (meal = {}) => {
+  const carbs = Number(meal.macros?.c || 0);
+  if (carbs > 50) return 'high';
+  if (carbs > 20) return 'medium';
+  return 'low';
+};
+
+const addRuleMetadata = (meal = {}) => {
+  const existing = meal.rule_metadata || {};
+  return {
+    ...meal,
+    rule_metadata: {
+      protein_family: existing.protein_family || classifyProteinFamily(meal),
+      meal_weight_class: existing.meal_weight_class || classifyMealWeightClass(meal),
+      carb_level: existing.carb_level || classifyCarbLevel(meal)
+    }
+  };
+};
+
+export const mealDatabase = Object.fromEntries(
+  Object.entries(baseMealDatabase).map(([mealType, meals]) => [
+    mealType,
+    meals.map((meal) => addRuleMetadata(meal))
+  ])
+);

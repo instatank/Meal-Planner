@@ -94,6 +94,26 @@ const inferTags = (meal, mealType) => {
   return Array.from(tags);
 };
 
+const inferMealWeightClass = (meal) => {
+  const calories = Number(meal.cal || 0);
+  if (calories > 600) return 'heavy';
+  if (calories >= 350) return 'medium';
+  return 'light';
+};
+
+const inferCarbLevel = (meal) => {
+  const carbs = Number(meal.macros?.c || 0);
+  if (carbs > 50) return 'high';
+  if (carbs > 20) return 'medium';
+  return 'low';
+};
+
+const getRuleMetadata = (meal) => ({
+  protein_family: meal.rule_metadata?.protein_family || 'vegetarian',
+  meal_weight_class: meal.rule_metadata?.meal_weight_class || inferMealWeightClass(meal),
+  carb_level: meal.rule_metadata?.carb_level || inferCarbLevel(meal)
+});
+
 const mealRows = [];
 const componentRows = [];
 const seenIds = new Set();
@@ -105,6 +125,7 @@ for (const [mealType, meals] of Object.entries(mealDatabase)) {
     const preferredId = meal.meal_id || baseId;
     const mealId = uniqueId(preferredId, seenIds);
     const tags = inferTags(meal, mealType);
+    const ruleMetadata = getRuleMetadata(meal);
 
     mealRows.push({
       meal_id: mealId,
@@ -123,7 +144,10 @@ for (const [mealType, meals] of Object.entries(mealDatabase)) {
       is_active: true,
       tags: JSON.stringify(tags),
       metadata: JSON.stringify({
-        macros_p: Number(meal.macros?.p || meal.protein || 0)
+        macros_p: Number(meal.macros?.p || meal.protein || 0),
+        protein_family: ruleMetadata.protein_family,
+        meal_weight_class: ruleMetadata.meal_weight_class,
+        carb_level: ruleMetadata.carb_level
       })
     });
 
@@ -163,6 +187,7 @@ const schemaRows = [
   { table: 'meal_templates', column: 'calories_kcal', type: 'integer', required: 'yes', description: 'Calories' },
   { table: 'meal_templates', column: 'nutrition_source', type: 'text', required: 'no', description: 'Nutrition source traceability' },
   { table: 'meal_templates', column: 'assumption_version', type: 'text', required: 'no', description: 'Assumption profile used for normalization' },
+  { table: 'meal_templates', column: 'metadata', type: 'jsonb', required: 'yes', description: 'Derived keys: macros_p, protein_family, meal_weight_class, carb_level' },
   { table: 'meal_template_components', column: 'meal_id', type: 'text (pk,fk)', required: 'yes', description: 'Links to template' },
   { table: 'daily_meal_plan', column: 'user_id + plan_date + meal_type', type: 'unique', required: 'yes', description: 'One row per meal slot/day' },
   { table: 'daily_meal_plan', column: 'status', type: 'text', required: 'yes', description: 'planned/confirmed/skipped/custom' },

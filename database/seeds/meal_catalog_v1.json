@@ -1,6 +1,6 @@
 {
   "version": "v1",
-  "generatedAt": "2026-02-17T16:38:04.008Z",
+  "generatedAt": "2026-02-18T09:24:58.662Z",
   "mealCount": 35,
   "sourceFile": "src/data/mealDatabase.js",
   "assumptions": [
@@ -57,7 +57,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"breakfast\"]",
-      "metadata": "{\"macros_p\":22}"
+      "metadata": "{\"macros_p\":22,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "breakfast_boiled-eggs-ham-sandwich",
@@ -75,7 +75,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"breakfast\",\"grilled\"]",
-      "metadata": "{\"macros_p\":38}"
+      "metadata": "{\"macros_p\":38,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "breakfast_smoked-salmon-avocado-on-toast",
@@ -93,7 +93,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"breakfast\",\"grilled\"]",
-      "metadata": "{\"macros_p\":33}"
+      "metadata": "{\"macros_p\":33,\"protein_family\":\"fish\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "breakfast_greek-yogurt-berry-bowl",
@@ -111,7 +111,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"breakfast\",\"grilled\",\"low-carb\"]",
-      "metadata": "{\"macros_p\":21}"
+      "metadata": "{\"macros_p\":21,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "breakfast_poha-kabab-protein-shake",
@@ -129,7 +129,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"breakfast\"]",
-      "metadata": "{\"macros_p\":37}"
+      "metadata": "{\"macros_p\":37,\"protein_family\":\"chicken\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "breakfast_egg-white-omelette-avocado",
@@ -147,7 +147,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"breakfast\",\"low-carb\"]",
-      "metadata": "{\"macros_p\":19}"
+      "metadata": "{\"macros_p\":19,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "breakfast_carrot-halwa-sugar-free-protein-shake",
@@ -165,7 +165,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"breakfast\",\"grilled\",\"low-carb\"]",
-      "metadata": "{\"macros_p\":28}"
+      "metadata": "{\"macros_p\":28,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "breakfast_aloo-paratha-curd",
@@ -183,7 +183,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"breakfast\"]",
-      "metadata": "{\"macros_p\":18}"
+      "metadata": "{\"macros_p\":18,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "breakfast_idli-mysore-masala-dosa-sambar-chutney",
@@ -201,7 +201,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"breakfast\"]",
-      "metadata": "{\"macros_p\":17}"
+      "metadata": "{\"macros_p\":17,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_chicken-curry-jowar-roti",
@@ -219,7 +219,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"high-protein\",\"indian\"]",
-      "metadata": "{\"macros_p\":55.5}"
+      "metadata": "{\"macros_p\":55.5,\"protein_family\":\"chicken\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_grilled-salmon-fillet-sauteed-veg-spaghetti-aglio-e-olio",
@@ -237,7 +237,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"grilled\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":43.5}"
+      "metadata": "{\"macros_p\":43.5,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "lunch_dinner_rajma-chawal-raita",
@@ -255,7 +255,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":19}"
+      "metadata": "{\"macros_p\":19,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_chole-jowar-roti-raita",
@@ -273,7 +273,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":24}"
+      "metadata": "{\"macros_p\":24,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_vietnamese-chicken-pho",
@@ -291,7 +291,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"soup\",\"high-protein\",\"asian\"]",
-      "metadata": "{\"macros_p\":49.4}"
+      "metadata": "{\"macros_p\":49.4,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "lunch_dinner_grilled-steak-mixed-greens-salad",
@@ -309,7 +309,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"salad\",\"grilled\",\"low-carb\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":49}"
+      "metadata": "{\"macros_p\":49,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "lunch_dinner_thai-pad-krapow-rice",
@@ -327,7 +327,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"high-protein\",\"asian\"]",
-      "metadata": "{\"macros_p\":49.3}"
+      "metadata": "{\"macros_p\":49.3,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "lunch_dinner_mutton-keema-jowar-roti",
@@ -345,7 +345,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":33.9}"
+      "metadata": "{\"macros_p\":33.9,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_arhar-dal-rice-matar-paneer",
@@ -363,7 +363,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":35}"
+      "metadata": "{\"macros_p\":35,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_chicken-curry-jowar-roti-dal",
@@ -381,7 +381,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"high-protein\",\"indian\"]",
-      "metadata": "{\"macros_p\":64}"
+      "metadata": "{\"macros_p\":64,\"protein_family\":\"chicken\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_grilled-fish-pumpkin-salad",
@@ -399,7 +399,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"salad\",\"grilled\",\"low-carb\",\"western\"]",
-      "metadata": "{\"macros_p\":37}"
+      "metadata": "{\"macros_p\":37,\"protein_family\":\"fish\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "lunch_dinner_grilled-salmon-sauteed-veg-garlic-rice",
@@ -417,7 +417,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"grilled\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":42}"
+      "metadata": "{\"macros_p\":42,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "lunch_dinner_chicken-soup-smoked-salmon-salad",
@@ -435,7 +435,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"salad\",\"soup\",\"low-carb\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":61}"
+      "metadata": "{\"macros_p\":61,\"protein_family\":\"mixed\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "lunch_dinner_paneer-sabzi-dal-raita",
@@ -453,7 +453,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"low-carb\",\"indian\"]",
-      "metadata": "{\"macros_p\":30}"
+      "metadata": "{\"macros_p\":30,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "lunch_dinner_pork-chop-pumpkin-salad",
@@ -471,7 +471,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"salad\",\"grilled\",\"low-carb\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":44}"
+      "metadata": "{\"macros_p\":44,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "lunch_dinner_pork-chop-mixed-greens-salad",
@@ -489,7 +489,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"salad\",\"grilled\",\"low-carb\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":43}"
+      "metadata": "{\"macros_p\":43,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "lunch_dinner_tandoori-chicken-smoked-chicken-avocado-salad",
@@ -507,7 +507,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"salad\",\"low-carb\",\"high-protein\",\"indian\"]",
-      "metadata": "{\"macros_p\":60.9}"
+      "metadata": "{\"macros_p\":60.9,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "lunch_dinner_broccoli-soup-grilled-fish-spaghetti-aglio-e-olio",
@@ -525,7 +525,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"soup\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":47}"
+      "metadata": "{\"macros_p\":47,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "lunch_dinner_saag-meat-jowar-roti-dal",
@@ -543,7 +543,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":36}"
+      "metadata": "{\"macros_p\":36,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_kofta-dal-jowar-roti",
@@ -561,7 +561,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":33}"
+      "metadata": "{\"macros_p\":33,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_kababs-dal-gobi-jowar-roti",
@@ -579,7 +579,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"indian\"]",
-      "metadata": "{\"macros_p\":37}"
+      "metadata": "{\"macros_p\":37,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
     },
     {
       "meal_id": "lunch_dinner_fish-curry-rice",
@@ -597,7 +597,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":36}"
+      "metadata": "{\"macros_p\":36,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "snack_nuts-seeds-protein-shake",
@@ -615,7 +615,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"snack\",\"global\"]",
-      "metadata": "{\"macros_p\":31}"
+      "metadata": "{\"macros_p\":31,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
     },
     {
       "meal_id": "snack_sweet-potato-chaat",
@@ -633,7 +633,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"snack\",\"indian\"]",
-      "metadata": "{\"macros_p\":4}"
+      "metadata": "{\"macros_p\":4,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "snack_kaala-chana-chaat",
@@ -651,7 +651,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"snack\",\"indian\"]",
-      "metadata": "{\"macros_p\":10}"
+      "metadata": "{\"macros_p\":10,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
     },
     {
       "meal_id": "snack_avocado-cheese-toast",
@@ -669,7 +669,7 @@
       "source": "seed_v1",
       "is_active": true,
       "tags": "[\"snack\",\"global\"]",
-      "metadata": "{\"macros_p\":16}"
+      "metadata": "{\"macros_p\":16,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
     }
   ],
   "components": [
