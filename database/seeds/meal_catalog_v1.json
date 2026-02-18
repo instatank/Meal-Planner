@@ -1,7 +1,7 @@
 {
   "version": "v1",
-  "generatedAt": "2026-02-18T09:24:58.662Z",
-  "mealCount": 35,
+  "generatedAt": "2026-02-18T10:02:26.590Z",
+  "mealCount": 37,
   "sourceFile": "src/data/mealDatabase.js",
   "assumptions": [
     {
@@ -600,6 +600,42 @@
       "metadata": "{\"macros_p\":36,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
     },
     {
+      "meal_id": "lunch_dinner_sweet-potato-curry-kaala-chanaa-sabzi-jowar-roti",
+      "meal_type": "lunch_dinner",
+      "canonical_name": "Sweet potato curry + kaala chanaa sabzi + jowar roti",
+      "display_name": "Sweet Potato Curry + Kaala Chanaa + Jowar Roti",
+      "name": "Sweet potato curry + kaala chanaa sabzi + jowar roti",
+      "cuisine": "indian",
+      "calories_kcal": 590,
+      "protein_g": 22,
+      "carbs_g": 102,
+      "fat_g": 11,
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_02_17",
+      "source": "seed_v1",
+      "is_active": true,
+      "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
+      "metadata": "{\"macros_p\":22,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\"}"
+    },
+    {
+      "meal_id": "lunch_dinner_chicken-red-curry-rice",
+      "meal_type": "lunch_dinner",
+      "canonical_name": "Chicken red curry + rice",
+      "display_name": "Chicken Red Curry + Rice",
+      "name": "Chicken red curry + rice",
+      "cuisine": "asian",
+      "calories_kcal": 520,
+      "protein_g": 47,
+      "carbs_g": 45,
+      "fat_g": 16,
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_02_17",
+      "source": "seed_v1",
+      "is_active": true,
+      "tags": "[\"lunch\",\"dinner\",\"curry\",\"high-protein\",\"asian\"]",
+      "metadata": "{\"macros_p\":47,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+    },
+    {
       "meal_id": "snack_nuts-seeds-protein-shake",
       "meal_type": "snack",
       "canonical_name": "Nuts, seeds + protein shake",
@@ -1011,6 +1047,28 @@
       "carb_amount_g": 80,
       "veg_name": "",
       "veg_amount_g": "",
+      "style": "Curry style",
+      "metadata": "{}"
+    },
+    {
+      "meal_id": "lunch_dinner_sweet-potato-curry-kaala-chanaa-sabzi-jowar-roti",
+      "protein_name": "Kaala chanaa (black chickpeas)",
+      "protein_amount_g": 160,
+      "carb_name": "Jowar roti (millet)",
+      "carb_amount_g": 2,
+      "veg_name": "Sweet potato curry",
+      "veg_amount_g": 180,
+      "style": "Curry style",
+      "metadata": "{}"
+    },
+    {
+      "meal_id": "lunch_dinner_chicken-red-curry-rice",
+      "protein_name": "Chicken breast",
+      "protein_amount_g": 150,
+      "carb_name": "Cooked rice",
+      "carb_amount_g": 80,
+      "veg_name": "Red curry vegetables",
+      "veg_amount_g": 120,
       "style": "Curry style",
       "metadata": "{}"
     },

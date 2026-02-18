@@ -757,6 +757,56 @@ const baseMealDatabase = {
         "f": 12
       },
       "cuisine": "indian"
+    },
+    {
+      "meal_id": "lunch_dinner_sweet-potato-curry-kaala-chanaa-sabzi-jowar-roti",
+      "canonical_name": "Sweet potato curry + kaala chanaa sabzi + jowar roti",
+      "display_name": "Sweet Potato Curry + Kaala Chanaa + Jowar Roti",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_02_17",
+      "name": "Sweet potato curry + kaala chanaa sabzi + jowar roti",
+      "components": {
+        "protein": "Kaala chanaa (black chickpeas)",
+        "amount": 160,
+        "carb": "Jowar roti (millet)",
+        "carbAmount": 2,
+        "veg": "Sweet potato curry",
+        "vegAmount": 180,
+        "style": "Curry style"
+      },
+      "protein": 22,
+      "cal": 590,
+      "macros": {
+        "p": 22,
+        "c": 102,
+        "f": 11
+      },
+      "cuisine": "indian"
+    },
+    {
+      "meal_id": "lunch_dinner_chicken-red-curry-rice",
+      "canonical_name": "Chicken red curry + rice",
+      "display_name": "Chicken Red Curry + Rice",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_02_17",
+      "name": "Chicken red curry + rice",
+      "components": {
+        "protein": "Chicken breast",
+        "amount": 150,
+        "carb": "Cooked rice",
+        "carbAmount": 80,
+        "veg": "Red curry vegetables",
+        "vegAmount": 120,
+        "style": "Curry style"
+      },
+      "protein": 47,
+      "cal": 520,
+      "macros": {
+        "p": 47,
+        "c": 45,
+        "f": 16
+      },
+      "cuisine": "asian"
     }
   ],
   "snack": [
