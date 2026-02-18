@@ -238,6 +238,25 @@ const MealPlannerApp = () => {
     });
   };
 
+  const getDayOrdinal = (day) => {
+    if (day % 100 >= 11 && day % 100 <= 13) return `${day}th`;
+    if (day % 10 === 1) return `${day}st`;
+    if (day % 10 === 2) return `${day}nd`;
+    if (day % 10 === 3) return `${day}rd`;
+    return `${day}th`;
+  };
+
+  const formatWeekSnapshotDateLabel = (dateKey) => {
+    const date = parseDateKey(dateKey);
+    if (Number.isNaN(date.getTime())) return dateKey;
+    const weekday = date.toLocaleDateString('en-US', {
+      timeZone: IST_TIME_ZONE,
+      weekday: 'short'
+    });
+    const day = date.getUTCDate();
+    return `${weekday}, ${getDayOrdinal(day)}`;
+  };
+
   const getWeekDateKeys = (centerKey) => {
     const center = parseDateKey(centerKey);
     if (Number.isNaN(center.getTime())) {
@@ -1575,7 +1594,7 @@ const MealPlannerApp = () => {
                   <div key={dateKey} className={`border rounded p-3 ${dateKey === selectedDateKey ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
                     <div className="flex justify-between items-center mb-2">
                       <button onClick={() => setSelectedDateKey(dateKey)} className="font-semibold text-gray-700 hover:text-blue-700">
-                        {formatDateLabel(dateKey)}
+                        {formatWeekSnapshotDateLabel(dateKey)}
                       </button>
                       <span className="text-xs text-gray-600">
                         {completion.confirmedCount}/{completion.totalSlots} confirmed
