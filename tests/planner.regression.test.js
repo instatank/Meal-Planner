@@ -2,9 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  CARB_HEAVY_THRESHOLD,
   createDefaultPlan,
+  DAILY_CARB_HARD_CAP,
+  DAILY_PROTEIN_MAX,
+  DAILY_PROTEIN_MIN,
+  FAT_HEAVY_THRESHOLD,
   generatePlanForDate,
   getMealsForType,
+  MIN_MEAL_PROTEIN,
   normalizePreferences
 } from '../src/lib/plannerGenerator.js';
 import { mealDatabase } from '../src/data/mealDatabase.js';
@@ -52,6 +58,76 @@ const fixturePreferences = normalizePreferences({
   }
 });
 
+const PRIMARY_FAMILY_PATTERNS = {
+  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp)\b/i,
+  chicken: /\b(chicken|turkey)\b/i,
+  'red-meat': /\b(beef|mutton|lamb|pork|steak|keema|kofta)\b/i
+};
+
+const PRIMARY_FAMILY_COUNT_PATTERNS = {
+  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp)\b/gi,
+  chicken: /\b(chicken|turkey)\b/gi,
+  'red-meat': /\b(beef|mutton|lamb|pork|steak|keema|kofta)\b/gi
+};
+
+const LEGUME_FIBRE_PATTERN = /\b(dal|rajma|chole|lentil|bean|sambar)\b/i;
+const VEG_FIBRE_PATTERN = /\b(salad|greens|broccoli|gobi|veg|vegetable|pumpkin|matar|saag)\b/i;
+const WHOLEGRAIN_FIBRE_PATTERN = /\b(jowar|millet|whole|oat)\b/i;
+
+const getMacro = (meal, key) => Number(meal?.macros?.[key] || 0);
+
+const isHeavyMeal = (meal) => (meal.cal || 0) > 600 || (getMacro(meal, 'f') > 25 && getMacro(meal, 'c') > 35);
+const isCarbHeavyMeal = (meal) => getMacro(meal, 'c') >= CARB_HEAVY_THRESHOLD;
+const isFatHeavyMeal = (meal) => getMacro(meal, 'f') > FAT_HEAVY_THRESHOLD;
+
+const getPrimaryFamily = (meal) => {
+  const text = `${meal?.components?.protein || ''} ${meal?.name || ''}`;
+  if (PRIMARY_FAMILY_PATTERNS.fish.test(text)) return 'fish';
+  if (PRIMARY_FAMILY_PATTERNS.chicken.test(text)) return 'chicken';
+  if (PRIMARY_FAMILY_PATTERNS['red-meat'].test(text)) return 'red-meat';
+  return null;
+};
+
+const hasRepeatedPrimaryFamilyInsideMeal = (meal) => {
+  const mealName = String(meal?.name || '');
+  return Object.values(PRIMARY_FAMILY_COUNT_PATTERNS).some((pattern) => {
+    const matches = mealName.match(pattern);
+    return (matches?.length || 0) >= 2;
+  });
+};
+
+const hasMeatFibreHint = (meal) => {
+  const primaryFamily = getPrimaryFamily(meal);
+  if (!primaryFamily) return true;
+  const text = `${meal?.name || ''} ${meal?.components?.carb || ''} ${meal?.components?.veg || ''}`;
+  return LEGUME_FIBRE_PATTERN.test(text) || VEG_FIBRE_PATTERN.test(text) || WHOLEGRAIN_FIBRE_PATTERN.test(text);
+};
+
+const assertSatisfiesHardConstraints = (plan) => {
+  const meals = [plan.breakfast, plan.lunch, plan.dinner];
+  const totalProtein = meals.reduce((sum, meal) => sum + Number(meal?.protein || 0), 0);
+  const totalCarbs = meals.reduce((sum, meal) => sum + getMacro(meal, 'c'), 0);
+  const proteinValues = meals.map((meal) => Number(meal?.protein || 0));
+
+  assert.ok(totalProtein >= DAILY_PROTEIN_MIN && totalProtein <= DAILY_PROTEIN_MAX, `total protein out of range: ${totalProtein}`);
+  assert.ok(totalCarbs <= DAILY_CARB_HARD_CAP, `total carbs exceed cap: ${totalCarbs}`);
+  assert.ok(meals.every((meal) => Number(meal?.protein || 0) >= MIN_MEAL_PROTEIN), 'each meal must be at least 20g protein');
+  assert.ok(meals.filter(isHeavyMeal).length <= 1, 'max 1 heavy meal/day');
+  assert.ok(meals.filter(isCarbHeavyMeal).length <= 1, 'max 1 carb-heavy meal/day');
+  assert.ok(meals.filter(isFatHeavyMeal).length <= 1, 'max 1 fat-heavy meal/day');
+  assert.ok(meals.every((meal) => !hasRepeatedPrimaryFamilyInsideMeal(meal)), 'no repeated primary family inside one meal');
+  assert.ok(meals.every((meal) => hasMeatFibreHint(meal)), 'meat meals must include fibre hints');
+  assert.ok((plan.lunch?.cuisine === 'indian') !== (plan.dinner?.cuisine === 'indian'), 'lunch+dinner must split indian/non-indian');
+
+  const lunchFamily = getPrimaryFamily(plan.lunch);
+  const dinnerFamily = getPrimaryFamily(plan.dinner);
+  if (lunchFamily && dinnerFamily) {
+    assert.notEqual(lunchFamily, dinnerFamily, 'lunch and dinner should not repeat same primary protein family');
+  }
+
+  assert.ok(Math.max(...proteinValues) - Math.min(...proteinValues) <= 40, 'protein should be balanced across meals');
+};
+
 const runFixture = () =>
   generatePlanForDate({
     dateKey: fixtureDateKey,
@@ -79,8 +155,27 @@ test('planner regression snapshot for fixed fixture', () => {
   assert.deepEqual(snapshot, {
     breakfast: 'Carrot halwa (sugar-free) + protein shake',
     lunch: 'Chicken curry + jowar roti + dal',
-    dinner: 'Vietnamese chicken pho'
+    dinner: 'Grilled fish + pumpkin salad'
   });
+});
+
+test('generated fixture plan satisfies V1 hard constraints', () => {
+  const generated = runFixture();
+  assertSatisfiesHardConstraints(generated);
+});
+
+test('hard constraints hold across a date sample', () => {
+  const dateKeys = ['2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23'];
+
+  for (const dateKey of dateKeys) {
+    const generated = generatePlanForDate({
+      dateKey,
+      plans: structuredClone(fixturePlans),
+      preferences: structuredClone(fixturePreferences),
+      mealDatabase
+    });
+    assertSatisfiesHardConstraints(generated);
+  }
 });
 
 test('lunch and dinner both draw from shared lunchDinner pool', () => {
