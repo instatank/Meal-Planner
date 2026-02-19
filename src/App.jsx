@@ -17,11 +17,22 @@ import {
   getCustomMealOccurrenceCount,
   getCustomMealCandidates
 } from './lib/mealEvents';
+import {
+  ROLE_OPTIONS,
+  GOAL_OPTIONS,
+  getDefaultProfileDraft,
+  createOnboardingProfile,
+  normalizeStoredOnboardingProfile,
+  getRoleUiConfig,
+  getGoalUiConfig,
+  mapProfileToRulesAdapter
+} from './lib/profileAdapter';
 
 const MealPlannerApp = () => {
   const IST_TIME_ZONE = 'Asia/Kolkata';
   const STORAGE_API_BASE = '/api/storage';
   const DEFAULT_USER_CATALOG = { breakfast: [], lunchDinner: [], snack: [] };
+  const ONBOARDING_PROFILE_STORAGE_KEY = 'meal-onboarding-profile';
 
   const [expandedMeals, setExpandedMeals] = useState({});
   const [showWeekly, setShowWeekly] = useState(false);
@@ -36,6 +47,10 @@ const MealPlannerApp = () => {
   const [notification, setNotification] = useState('');
   const [loading, setLoading] = useState(true);
   const [userMealCatalog, setUserMealCatalog] = useState(DEFAULT_USER_CATALOG);
+  const [onboardingProfile, setOnboardingProfile] = useState(null);
+  const [onboardingDraft, setOnboardingDraft] = useState(() => getDefaultProfileDraft());
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [showPreferencesModal, setShowPreferencesModal] = useState(false);
   const todayDate = new Date().toLocaleDateString('en-IN', { 
     timeZone: IST_TIME_ZONE,
     weekday: 'long',
@@ -301,6 +316,11 @@ const MealPlannerApp = () => {
   const [mealHistory, setMealHistory] = useState({});
   const [preferences, setPreferences] = useState(() => normalizePreferences({}));
   const [mealEvents, setMealEvents] = useState([]);
+  const hasCompletedOnboarding = Boolean(onboardingProfile?.isComplete);
+  const roleConfig = getRoleUiConfig(onboardingProfile?.role);
+  const goalConfig = getGoalUiConfig(onboardingProfile?.goal);
+  const isViewerMode = Boolean(roleConfig?.readOnly);
+  const rulesProfileAdapter = useMemo(() => mapProfileToRulesAdapter(onboardingProfile), [onboardingProfile]);
 
   const safeParseJson = (value, fallback = null) => {
     if (value == null) return fallback;
@@ -405,12 +425,16 @@ const MealPlannerApp = () => {
         const plansResult = await storageGet('meal-plans');
         const eventsResult = await storageGet('meal-events');
         const userCatalogResult = await storageGet('meal-user-catalog');
+        const onboardingProfileResult = await storageGet(ONBOARDING_PROFILE_STORAGE_KEY);
 
         const parsedHistory = normalizeDateMap(safeParseJson(historyResult, historyResult) || {});
         const parsedPrefs = normalizePreferences(safeParseJson(prefsResult, prefsResult) || {});
         const parsedPlans = normalizeDateMap(safeParseJson(plansResult, plansResult) || {});
         const parsedEventsRaw = safeParseJson(eventsResult, eventsResult);
         const parsedUserCatalog = normalizeUserMealCatalog(safeParseJson(userCatalogResult, userCatalogResult) || {});
+        const parsedOnboardingProfile = normalizeStoredOnboardingProfile(
+          safeParseJson(onboardingProfileResult, onboardingProfileResult)
+        );
         let parsedEvents = normalizeMealEvents(parsedEventsRaw || []);
 
         if (!parsedEvents.length && hasPreferenceSignals(parsedPrefs)) {
@@ -432,12 +456,18 @@ const MealPlannerApp = () => {
         setMealPlans(parsedPlans);
         setMealEvents(parsedEvents);
         setUserMealCatalog(parsedUserCatalog);
+        setOnboardingProfile(parsedOnboardingProfile);
+        setOnboardingDraft(parsedOnboardingProfile ? { role: parsedOnboardingProfile.role, goal: parsedOnboardingProfile.goal } : getDefaultProfileDraft());
+        setOnboardingStep(1);
 
         void saveToStorage('meal-history', parsedHistory);
         void saveToStorage('meal-preferences', derivedPreferences);
         void saveToStorage('meal-plans', parsedPlans);
         void saveToStorage('meal-events', parsedEvents);
         void saveToStorage('meal-user-catalog', parsedUserCatalog);
+        if (parsedOnboardingProfile) {
+          void saveToStorage(ONBOARDING_PROFILE_STORAGE_KEY, parsedOnboardingProfile);
+        }
       } catch (error) {
         console.log('No stored data', error);
       }
@@ -509,6 +539,34 @@ const MealPlannerApp = () => {
     setTimeout(() => setNotification(''), 3000);
   };
 
+  const persistOnboardingProfile = async (draft, options = {}) => {
+    const { silent = false } = options;
+    const nextProfile = createOnboardingProfile(draft);
+    setOnboardingProfile(nextProfile);
+    setOnboardingDraft({ role: nextProfile.role, goal: nextProfile.goal });
+    setOnboardingStep(1);
+    await saveToStorage(ONBOARDING_PROFILE_STORAGE_KEY, nextProfile);
+    if (!silent) {
+      showNotification('✓ Preferences saved');
+    }
+    return nextProfile;
+  };
+
+  const openPreferencesEditor = () => {
+    const fallbackDraft = getDefaultProfileDraft();
+    setOnboardingDraft({
+      role: onboardingProfile?.role || fallbackDraft.role,
+      goal: onboardingProfile?.goal || fallbackDraft.goal
+    });
+    setShowPreferencesModal(true);
+  };
+
+  const blockViewerAction = () => {
+    if (!isViewerMode) return false;
+    showNotification('👁️ Viewer mode is read-only');
+    return true;
+  };
+
   const toggleExpand = (meal) => {
     setExpandedMeals((prev) => ({ ...prev, [meal]: !prev[meal] }));
   };
@@ -546,6 +604,7 @@ const MealPlannerApp = () => {
   };
 
   const approveCustomCandidate = async (candidate) => {
+    if (blockViewerAction()) return;
     if (!candidate?.displayName) return;
     const normalizedKey = candidate.normalizedKey || normalizeCandidateKey(candidate.displayName);
     const targetMealType = candidate.suggestedMealType || 'lunchDinner';
@@ -577,6 +636,7 @@ const MealPlannerApp = () => {
   };
 
   const handleSwap = (mealType) => {
+    if (blockViewerAction()) return;
     const currentMeal = selectedDayPlan[mealType];
     const availableMeals = getMealsForType(mealType);
     if (!availableMeals.length) {
@@ -599,6 +659,7 @@ const MealPlannerApp = () => {
   };
 
   const handleEdit = (mealType) => {
+    if (blockViewerAction()) return;
     const meal = selectedDayPlan[mealType];
     setEditedComponents({
       protein: meal.components?.protein || componentOptions.protein[0].name,
@@ -651,6 +712,7 @@ const MealPlannerApp = () => {
   };
 
   const applyComponentEdit = () => {
+    if (blockViewerAction()) return;
     const manualText = manualEditText.trim();
     const originalMealName = (selectedDayPlan[currentModalMealType]?.name || '').trim();
     const isManualOverride = manualText.length > 0 && manualText.toLowerCase() !== originalMealName.toLowerCase();
@@ -760,12 +822,14 @@ const MealPlannerApp = () => {
   };
 
   const handleCustom = (mealType) => {
+    if (blockViewerAction()) return;
     setCurrentModalMealType(mealType);
     setCustomMealText('');
     setShowCustomModal(true);
   };
 
   const saveCustomMeal = () => {
+    if (blockViewerAction()) return;
     if (!customMealText.trim()) {
       showNotification('⚠️ Please enter a meal description');
       return;
@@ -818,6 +882,7 @@ const MealPlannerApp = () => {
   };
 
   const handleConfirm = async (mealType) => {
+    if (blockViewerAction()) return;
     const confirmedMeal = selectedDayPlan[mealType];
 
     const newHistory = { ...mealHistory };
@@ -846,6 +911,7 @@ const MealPlannerApp = () => {
   };
 
   const undoConfirmedForSelectedDay = async () => {
+    if (blockViewerAction()) return;
     const dayHistory = mealHistory[selectedDateKey];
     if (!dayHistory) {
       showNotification('⚠️ No confirmed meals to undo for this day');
@@ -891,6 +957,7 @@ const MealPlannerApp = () => {
   };
 
   const selectOrderOutOption = (option) => {
+    if (blockViewerAction()) return;
     const newMeal = {
       name: option.name,
       protein: option.protein,
@@ -905,6 +972,7 @@ const MealPlannerApp = () => {
   };
 
   const processQuickAction = (action) => {
+    if (blockViewerAction()) return;
     const lunchMeals = getMealsForType('lunch');
     const dinnerMeals = getMealsForType('dinner');
     const snackMeals = getMealsForType('snack');
@@ -1068,6 +1136,7 @@ const MealPlannerApp = () => {
 
 
   const regenerateRestOfWeek = () => {
+    if (blockViewerAction()) return;
     const weekKeys = getWeekDateKeys(selectedDateKey).sort();
     const remainingWeekKeys = weekKeys.filter((k) => k > selectedDateKey);
 
@@ -1126,6 +1195,123 @@ const MealPlannerApp = () => {
     const text = typeof mealOrName === 'string' ? mealOrName : mealOrName.display_name || mealOrName.name || '';
     return text.length > 44 ? `${text.slice(0, 43)}…` : text;
   };
+  const selectedRoleOption = ROLE_OPTIONS.find((option) => option.id === onboardingDraft.role) || ROLE_OPTIONS[0];
+  const selectedGoalOption = GOAL_OPTIONS.find((option) => option.id === onboardingDraft.goal) || GOAL_OPTIONS[0];
+  const readOnlyHint = 'Viewer mode: this action is disabled';
+
+  const saveOnboardingAndContinue = async () => {
+    await persistOnboardingProfile(onboardingDraft, { silent: true });
+    showNotification('✓ Onboarding complete');
+  };
+
+  const saveEditedPreferences = async () => {
+    await persistOnboardingProfile(onboardingDraft);
+    setShowPreferencesModal(false);
+  };
+
+  const renderOnboardingFlow = () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-md mx-auto">
+        <div className="bg-white rounded-lg shadow-md p-5 mt-6">
+          <h1 className="text-xl font-bold text-gray-800">Welcome to Meal Planner</h1>
+          <p className="text-sm text-gray-600 mt-1">Set your role and planning goal to personalize this workspace.</p>
+
+          <div className="mt-4 mb-5 flex items-center gap-2">
+            {[1, 2, 3].map((step) => (
+              <div key={step} className={`h-2 flex-1 rounded-full ${step <= onboardingStep ? 'bg-blue-500' : 'bg-gray-200'}`} />
+            ))}
+          </div>
+
+          {onboardingStep === 1 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-2">Step 1 of 3: Select your role</p>
+              <div className="space-y-2">
+                {ROLE_OPTIONS.map((option) => {
+                  const selected = onboardingDraft.role === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => setOnboardingDraft((prev) => ({ ...prev, role: option.id }))}
+                      className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${
+                        selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-800">{option.label}</div>
+                      <div className="text-xs text-gray-600 mt-1">{option.description}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {onboardingStep === 2 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-2">Step 2 of 3: Select your goal</p>
+              <div className="space-y-2">
+                {GOAL_OPTIONS.map((option) => {
+                  const selected = onboardingDraft.goal === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => setOnboardingDraft((prev) => ({ ...prev, goal: option.id }))}
+                      className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${
+                        selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-800">{option.label}</div>
+                      <div className="text-xs text-gray-600 mt-1">{option.description}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {onboardingStep === 3 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-2">Step 3 of 3: Review and confirm</p>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div className="text-xs uppercase tracking-wide text-gray-500">Role</div>
+                  <div className="text-sm font-semibold text-gray-800">{selectedRoleOption?.label}</div>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div className="text-xs uppercase tracking-wide text-gray-500">Goal</div>
+                  <div className="text-sm font-semibold text-gray-800">{selectedGoalOption?.label}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 flex gap-2">
+            <button
+              onClick={() => setOnboardingStep((prev) => Math.max(prev - 1, 1))}
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+              disabled={onboardingStep === 1}
+            >
+              Back
+            </button>
+            {onboardingStep < 3 ? (
+              <button
+                onClick={() => setOnboardingStep((prev) => Math.min(prev + 1, 3))}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                onClick={saveOnboardingAndContinue}
+                className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+              >
+                Confirm
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -1138,11 +1324,86 @@ const MealPlannerApp = () => {
     );
   }
 
+  if (!hasCompletedOnboarding) {
+    return renderOnboardingFlow();
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-2xl mx-auto">
         {notification && (
           <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-pulse">{notification}</div>
+        )}
+
+        {showPreferencesModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowPreferencesModal(false)}>
+            <div className="bg-white rounded-lg p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Edit Preferences</h3>
+                <button onClick={() => setShowPreferencesModal(false)} className="text-gray-500 hover:text-gray-700">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Role</p>
+                <div className="space-y-2">
+                  {ROLE_OPTIONS.map((option) => {
+                    const selected = onboardingDraft.role === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => setOnboardingDraft((prev) => ({ ...prev, role: option.id }))}
+                        className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
+                          selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="font-semibold text-gray-800">{option.label}</div>
+                        <div className="text-xs text-gray-600">{option.description}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Goal</p>
+                <div className="space-y-2">
+                  {GOAL_OPTIONS.map((option) => {
+                    const selected = onboardingDraft.goal === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => setOnboardingDraft((prev) => ({ ...prev, goal: option.id }))}
+                        className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
+                          selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="font-semibold text-gray-800">{option.label}</div>
+                        <div className="text-xs text-gray-600">{option.description}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <p className="text-[11px] text-gray-500 mb-4">
+                Rules adapter keys: role <strong>{rulesProfileAdapter.roleKey}</strong>, goal <strong>{rulesProfileAdapter.goalKey}</strong>
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPreferencesModal(false)}
+                  className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm font-semibold"
+                >
+                  Cancel
+                </button>
+                <button onClick={saveEditedPreferences} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold">
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {showCustomModal && (
@@ -1162,9 +1423,15 @@ const MealPlannerApp = () => {
                 value={customMealText}
                 onChange={(e) => setCustomMealText(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && saveCustomMeal()}
+                disabled={isViewerMode}
                 autoFocus
               />
-              <button onClick={saveCustomMeal} className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors">
+              <button
+                onClick={saveCustomMeal}
+                className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300"
+                disabled={isViewerMode}
+                title={isViewerMode ? readOnlyHint : ''}
+              >
                 Save Custom Meal
               </button>
             </div>
@@ -1188,7 +1455,9 @@ const MealPlannerApp = () => {
                       e.stopPropagation();
                       selectOrderOutOption(option);
                     }}
-                    className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors active:bg-blue-100"
+                    className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors active:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isViewerMode}
+                    title={isViewerMode ? readOnlyHint : ''}
                   >
                     <div className="font-semibold text-gray-800">{option.name}</div>
                     <div className="text-sm text-blue-600 font-bold mt-1">P: {option.protein}g | {option.cal} kcal</div>
@@ -1224,6 +1493,7 @@ const MealPlannerApp = () => {
                   placeholder="Type meal components here..."
                   value={manualEditText}
                   onChange={(e) => setManualEditText(e.target.value)}
+                  disabled={isViewerMode}
                 />
               </div>
 
@@ -1234,6 +1504,7 @@ const MealPlannerApp = () => {
                     className="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm"
                     value={editedComponents.protein}
                     onChange={(e) => setEditedComponents((prev) => ({ ...prev, protein: e.target.value }))}
+                    disabled={isViewerMode}
                   >
                     {componentOptions.protein.map((opt, idx) => (
                       <option key={idx} value={opt.name}>
@@ -1248,6 +1519,7 @@ const MealPlannerApp = () => {
                     className="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm"
                     value={editedComponents.carb}
                     onChange={(e) => setEditedComponents((prev) => ({ ...prev, carb: e.target.value }))}
+                    disabled={isViewerMode}
                   >
                     <option value="No carb">None</option>
                     {componentOptions.carb
@@ -1265,6 +1537,7 @@ const MealPlannerApp = () => {
                     className="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm"
                     value={editedComponents.veg}
                     onChange={(e) => setEditedComponents((prev) => ({ ...prev, veg: e.target.value }))}
+                    disabled={isViewerMode}
                   >
                     <option value="None">None</option>
                     {componentOptions.vegetable.map((opt, idx) => (
@@ -1280,6 +1553,7 @@ const MealPlannerApp = () => {
                     className="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm"
                     value={editedComponents.style}
                     onChange={(e) => setEditedComponents((prev) => ({ ...prev, style: e.target.value }))}
+                    disabled={isViewerMode}
                   >
                     {componentOptions.style.map((opt, idx) => (
                       <option key={idx} value={opt.name}>
@@ -1288,7 +1562,12 @@ const MealPlannerApp = () => {
                     ))}
                   </select>
                 </div>
-                <button onClick={applyComponentEdit} className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition-colors">
+                <button
+                  onClick={applyComponentEdit}
+                  className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300"
+                  disabled={isViewerMode}
+                  title={isViewerMode ? readOnlyHint : ''}
+                >
                   Apply Changes
                 </button>
               </div>
@@ -1298,6 +1577,18 @@ const MealPlannerApp = () => {
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-4">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">🍽️ My Meal Companion</h1>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className={`text-[11px] px-2 py-1 rounded-full font-semibold ${isViewerMode ? 'bg-gray-200 text-gray-700' : 'bg-green-100 text-green-700'}`}>
+              {roleConfig?.label}
+            </span>
+            <span className="text-[11px] px-2 py-1 rounded-full font-semibold bg-blue-100 text-blue-700">{goalConfig?.label}</span>
+            <button
+              onClick={openPreferencesEditor}
+              className="text-[11px] px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200 font-semibold"
+            >
+              Edit Preferences
+            </button>
+          </div>
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-gray-600">{formatDateLabel(selectedDateKey)}</p>
             <div className="flex items-center gap-2">
@@ -1306,13 +1597,22 @@ const MealPlannerApp = () => {
               </button>
               <button
                 onClick={undoConfirmedForSelectedDay}
-                className="text-[11px] px-2 py-1 bg-amber-100 text-amber-800 rounded-md hover:bg-amber-200 font-semibold whitespace-nowrap"
+                className="text-[11px] px-2 py-1 bg-amber-100 text-amber-800 rounded-md hover:bg-amber-200 font-semibold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                disabled={isViewerMode}
+                title={isViewerMode ? readOnlyHint : ''}
               >
                 Undo
               </button>
             </div>
           </div>
         </div>
+
+        {isViewerMode && (
+          <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 mb-4">
+            <p className="text-sm font-semibold text-gray-700">Viewer mode is active</p>
+            <p className="text-xs text-gray-600 mt-1">Swap, edit, confirm, undo, and regen actions are disabled in read-only mode.</p>
+          </div>
+        )}
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-4">
           {selectedMealTypeOrder.map((mealType) => {
@@ -1348,14 +1648,16 @@ const MealPlannerApp = () => {
                   <button
                     onClick={() => handleConfirm(mealType)}
                     className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isConfirmed || isSkipped}
+                    disabled={isConfirmed || isSkipped || isViewerMode}
+                    title={isViewerMode ? readOnlyHint : ''}
                   >
                     {isConfirmed ? '✓ Confirmed' : 'Confirm'}
                   </button>
                   <button
                     onClick={() => handleSwap(mealType)}
                     className="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isConfirmed || isSkipped}
+                    disabled={isConfirmed || isSkipped || isViewerMode}
+                    title={isViewerMode ? readOnlyHint : ''}
                   >
                     Swap
                   </button>
@@ -1363,7 +1665,8 @@ const MealPlannerApp = () => {
                     <button
                       onClick={() => handleEdit(mealType)}
                       className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isConfirmed || isSkipped}
+                      disabled={isConfirmed || isSkipped || isViewerMode}
+                      title={isViewerMode ? readOnlyHint : ''}
                     >
                       <Edit3 className="inline mr-1" size={12} />
                       Edit
@@ -1378,7 +1681,8 @@ const MealPlannerApp = () => {
                         setShowOrderOutModal(true);
                       }}
                       className="text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isConfirmed || isSkipped}
+                      disabled={isConfirmed || isSkipped || isViewerMode}
+                      title={isViewerMode ? readOnlyHint : ''}
                     >
                       Order out
                     </button>
@@ -1387,7 +1691,8 @@ const MealPlannerApp = () => {
                     <button
                       onClick={() => handleCustom(mealType)}
                       className="text-xs px-3 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isConfirmed || isSkipped}
+                      disabled={isConfirmed || isSkipped || isViewerMode}
+                      title={isViewerMode ? readOnlyHint : ''}
                     >
                       Custom
                     </button>
@@ -1412,25 +1717,33 @@ const MealPlannerApp = () => {
             <div className="grid grid-cols-4 gap-2 mb-2">
               <button
                 onClick={() => processQuickAction('light')}
-                className="text-[11px] px-2 py-1.5 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors whitespace-nowrap"
+                className="text-[11px] px-2 py-1.5 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isViewerMode}
+                title={isViewerMode ? readOnlyHint : ''}
               >
                 🥗 Go Light
               </button>
               <button
                 onClick={() => processQuickAction('indian')}
-                className="text-[11px] px-2 py-1.5 bg-orange-100 text-orange-700 rounded-full hover:bg-orange-200 transition-colors whitespace-nowrap"
+                className="text-[11px] px-2 py-1.5 bg-orange-100 text-orange-700 rounded-full hover:bg-orange-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isViewerMode}
+                title={isViewerMode ? readOnlyHint : ''}
               >
                 🍛 Indian
               </button>
               <button
                 onClick={() => processQuickAction('surprise')}
-                className="text-[11px] px-2 py-1.5 bg-pink-100 text-pink-700 rounded-full hover:bg-pink-200 transition-colors whitespace-nowrap"
+                className="text-[11px] px-2 py-1.5 bg-pink-100 text-pink-700 rounded-full hover:bg-pink-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isViewerMode}
+                title={isViewerMode ? readOnlyHint : ''}
               >
                 🎲 Surprise
               </button>
               <button
                 onClick={() => processQuickAction('addsnack')}
-                className="text-[11px] px-2 py-1.5 bg-teal-100 text-teal-700 rounded-full hover:bg-teal-200 transition-colors whitespace-nowrap"
+                className="text-[11px] px-2 py-1.5 bg-teal-100 text-teal-700 rounded-full hover:bg-teal-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isViewerMode}
+                title={isViewerMode ? readOnlyHint : ''}
               >
                 ➕ Snack
               </button>
@@ -1451,7 +1764,9 @@ const MealPlannerApp = () => {
                     </div>
                     <button
                       onClick={() => approveCustomCandidate(candidate)}
-                      className="shrink-0 rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-300 transition-colors"
+                      className="shrink-0 rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isViewerMode}
+                      title={isViewerMode ? readOnlyHint : ''}
                     >
                       Add
                     </button>
@@ -1475,7 +1790,9 @@ const MealPlannerApp = () => {
 
         <button
           onClick={regenerateRestOfWeek}
-          className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold mb-4 hover:bg-green-600 transition-colors"
+          className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold mb-4 hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300"
+          disabled={isViewerMode}
+          title={isViewerMode ? readOnlyHint : ''}
         >
           ♻️ Regen Rest Of Week
         </button>
