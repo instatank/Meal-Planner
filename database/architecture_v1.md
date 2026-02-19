@@ -19,6 +19,8 @@ Use these tables (see `database/schema_v1.sql`):
 2. `meal_templates`
 - Central meal catalog with macros, cuisine, tags.
 - Acts as the source for generation options.
+- Tag schema (json): `meal_type`, `protein_family`, `carb_level`, `cuisine`, `format`, `effort`, `goal_fit`.
+- Nutrition metadata (json): `source_type`, `source_url`, `confidence_score`, `needs_review`.
 
 3. `meal_template_components`
 - Normalized ingredient/component structure for each template meal.
@@ -53,6 +55,13 @@ Then generation score per candidate meal can combine:
 - recent-day penalty
 - preference scores
 - day theme (low-carb/indian/etc.)
+
+Similarity recommendation trigger:
+- If a meal is confirmed `>= 3` times in rolling 7 days, generate similar suggestions using:
+  - `format`
+  - `protein_family`
+  - `carb_level`
+  - `cuisine`
 
 ## AI Guidance (when ready)
 Do not start with AI as core planner.

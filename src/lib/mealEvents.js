@@ -1,4 +1,5 @@
 import { normalizePreferences } from './plannerGenerator.js';
+import { flattenMealDatabase, scoreMealMetadataSimilarity } from './mealDataLayer.js';
 
 export const EVENT_WEIGHTS = {
   confirmAccept: 2,
@@ -156,6 +157,14 @@ const resolveCandidateTargetType = (mealTypeCounts = {}) => {
   return 'lunchDinner';
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const normalizeMealNameKey = (value = '') =>
+  String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
 export const getCustomMealCandidates = (events = [], existingMealNames = [], options = {}) => {
   const lookbackDays = Number(options.lookbackDays || 45);
   const minCount = Number(options.minCount || 3);
@@ -204,4 +213,100 @@ export const getCustomMealCandidates = (events = [], existingMealNames = [], opt
       suggestedMealType: resolveCandidateTargetType(item.mealTypeCounts)
     }))
     .sort((a, b) => b.count - a.count || String(b.lastSeenAt).localeCompare(String(a.lastSeenAt)));
+};
+
+export const getFrequentConfirmedMeals = (events = [], options = {}) => {
+  const lookbackDays = Number(options.lookbackDays || 7);
+  const minCount = Number(options.minCount || 3);
+  const nowMs = Number.isFinite(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
+  const cutoffMs = nowMs - lookbackDays * DAY_MS;
+
+  const sortedEvents = normalizeMealEvents(events);
+  const undoneIds = collectUndoneEventIds(sortedEvents);
+  const grouped = new Map();
+
+  for (const event of sortedEvents) {
+    if (!event || undoneIds.has(event.id) || event.type !== 'confirm') continue;
+
+    const eventTime = new Date(event.timestamp).getTime();
+    if (Number.isNaN(eventTime) || eventTime < cutoffMs) continue;
+
+    const mealName = String(event.mealName || '').trim();
+    const normalizedName = normalizeMealNameKey(mealName);
+    if (!normalizedName) continue;
+
+    const current = grouped.get(normalizedName) || {
+      mealName,
+      normalizedName,
+      count: 0,
+      lastConfirmedAt: event.timestamp
+    };
+
+    current.count += 1;
+    if (String(event.timestamp) > String(current.lastConfirmedAt)) {
+      current.lastConfirmedAt = event.timestamp;
+      current.mealName = mealName || current.mealName;
+    }
+
+    grouped.set(normalizedName, current);
+  }
+
+  return Array.from(grouped.values())
+    .filter((item) => item.count >= minCount)
+    .sort((a, b) => b.count - a.count || String(b.lastConfirmedAt).localeCompare(String(a.lastConfirmedAt)));
+};
+
+export const getSimilarMealSuggestions = ({ events = [], mealDatabase = {}, options = {} } = {}) => {
+  const lookbackDays = Number(options.lookbackDays || 7);
+  const minCount = Number(options.minCount || 3);
+  const maxSuggestions = Number(options.maxSuggestions || 5);
+  const nowMs = Number.isFinite(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
+
+  const triggered = getFrequentConfirmedMeals(events, {
+    lookbackDays,
+    minCount,
+    nowMs
+  });
+  if (!triggered.length) return [];
+
+  const allMeals = flattenMealDatabase(mealDatabase);
+  const byName = new Map(allMeals.map((meal) => [normalizeMealNameKey(meal.name), meal]));
+  const suggestions = [];
+
+  for (const trigger of triggered) {
+    const baseMeal = byName.get(trigger.normalizedName);
+    if (!baseMeal) continue;
+
+    const candidateSuggestions = [];
+
+    for (const candidate of allMeals) {
+      if (!candidate?.name || candidate.name === baseMeal.name) continue;
+      const similarity = scoreMealMetadataSimilarity(baseMeal, candidate);
+      if (similarity.score <= 0) continue;
+
+      candidateSuggestions.push({
+        meal_id: candidate.meal_id || '',
+        meal_name: candidate.name,
+        score: similarity.score,
+        matched_fields: similarity.matched_fields,
+        tags: candidate.tags
+      });
+    }
+
+    candidateSuggestions.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.matched_fields.length !== a.matched_fields.length) {
+        return b.matched_fields.length - a.matched_fields.length;
+      }
+      return String(a.meal_name).localeCompare(String(b.meal_name));
+    });
+
+    suggestions.push({
+      trigger_meal_name: baseMeal.name,
+      confirm_count_7d: trigger.count,
+      suggested_meals: candidateSuggestions.slice(0, maxSuggestions)
+    });
+  }
+
+  return suggestions;
 };

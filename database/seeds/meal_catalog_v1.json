@@ -1,6 +1,6 @@
 {
   "version": "v1",
-  "generatedAt": "2026-02-18T10:02:26.590Z",
+  "generatedAt": "2026-02-19T16:35:17.433Z",
   "mealCount": 37,
   "sourceFile": "src/data/mealDatabase.js",
   "assumptions": [
@@ -56,8 +56,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"breakfast\"]",
-      "metadata": "{\"macros_p\":22,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"vegetarian\",\"carb_level\":\"low\",\"cuisine\":\"global\",\"format\":\"toast\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":22,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\",\"format\":\"toast\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":242,\"delta_kcal\":10,\"tolerance_kcal\":50.4},\"issues\":[]}}"
     },
     {
       "meal_id": "breakfast_boiled-eggs-ham-sandwich",
@@ -74,8 +74,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"breakfast\",\"grilled\"]",
-      "metadata": "{\"macros_p\":38,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"red_meat\",\"carb_level\":\"medium\",\"cuisine\":\"global\",\"format\":\"sandwich\",\"effort\":\"low\",\"goal_fit\":[\"high_protein\",\"low_carb\"]}",
+      "metadata": "{\"macros_p\":38,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"sandwich\",\"effort\":\"low\",\"goal_fit\":[\"high_protein\",\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":379,\"delta_kcal\":11,\"tolerance_kcal\":78},\"issues\":[]}}"
     },
     {
       "meal_id": "breakfast_smoked-salmon-avocado-on-toast",
@@ -92,8 +92,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"breakfast\",\"grilled\"]",
-      "metadata": "{\"macros_p\":33,\"protein_family\":\"fish\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"fish\",\"carb_level\":\"low\",\"cuisine\":\"global\",\"format\":\"toast\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":33,\"protein_family\":\"fish\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\",\"format\":\"toast\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":343,\"delta_kcal\":2,\"tolerance_kcal\":69},\"issues\":[]}}"
     },
     {
       "meal_id": "breakfast_greek-yogurt-berry-bowl",
@@ -110,8 +110,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"breakfast\",\"grilled\",\"low-carb\"]",
-      "metadata": "{\"macros_p\":21,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"vegetarian\",\"carb_level\":\"medium\",\"cuisine\":\"global\",\"format\":\"bowl\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":21,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\",\"format\":\"bowl\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":216,\"delta_kcal\":4,\"tolerance_kcal\":44},\"issues\":[]}}"
     },
     {
       "meal_id": "breakfast_poha-kabab-protein-shake",
@@ -128,8 +128,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"breakfast\"]",
-      "metadata": "{\"macros_p\":37,\"protein_family\":\"chicken\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"chicken\",\"carb_level\":\"medium\",\"cuisine\":\"global\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[]}",
+      "metadata": "{\"macros_p\":37,\"protein_family\":\"chicken\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":345,\"delta_kcal\":0,\"tolerance_kcal\":69},\"issues\":[]}}"
     },
     {
       "meal_id": "breakfast_egg-white-omelette-avocado",
@@ -146,8 +146,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"breakfast\",\"low-carb\"]",
-      "metadata": "{\"macros_p\":19,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"vegetarian\",\"carb_level\":\"low\",\"cuisine\":\"global\",\"format\":\"plate\",\"effort\":\"medium\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":19,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\",\"format\":\"plate\",\"effort\":\"medium\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":220,\"delta_kcal\":25,\"tolerance_kcal\":49},\"issues\":[]}}"
     },
     {
       "meal_id": "breakfast_carrot-halwa-sugar-free-protein-shake",
@@ -164,8 +164,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"breakfast\",\"grilled\",\"low-carb\"]",
-      "metadata": "{\"macros_p\":28,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"vegetarian\",\"carb_level\":\"medium\",\"cuisine\":\"global\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":28,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":280,\"delta_kcal\":40,\"tolerance_kcal\":64},\"issues\":[]}}"
     },
     {
       "meal_id": "breakfast_aloo-paratha-curd",
@@ -182,8 +182,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"breakfast\"]",
-      "metadata": "{\"macros_p\":18,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"vegetarian\",\"carb_level\":\"high\",\"cuisine\":\"global\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[]}",
+      "metadata": "{\"macros_p\":18,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":574,\"delta_kcal\":14,\"tolerance_kcal\":112},\"issues\":[]}}"
     },
     {
       "meal_id": "breakfast_idli-mysore-masala-dosa-sambar-chutney",
@@ -200,8 +200,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"breakfast\"]",
-      "metadata": "{\"macros_p\":17,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"vegetarian\",\"carb_level\":\"high\",\"cuisine\":\"global\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[]}",
+      "metadata": "{\"macros_p\":17,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":607,\"delta_kcal\":13,\"tolerance_kcal\":124},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_chicken-curry-jowar-roti",
@@ -218,8 +218,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"high-protein\",\"indian\"]",
-      "metadata": "{\"macros_p\":55.5,\"protein_family\":\"chicken\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"chicken\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"high_protein\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":55.5,\"protein_family\":\"chicken\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"high_protein\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":626.2,\"delta_kcal\":37.8,\"tolerance_kcal\":132.8},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_grilled-salmon-fillet-sauteed-veg-spaghetti-aglio-e-olio",
@@ -236,8 +236,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"grilled\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":43.5,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"fish\",\"carb_level\":\"medium\",\"cuisine\":\"western\",\"format\":\"plate\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":43.5,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"plate\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":582.2,\"delta_kcal\":5.2,\"tolerance_kcal\":115.4},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_rajma-chawal-raita",
@@ -254,8 +254,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":19,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"vegetarian\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[]}",
+      "metadata": "{\"macros_p\":19,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":407,\"delta_kcal\":3,\"tolerance_kcal\":82},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_chole-jowar-roti-raita",
@@ -272,8 +272,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":24,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"vegetarian\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[]}",
+      "metadata": "{\"macros_p\":24,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":583,\"delta_kcal\":8,\"tolerance_kcal\":115},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_vietnamese-chicken-pho",
@@ -290,8 +290,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"soup\",\"high-protein\",\"asian\"]",
-      "metadata": "{\"macros_p\":49.4,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"chicken\",\"carb_level\":\"medium\",\"cuisine\":\"asian\",\"format\":\"soup\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\"]}",
+      "metadata": "{\"macros_p\":49.4,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"soup\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":396.6,\"delta_kcal\":18.4,\"tolerance_kcal\":83},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_grilled-steak-mixed-greens-salad",
@@ -308,8 +308,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"salad\",\"grilled\",\"low-carb\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":49,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"red_meat\",\"carb_level\":\"low\",\"cuisine\":\"western\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":49,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":477,\"delta_kcal\":3,\"tolerance_kcal\":96},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_thai-pad-krapow-rice",
@@ -326,8 +326,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"high-protein\",\"asian\"]",
-      "metadata": "{\"macros_p\":49.3,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"chicken\",\"carb_level\":\"medium\",\"cuisine\":\"asian\",\"format\":\"plate\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\"]}",
+      "metadata": "{\"macros_p\":49.3,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"plate\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":405.2,\"delta_kcal\":13.8,\"tolerance_kcal\":83.8},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_mutton-keema-jowar-roti",
@@ -344,8 +344,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":33.9,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"red_meat\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"]}",
+      "metadata": "{\"macros_p\":33.9,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":641.5,\"delta_kcal\":23.5,\"tolerance_kcal\":133},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_arhar-dal-rice-matar-paneer",
@@ -362,8 +362,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":35,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"vegetarian\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"]}",
+      "metadata": "{\"macros_p\":35,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":715,\"delta_kcal\":15,\"tolerance_kcal\":146},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_chicken-curry-jowar-roti-dal",
@@ -380,8 +380,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"high-protein\",\"indian\"]",
-      "metadata": "{\"macros_p\":64,\"protein_family\":\"chicken\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"chicken\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"high_protein\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":64,\"protein_family\":\"chicken\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"high_protein\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":745,\"delta_kcal\":40,\"tolerance_kcal\":157},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_grilled-fish-pumpkin-salad",
@@ -398,8 +398,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"salad\",\"grilled\",\"low-carb\",\"western\"]",
-      "metadata": "{\"macros_p\":37,\"protein_family\":\"fish\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"fish\",\"carb_level\":\"low\",\"cuisine\":\"western\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":37,\"protein_family\":\"fish\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":276,\"delta_kcal\":3,\"tolerance_kcal\":55.8},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_grilled-salmon-sauteed-veg-garlic-rice",
@@ -416,8 +416,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"grilled\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":42,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"fish\",\"carb_level\":\"medium\",\"cuisine\":\"western\",\"format\":\"plate\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":42,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"plate\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":543.4,\"delta_kcal\":1.4,\"tolerance_kcal\":108.4},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_chicken-soup-smoked-salmon-salad",
@@ -434,8 +434,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"salad\",\"soup\",\"low-carb\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":61,\"protein_family\":\"mixed\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"mixed\",\"carb_level\":\"low\",\"cuisine\":\"western\",\"format\":\"soup\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":61,\"protein_family\":\"mixed\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\",\"format\":\"soup\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":412,\"delta_kcal\":35,\"tolerance_kcal\":89.4},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_paneer-sabzi-dal-raita",
@@ -452,8 +452,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"low-carb\",\"indian\"]",
-      "metadata": "{\"macros_p\":30,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"vegetarian\",\"carb_level\":\"medium\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[]}",
+      "metadata": "{\"macros_p\":30,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":569,\"delta_kcal\":9,\"tolerance_kcal\":112},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_pork-chop-pumpkin-salad",
@@ -470,8 +470,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"salad\",\"grilled\",\"low-carb\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":44,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"red_meat\",\"carb_level\":\"low\",\"cuisine\":\"western\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":44,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":520,\"delta_kcal\":13,\"tolerance_kcal\":106.6},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_pork-chop-mixed-greens-salad",
@@ -488,8 +488,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"salad\",\"grilled\",\"low-carb\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":43,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"red_meat\",\"carb_level\":\"low\",\"cuisine\":\"western\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\"]}",
+      "metadata": "{\"macros_p\":43,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":435,\"delta_kcal\":12,\"tolerance_kcal\":89.4},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_tandoori-chicken-smoked-chicken-avocado-salad",
@@ -506,8 +506,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"salad\",\"low-carb\",\"high-protein\",\"indian\"]",
-      "metadata": "{\"macros_p\":60.9,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"chicken\",\"carb_level\":\"low\",\"cuisine\":\"indian\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":60.9,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"low\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":446.5,\"delta_kcal\":19.5,\"tolerance_kcal\":93.2},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_broccoli-soup-grilled-fish-spaghetti-aglio-e-olio",
@@ -524,8 +524,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"soup\",\"high-protein\",\"western\"]",
-      "metadata": "{\"macros_p\":47,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"fish\",\"carb_level\":\"medium\",\"cuisine\":\"western\",\"format\":\"soup\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":47,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"soup\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":489,\"delta_kcal\":11,\"tolerance_kcal\":95.6},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_saag-meat-jowar-roti-dal",
@@ -542,8 +542,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":36,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"red_meat\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"]}",
+      "metadata": "{\"macros_p\":36,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":689,\"delta_kcal\":21,\"tolerance_kcal\":142},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_kofta-dal-jowar-roti",
@@ -560,8 +560,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":33,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"red_meat\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"]}",
+      "metadata": "{\"macros_p\":33,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\",\"format\":\"curry\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":704,\"delta_kcal\":20,\"tolerance_kcal\":144.8},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_kababs-dal-gobi-jowar-roti",
@@ -578,8 +578,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"indian\"]",
-      "metadata": "{\"macros_p\":37,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"red_meat\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"plate\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"]}",
+      "metadata": "{\"macros_p\":37,\"protein_family\":\"red_meat\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"high\",\"format\":\"plate\",\"effort\":\"high\",\"goal_fit\":[\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":666,\"delta_kcal\":3,\"tolerance_kcal\":133.8},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_fish-curry-rice",
@@ -596,8 +596,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":36,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"fish\",\"carb_level\":\"medium\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":36,\"protein_family\":\"fish\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":372,\"delta_kcal\":8,\"tolerance_kcal\":76},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_sweet-potato-curry-kaala-chanaa-sabzi-jowar-roti",
@@ -614,8 +614,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"indian\"]",
-      "metadata": "{\"macros_p\":22,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"vegetarian\",\"carb_level\":\"high\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[]}",
+      "metadata": "{\"macros_p\":22,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"high\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":595,\"delta_kcal\":5,\"tolerance_kcal\":118},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_chicken-red-curry-rice",
@@ -632,8 +632,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"lunch\",\"dinner\",\"curry\",\"high-protein\",\"asian\"]",
-      "metadata": "{\"macros_p\":47,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"chicken\",\"carb_level\":\"medium\",\"cuisine\":\"asian\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"]}",
+      "metadata": "{\"macros_p\":47,\"protein_family\":\"chicken\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":512,\"delta_kcal\":8,\"tolerance_kcal\":104},\"issues\":[]}}"
     },
     {
       "meal_id": "snack_nuts-seeds-protein-shake",
@@ -650,8 +650,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"snack\",\"global\"]",
-      "metadata": "{\"macros_p\":31,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\"}"
+      "tags": "{\"meal_type\":\"snack\",\"protein_family\":\"vegetarian\",\"carb_level\":\"low\",\"cuisine\":\"global\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":31,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"low\",\"format\":\"plate\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":330,\"delta_kcal\":10,\"tolerance_kcal\":64},\"issues\":[]}}"
     },
     {
       "meal_id": "snack_sweet-potato-chaat",
@@ -668,8 +668,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"snack\",\"indian\"]",
-      "metadata": "{\"macros_p\":4,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"snack\",\"protein_family\":\"vegetarian\",\"carb_level\":\"medium\",\"cuisine\":\"indian\",\"format\":\"chaat\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":4,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\",\"format\":\"chaat\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":184,\"delta_kcal\":4,\"tolerance_kcal\":36},\"issues\":[]}}"
     },
     {
       "meal_id": "snack_kaala-chana-chaat",
@@ -686,8 +686,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"snack\",\"indian\"]",
-      "metadata": "{\"macros_p\":10,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"snack\",\"protein_family\":\"vegetarian\",\"carb_level\":\"medium\",\"cuisine\":\"indian\",\"format\":\"chaat\",\"effort\":\"low\",\"goal_fit\":[]}",
+      "metadata": "{\"macros_p\":10,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\",\"format\":\"chaat\",\"effort\":\"low\",\"goal_fit\":[],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":216,\"delta_kcal\":4,\"tolerance_kcal\":44},\"issues\":[]}}"
     },
     {
       "meal_id": "snack_avocado-cheese-toast",
@@ -704,8 +704,8 @@
       "assumption_version": "assumptions_v2026_02_17",
       "source": "seed_v1",
       "is_active": true,
-      "tags": "[\"snack\",\"global\"]",
-      "metadata": "{\"macros_p\":16,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\"}"
+      "tags": "{\"meal_type\":\"snack\",\"protein_family\":\"vegetarian\",\"carb_level\":\"medium\",\"cuisine\":\"global\",\"format\":\"toast\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"]}",
+      "metadata": "{\"macros_p\":16,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"light\",\"carb_level\":\"medium\",\"format\":\"toast\",\"effort\":\"low\",\"goal_fit\":[\"low_carb\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":328,\"delta_kcal\":1,\"tolerance_kcal\":65.4},\"issues\":[]}}"
     }
   ],
   "components": [

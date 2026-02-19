@@ -12,7 +12,7 @@ create table if not exists app_users (
 
 create table if not exists meal_templates (
   meal_id text primary key,
-  meal_type text not null check (meal_type in ('breakfast', 'lunch', 'dinner')),
+  meal_type text not null check (meal_type in ('breakfast', 'lunch', 'dinner', 'lunch_dinner', 'snack')),
   name text not null,
   cuisine text not null default 'global',
   calories_kcal integer not null default 0,
@@ -21,7 +21,11 @@ create table if not exists meal_templates (
   fat_g numeric(6,2) not null default 0,
   source text not null default 'seed',
   is_active boolean not null default true,
-  tags jsonb not null default '[]'::jsonb,
+  -- tags contract:
+  -- {"meal_type","protein_family","carb_level","cuisine","format","effort","goal_fit"}
+  tags jsonb not null default '{}'::jsonb,
+  -- metadata contract:
+  -- {"macros_p","source_type","source_url","confidence_score","needs_review","validation"}
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
