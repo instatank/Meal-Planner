@@ -10,3 +10,4 @@ data/runtime-storage.json
 meal_database.numbers
 meal_database.xlsx
 .vite-from-truth-unites/
+.vercel

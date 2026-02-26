@@ -50,11 +50,11 @@ export const computeMacros = (parts = []) => {
 
   return {
     cal: Math.round(totals.cal),
-    protein: round2(totals.p),
+    protein: Math.round(totals.p),
     macros: {
-      p: round2(totals.p),
-      c: round2(totals.c),
-      f: round2(totals.f)
+      p: Math.round(totals.p),
+      c: Math.round(totals.c),
+      f: Math.round(totals.f)
     }
   };
 };

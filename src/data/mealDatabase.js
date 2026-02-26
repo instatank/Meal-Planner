@@ -545,11 +545,11 @@ const baseMealsList = {
     },
     {
       "meal_id": "lunch_dinner_chicken-red-curry-rice",
-      "canonical_name": "Thai chicken red curry + rice",
-      "display_name": "Thai Chicken Red Curry + Rice",
+      "canonical_name": "Chicken red curry + rice",
+      "display_name": "Chicken Red Curry + Rice",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_02_17",
-      "name": "Thai chicken red curry + rice",
+      "name": "Chicken red curry + rice",
       "parts": [
         { "ingredientId": "chicken_breast", "qty": 150, "unit": "g" },
         { "ingredientId": "cooked_rice", "qty": 120, "unit": "g" },
@@ -559,24 +559,6 @@ const baseMealsList = {
         "protein": "Chicken breast", "amount": 150, "carb": "Cooked rice", "carbAmount": 80, "veg": "Red curry vegetables", "vegAmount": 100, "style": "Curry style"
       },
       "cuisine": "asian"
-    },
-    {
-      "meal_id": "lunch_dinner_veg-kofta-dal-jowar-roti-seekh-kababs",
-      "canonical_name": "Vegetable kofta + dal + jowar roti + seekh kababs",
-      "display_name": "Veg Kofta + Dal + Roti + Kababs",
-      "nutrition_source": "User supplied",
-      "name": "Vegetable kofta + dal + Jowar roti + two seekh kababs",
-      "parts": [
-        { "ingredientId": "veg_kofta", "qty": 80, "unit": "g" },
-        { "ingredientId": "arhar_dal", "qty": 100, "unit": "g" },
-        { "ingredientId": "jowar_roti", "qty": 1, "unit": "piece" },
-        { "ingredientId": "lamb_seekh_kabab", "qty": 100, "unit": "g" },
-        { "ingredientId": "curry_base", "qty": 30, "unit": "g" }
-      ],
-      "components": {
-        "protein": "Lamb seekh kabab", "amount": 100, "carb": "Jowar roti", "carbAmount": 1, "veg": "Vegetable kofta", "vegAmount": 80, "style": "Curry style"
-      },
-      "cuisine": "indian"
     }
   ],
   "snack": [
@@ -621,21 +603,6 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Kaala chana", "amount": 150, "carb": "No carb", "carbAmount": 0, "veg": null, "style": "Chaat"
-      }
-    },
-    {
-      "meal_id": "snack_hummus-crackers-vegetable-salad",
-      "canonical_name": "Hummus + crackers + vegetable salad",
-      "display_name": "Hummus + Crackers + Veg Salad",
-      "nutrition_source": "User supplied",
-      "name": "Hummus + crackers + vegetable salad (carrot, raddish, cucumber)",
-      "parts": [
-        { "ingredientId": "hummus", "qty": 60, "unit": "g" },
-        { "ingredientId": "crackers", "qty": 30, "unit": "g" },
-        { "ingredientId": "raw_vegetables", "qty": 120, "unit": "g" }
-      ],
-      "components": {
-        "protein": "Hummus", "amount": 60, "carb": "Crackers", "carbAmount": 30, "veg": "Raw vegetables", "vegAmount": 120, "style": "Raw"
       }
     },
     {
