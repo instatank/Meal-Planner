@@ -264,13 +264,6 @@ const scoreMealCandidate = ({
 
   let score = 0;
 
-  const repeatCount = recentCounts[mealType]?.[mealName] || 0;
-  score -= repeatCount * 2.4;
-
-  if (yesterdayPlan?.[mealType]?.name === mealName) {
-    score -= 6;
-  }
-
   score += Math.min((accepts[mealName] || 0) * 0.8, 5);
   score += Math.min((edits[mealName] || 0) * 0.35, 2);
   score -= Math.min((avoids[mealName] || 0) * 0.95, 5);
