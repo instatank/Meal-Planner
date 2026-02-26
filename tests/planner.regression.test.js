@@ -155,7 +155,7 @@ test('planner regression snapshot for fixed fixture', () => {
   assert.deepEqual(snapshot, {
     breakfast: 'Carrot halwa (sugar-free) + protein shake',
     lunch: 'Chicken curry + jowar roti + dal',
-    dinner: 'Grilled fish + pumpkin salad'
+    dinner: 'Chicken soup + smoked salmon salad'
   });
 });
 

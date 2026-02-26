@@ -1,6 +1,8 @@
 const GOAL_NAMES = ['high_protein', 'low_carb', 'two_meals'];
 const METADATA_SIMILARITY_FIELDS = ['format', 'protein_family', 'carb_level', 'cuisine'];
 
+import { ingredients } from '../data/ingredients.js';
+
 const ALLOWED_MEAL_TYPE_TAGS = new Set(['breakfast', 'lunch_dinner', 'snack']);
 const ALLOWED_PROTEIN_FAMILIES = new Set(['chicken', 'fish', 'red_meat', 'vegetarian', 'mixed']);
 const ALLOWED_CARB_LEVELS = new Set(['low', 'medium', 'high']);
@@ -23,6 +25,39 @@ const normalizedText = (...parts) =>
     .join(' ');
 
 const has = (text, pattern) => pattern.test(text);
+
+export const computeMacros = (parts = []) => {
+  const totals = { cal: 0, p: 0, c: 0, f: 0 };
+
+  for (const part of parts) {
+    const ing = ingredients[part.ingredientId];
+    if (!ing || !ing.per100g) continue;
+
+    let weightG = part.qty;
+
+    // If unit is piece/slice, use the pieceWeightG to determine total mass
+    if (part.unit === 'piece' || part.unit === 'slice') {
+      const pieceWeight = ing.defaultPortion?.pieceWeightG || 100; // Fallback to 100 if undefined
+      weightG = part.qty * pieceWeight;
+    }
+
+    const ratio = weightG / 100;
+    totals.cal += (ing.per100g.kcal || 0) * ratio;
+    totals.p += (ing.per100g.p || 0) * ratio;
+    totals.c += (ing.per100g.c || 0) * ratio;
+    totals.f += (ing.per100g.f || 0) * ratio;
+  }
+
+  return {
+    cal: Math.round(totals.cal),
+    protein: round2(totals.p),
+    macros: {
+      p: round2(totals.p),
+      c: round2(totals.c),
+      f: round2(totals.f)
+    }
+  };
+};
 
 export const normalizeMealTypeTag = (mealType = '') => {
   if (mealType === 'lunchDinner') return 'lunch_dinner';
@@ -264,13 +299,13 @@ export const buildMealDataMetadata = ({ meal = {}, mealType = '' } = {}) => {
     ...getInvalidTagIssues(tags),
     ...(!macroCheck.is_consistent
       ? [
-          {
-            code: 'macro_calorie_mismatch',
-            field: 'cal/macros',
-            message: 'Calories deviate from macro-derived calories beyond tolerance',
-            severity: 'warn'
-          }
-        ]
+        {
+          code: 'macro_calorie_mismatch',
+          field: 'cal/macros',
+          message: 'Calories deviate from macro-derived calories beyond tolerance',
+          severity: 'warn'
+        }
+      ]
       : [])
   ];
 
@@ -280,10 +315,10 @@ export const buildMealDataMetadata = ({ meal = {}, mealType = '' } = {}) => {
     typeof existingNutrition.confidence_score === 'number'
       ? round2(clamp01(existingNutrition.confidence_score))
       : computeConfidenceScore({
-          sourceType,
-          issueCount: issues.length,
-          hasAssumptions: /assumption/i.test(String(meal.nutrition_source || ''))
-        });
+        sourceType,
+        issueCount: issues.length,
+        hasAssumptions: /assumption/i.test(String(meal.nutrition_source || ''))
+      });
   const needsReview =
     typeof existingNutrition.needs_review === 'boolean'
       ? existingNutrition.needs_review
