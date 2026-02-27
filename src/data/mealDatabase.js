@@ -50,21 +50,7 @@ const baseMealsList = {
         "protein": "Smoked salmon", "amount": 150, "carb": "Whole wheat toast", "carbAmount": 1, "veg": null, "style": "Grilled"
       }
     },
-    {
-      "meal_id": "breakfast_greek-yogurt-berry-bowl",
-      "canonical_name": "Greek yogurt + berry bowl",
-      "display_name": "Greek yogurt + berry bowl",
-      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
-      "assumption_version": "assumptions_v2026_02_17",
-      "name": "Greek yogurt + berry bowl",
-      "parts": [
-        { "ingredientId": "greek_yogurt", "qty": 200, "unit": "g" },
-        { "ingredientId": "berry_mix", "qty": 100, "unit": "g" }
-      ],
-      "components": {
-        "protein": null, "amount": 0, "carb": "No carb", "carbAmount": 0, "veg": null, "style": "Grilled"
-      }
-    },
+
     {
       "meal_id": "breakfast_poha-kabab-protein-shake",
       "canonical_name": "Poha + kabab/protein shake",
@@ -97,21 +83,7 @@ const baseMealsList = {
         "protein": "Eggs (whole)", "amount": 120, "carb": "No carb", "carbAmount": 0, "veg": "Mixed salad", "vegAmount": 100, "style": "Pan-fried"
       }
     },
-    {
-      "meal_id": "breakfast_carrot-halwa-sugar-free-protein-shake",
-      "canonical_name": "Carrot halwa (sugar-free) + protein shake",
-      "display_name": "Carrot Halwa + Protein Shake",
-      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
-      "assumption_version": "assumptions_v2026_02_17",
-      "name": "Carrot halwa (sugar-free) + protein shake",
-      "parts": [
-        { "ingredientId": "protein_shake", "qty": 1, "unit": "piece" },
-        { "ingredientId": "mixed_veg_sabzi", "qty": 100, "unit": "g" } // Approximation for halwa body
-      ],
-      "components": {
-        "protein": null, "amount": 0, "carb": "No carb", "carbAmount": 0, "veg": null, "style": "Grilled"
-      }
-    },
+
     {
       "meal_id": "breakfast_aloo-paratha-curd",
       "canonical_name": "Aloo paratha + curd",
@@ -562,6 +534,36 @@ const baseMealsList = {
     }
   ],
   "snack": [
+    {
+      "meal_id": "snack_greek-yogurt-berry-bowl",
+      "canonical_name": "Greek yogurt + berry bowl",
+      "display_name": "Greek yogurt + berry bowl",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_02_17",
+      "name": "Greek yogurt + berry bowl",
+      "parts": [
+        { "ingredientId": "greek_yogurt", "qty": 200, "unit": "g" },
+        { "ingredientId": "berry_mix", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": null, "amount": 0, "carb": "No carb", "carbAmount": 0, "veg": null, "style": "Grilled"
+      }
+    },
+    {
+      "meal_id": "snack_carrot-halwa-sugar-free-protein-shake",
+      "canonical_name": "Carrot halwa (sugar-free) + protein shake",
+      "display_name": "Carrot Halwa + Protein Shake",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_02_17",
+      "name": "Carrot halwa (sugar-free) + protein shake",
+      "parts": [
+        { "ingredientId": "protein_shake", "qty": 1, "unit": "piece" },
+        { "ingredientId": "mixed_veg_sabzi", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": null, "amount": 0, "carb": "No carb", "carbAmount": 0, "veg": null, "style": "Grilled"
+      }
+    },
     {
       "meal_id": "snack_nuts-seeds-protein-shake",
       "canonical_name": "Nuts, seeds + protein shake",
