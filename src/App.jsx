@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Check, TrendingUp, X, Edit3 } from 'lucide-react';
 import { mealDatabase } from './data/mealDatabase';
 import OnboardingFlow from './components/OnboardingFlow';
+import Omnibox from './components/Omnibox';
 import {
   CORE_MEAL_TYPES,
   getMealsForType as plannerGetMealsForType,
@@ -27,6 +28,7 @@ import {
   normalizeOnboardingProfile
 } from './lib/onboardingProfile';
 import { buildGoalAdjustedPlannerInput, getMealTypeOrderForGoal } from './lib/onboardingPlannerAdapter';
+import { computeMacros } from './lib/mealDataLayer';
 
 const MealPlannerApp = () => {
   const IST_TIME_ZONE = 'Asia/Kolkata';
@@ -37,17 +39,13 @@ const MealPlannerApp = () => {
   const [expandedMeals, setExpandedMeals] = useState({});
   const [showWeekly, setShowWeekly] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
-  const [showOrderOutModal, setShowOrderOutModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showCustomModal, setShowCustomModal] = useState(false);
-  const [customMealText, setCustomMealText] = useState('');
-  const [currentModalMealType, setCurrentModalMealType] = useState('');
-  const [editedComponents, setEditedComponents] = useState({});
-  const [manualEditText, setManualEditText] = useState('');
   const [notification, setNotification] = useState('');
+  const [showDiningOutModal, setShowDiningOutModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userMealCatalog, setUserMealCatalog] = useState(DEFAULT_USER_CATALOG);
-  const todayDate = new Date().toLocaleDateString('en-IN', { 
+  const omniboxRef = React.useRef(null);
+  const [activeOmniboxContext, setActiveOmniboxContext] = useState(null);
+  const todayDate = new Date().toLocaleDateString('en-IN', {
     timeZone: IST_TIME_ZONE,
     weekday: 'long',
     year: 'numeric',
@@ -56,82 +54,10 @@ const MealPlannerApp = () => {
   });
 
   const getTodayDayName = () => {
-    return new Date().toLocaleDateString('en-IN', { 
+    return new Date().toLocaleDateString('en-IN', {
       timeZone: IST_TIME_ZONE,
       weekday: 'short'
     });
-  };
-
-  // Component options for swapping
-  const componentOptions = {
-    protein: [
-      { name: "Chicken breast", cal: 165, p: 31, c: 0, f: 3.6, per100g: true },
-      { name: "Fish fillet", cal: 110, p: 23, c: 0, f: 2, per100g: true },
-      { name: "Grilled salmon", cal: 206, p: 22, c: 0, f: 13, per100g: true },
-      { name: "Smoked salmon", cal: 117, p: 18, c: 0, f: 4.3, per100g: true },
-      { name: "Eggs (whole)", cal: 155, p: 13, c: 1, f: 11, per100g: true },
-      { name: "Paneer", cal: 265, p: 18, c: 3, f: 20, per100g: true },
-      { name: "Beef steak", cal: 250, p: 26, c: 0, f: 16, per100g: true },
-      { name: "Pork chop", cal: 233, p: 23, c: 0, f: 15, per100g: true },
-      { name: "Lamb (seekh kabab)", cal: 280, p: 17, c: 2, f: 22, per100g: true },
-      { name: "Mutton keema", cal: 230, p: 19, c: 0, f: 17, per100g: true }
-    ],
-    carb: [
-      { name: "Cooked rice", cal: 130, p: 2.4, c: 28, f: 0.3, per100g: true },
-      { name: "Quinoa", cal: 120, p: 4.4, c: 21, f: 1.9, per100g: true },
-      { name: "Jowar roti (millet)", cal: 125, p: 2.7, c: 24, f: 1.3, perUnit: true },
-      { name: "Rice noodles", cal: 110, p: 2, c: 25, f: 0.2, per100g: true },
-      { name: "Pasta", cal: 131, p: 5, c: 25, f: 1.1, per100g: true },
-      { name: "Spaghetti aglio e olio (small portion)", cal: 185, p: 4.5, c: 29, f: 6.2, per100g: true },
-      { name: "Garlic rice (small portion)", cal: 150, p: 3, c: 28, f: 3, per100g: true },
-      { name: "Whole wheat toast", cal: 80, p: 4, c: 15, f: 1, perUnit: true },
-      { name: "Poha", cal: 180, p: 6, c: 38, f: 1, per100g: true },
-      { name: "No carb", cal: 0, p: 0, c: 0, f: 0, per100g: true }
-    ],
-    vegetable: [
-      { name: "Mixed salad", cal: 20, p: 1.3, c: 3.3, f: 0, per100g: true },
-      { name: "Mixed greens salad", cal: 18, p: 1.5, c: 3.2, f: 0.2, per100g: true },
-      { name: "Pumpkin salad", cal: 95, p: 2.2, c: 12, f: 4, per100g: true },
-      { name: "Smoked chicken + avocado salad", cal: 165, p: 12, c: 6, f: 10, per100g: true },
-      { name: "Smoked salmon salad", cal: 145, p: 10, c: 5, f: 8, per100g: true },
-      { name: "Sautéed spinach", cal: 35, p: 3, c: 4, f: 1, per100g: true },
-      { name: "Sautéed broccoli", cal: 55, p: 4, c: 7, f: 2, per100g: true },
-      { name: "Cauliflower", cal: 25, p: 2, c: 5, f: 0.3, per100g: true },
-      { name: "Sautéed peppers", cal: 40, p: 1, c: 6, f: 1.5, per100g: true },
-      { name: "Asparagus", cal: 27, p: 3, c: 3, f: 0.5, per100g: true },
-      { name: "Zucchini", cal: 21, p: 1.5, c: 3.1, f: 0.4, per100g: true },
-      { name: "Mixed veg sabzi", cal: 80, p: 3, c: 12, f: 2, per100g: true }
-    ],
-    style: [
-      { name: "Grilled", modifier: 1.0 },
-      { name: "Curry style", modifier: 1.15, addCal: 80 },
-      { name: "Tandoori", modifier: 1.05 },
-      { name: "Pan-fried", modifier: 1.1, addCal: 40 },
-      { name: "Soup style", modifier: 0.9, addCal: 60 }
-    ]
-  };
-
-
-  const orderOutOptions = {
-    breakfast: [
-      { name: "Protein smoothie bowl", protein: 28, cal: 320, note: "High-protein, low-carb" },
-      { name: "Eggs royale (salmon + poached eggs)", protein: 34, cal: 420, note: "Gourmet breakfast" }
-    ],
-    lunch: [
-      { name: "Grilled chicken tikka (6 pcs)", protein: 48, cal: 420, note: "High-protein, low-carb" },
-      { name: "Mutton kathi roll", protein: 28, cal: 450, note: "Moderate carbs" },
-      { name: "Seekh kabab platter", protein: 35, cal: 480, note: "Lamb kababs" },
-      { name: "Thai tom yum soup", protein: 30, cal: 320, note: "Light & spicy" },
-      { name: "Vietnamese bun cha", protein: 38, cal: 480, note: "Grilled pork" },
-      { name: "Ramen bowl", protein: 32, cal: 520, note: "Hearty noodle soup" }
-    ],
-    dinner: [
-      { name: "Tandoori fish + salad", protein: 38, cal: 340, note: "Low-carb, high-protein" },
-      { name: "Chicken kebab platter", protein: 45, cal: 450, note: "Mixed kebabs" },
-      { name: "Grilled steak + vegetables", protein: 52, cal: 600, note: "Premium protein" },
-      { name: "Shammi kabab (lamb)", protein: 30, cal: 420, note: "Rich & flavorful" },
-      { name: "Barra kabab platter", protein: 40, cal: 520, note: "Lamb chops" }
-    ]
   };
 
   const slugifyMealId = (text = '') =>
@@ -281,7 +207,7 @@ const MealPlannerApp = () => {
       return formatDateKeyFromUtcDate(d);
     });
   };
-  
+
 
   const getMealTypeOrder = (plan = {}, history = {}) =>
     getMealTypeOrderForGoal({
@@ -599,6 +525,148 @@ const MealPlannerApp = () => {
     showNotification(wasEditing ? '✓ Preferences updated' : '✓ Setup complete');
   };
 
+  const handleAIAction = (payload) => {
+    if (requireWriteAccess('AI Actions') === false) return;
+
+    // Use active context if present, else fallback to first available unconfirmed/unskipped slot
+    const targetSlot = activeOmniboxContext || CORE_MEAL_TYPES.find(type => !selectedDayHistory[type]?.confirmed && !selectedDayHistory[type]?.skipped) || 'dinner';
+
+    // Clear the active context state now that the prompt has returned
+    setActiveOmniboxContext(null);
+
+    try {
+      if (payload.intent === 'ADD_DB_MEAL') {
+        const mealData = payload.data;
+        updateSelectedPlan((prev) => ({
+          ...prev,
+          [targetSlot]: mealData
+        }));
+
+        setMealHistory((prev) => ({
+          ...prev,
+          [selectedDateKey]: {
+            ...prev[selectedDateKey],
+            [targetSlot]: { meal: mealData.name, confirmed: true, exactMatch: true }
+          }
+        }));
+
+        appendMealEvent({
+          type: 'custom',
+          dateKey: selectedDateKey,
+          mealType: targetSlot,
+          mealName: mealData.name
+        });
+
+        showNotification(`✓ Logged ${mealData.name}`);
+      }
+      else if (payload.intent === 'ADD_CUSTOM') {
+        const computed = computeMacros(payload.data.parts || []);
+
+        const mealData = {
+          name: payload.data.name,
+          parts: payload.data.parts || [],
+          cal: computed.cal,
+          protein: computed.protein,
+          macros: computed.macros,
+          custom: true
+        };
+
+        updateSelectedPlan((prev) => ({
+          ...prev,
+          [targetSlot]: mealData
+        }));
+
+        setMealHistory((prev) => ({
+          ...prev,
+          [selectedDateKey]: {
+            ...prev[selectedDateKey],
+            [targetSlot]: { meal: payload.data.name, confirmed: true, exactMatch: false }
+          }
+        }));
+
+        appendMealEvent({
+          type: 'custom',
+          dateKey: selectedDateKey,
+          mealType: targetSlot,
+          mealName: payload.data.name
+        });
+
+        showNotification(`✓ Logged ${payload.data.name}`);
+      }
+      else if (payload.intent === 'UNVERIFIED_NOVEL_FOOD') {
+        const mealData = {
+          name: payload.data.name,
+          cal: payload.data.estimatedCalories || 0,
+          protein: payload.data.estimatedProtein || 0,
+          macros: {
+            p: payload.data.estimatedProtein || 0,
+            c: payload.data.estimatedCarbs || 0,
+            f: payload.data.estimatedFats || 0
+          },
+          custom: true
+        };
+
+        // Save to pending novel foods queue here
+        storageGet('pending-novel-foods').then(currentQueueStr => {
+          const currentQueue = typeof currentQueueStr === 'string' ? JSON.parse(currentQueueStr || '[]') : (currentQueueStr || []);
+          currentQueue.push(mealData);
+          saveToStorage('pending-novel-foods', currentQueue);
+        }).catch(err => console.error('Failed to save novel food', err));
+
+        updateSelectedPlan((prev) => ({
+          ...prev,
+          [targetSlot]: mealData
+        }));
+
+        setMealHistory((prev) => ({
+          ...prev,
+          [selectedDateKey]: {
+            ...prev[selectedDateKey],
+            [targetSlot]: { meal: payload.data.name, confirmed: true, exactMatch: false }
+          }
+        }));
+
+        appendMealEvent({
+          type: 'custom',
+          dateKey: selectedDateKey,
+          mealType: targetSlot,
+          mealName: payload.data.name
+        });
+
+        showNotification(`🤖 Estimated: ${payload.data.name}`);
+      }
+      else if (payload.intent === 'DINING_OUT') {
+        const mealData = {
+          name: payload.data.name,
+          cal: payload.data.estimatedCalories || 0,
+          protein: 0,
+          macros: { p: 0, c: 0, f: 0 },
+          orderOut: true
+        };
+
+        updateSelectedPlan((prev) => ({
+          ...prev,
+          [targetSlot]: mealData
+        }));
+
+        showNotification(`🍱 Cheated: ${payload.data.name}`);
+      }
+
+      else if (payload.intent === 'GENERAL_SWAP') {
+        handleSwap(targetSlot);
+        showNotification('✓ Swapped based on AI request');
+      }
+
+      else if (payload.intent === 'MODIFY') {
+        showNotification('🚧 Component matching coming soon');
+      }
+
+    } catch (err) {
+      console.error(err);
+      showNotification('⚠️ Failed to apply AI changes');
+    }
+  };
+
   const buildPromotedCustomMeal = (candidateName, targetMealType) => {
     const canonicalName = String(candidateName || '').trim();
     const label = canonicalName.length > 44 ? `${canonicalName.slice(0, 43)}…` : canonicalName;
@@ -680,20 +748,6 @@ const MealPlannerApp = () => {
     showNotification(`✓ Swapped to: ${nextMeal.name}`);
   };
 
-  const handleEdit = (mealType) => {
-    if (!requireWriteAccess('Editing meals')) return;
-    const meal = selectedDayPlan[mealType];
-    setEditedComponents({
-      protein: meal.components?.protein || componentOptions.protein[0].name,
-      carb: meal.components?.carb || componentOptions.carb[0].name,
-      veg: meal.components?.veg || 'None',
-      style: meal.components?.style || componentOptions.style[0].name
-    });
-    setManualEditText(meal.name || '');
-    setCurrentModalMealType(mealType);
-    setShowEditModal(true);
-  };
-
   const getNearestMealProfile = (manualText, mealType) => {
     const q = manualText.toLowerCase().replace(/[^a-z0-9\s+]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!q) return null;
@@ -733,189 +787,31 @@ const MealPlannerApp = () => {
     return { meal: best, score: bestScore };
   };
 
-  const applyComponentEdit = () => {
-    if (!requireWriteAccess('Editing meals')) return;
-    const manualText = manualEditText.trim();
-    const originalMealName = (selectedDayPlan[currentModalMealType]?.name || '').trim();
-    const isManualOverride = manualText.length > 0 && manualText.toLowerCase() !== originalMealName.toLowerCase();
 
-    if (isManualOverride) {
-      const inferred = getNearestMealProfile(manualText, currentModalMealType);
-      const inferredMeal = inferred?.meal;
-      const currentMeal = selectedDayPlan[currentModalMealType] || {};
-      const fallbackProtein = currentMeal.protein || 0;
-      const fallbackCal = currentMeal.cal || 0;
-      const fallbackMacros = currentMeal.macros || { p: fallbackProtein, c: 0, f: 0 };
+  const handleEditClick = (mealType) => {
+    setActiveOmniboxContext(mealType);
+    if (omniboxRef.current) {
+      omniboxRef.current.focus();
 
-      const inferredProtein = inferredMeal?.protein ?? fallbackProtein;
-      const inferredCal = inferredMeal?.cal ?? fallbackCal;
-      const inferredMacros = inferredMeal?.macros || fallbackMacros;
-
-      const manualMeal = {
-        name: manualText,
-        protein: inferredProtein,
-        cal: inferredCal,
-        macros: {
-          p: inferredMacros.p ?? inferredProtein,
-          c: inferredMacros.c ?? fallbackMacros.c ?? 0,
-          f: inferredMacros.f ?? fallbackMacros.f ?? 0
-        },
-        isManualEntry: true,
-        inferredFrom: inferredMeal?.name || null
-      };
-
-      appendMealEvent({
-        type: 'edit',
-        dateKey: selectedDateKey,
-        mealType: currentModalMealType,
-        originalMealName: originalMealName || currentMeal?.name || '',
-        updatedMealName: inferredMeal?.name || null,
-        editedToMealName: manualText,
-        isManualEntry: true
-      });
-
-      updateSelectedPlan((prev) => ({ ...prev, [currentModalMealType]: manualMeal }));
-      setShowEditModal(false);
-
-      if (inferredMeal) {
-        showNotification('✓ Saved manual meal. Profile matched to: ' + inferredMeal.name);
-      } else {
-        showNotification('✓ Saved manual meal');
-      }
-      return;
-    }
-
-    const proteinData = componentOptions.protein.find((p) => p.name === editedComponents.protein);
-    const carbData = componentOptions.carb.find((c) => c.name === editedComponents.carb);
-    const vegData = editedComponents.veg !== 'None' ? componentOptions.vegetable.find((v) => v.name === editedComponents.veg) : null;
-
-    const proteinAmount = 150;
-    const carbAmount = carbData.perUnit ? 2 : 100;
-    const vegAmount = 100;
-
-    let totalCal = (proteinData.cal * proteinAmount) / 100;
-    let totalP = (proteinData.p * proteinAmount) / 100;
-    let totalC = carbData.perUnit ? carbData.c * carbAmount : (carbData.c * carbAmount) / 100;
-    let totalF = (proteinData.f * proteinAmount) / 100;
-
-    if (carbData.name !== 'No carb') {
-      totalCal += carbData.perUnit ? carbData.cal * carbAmount : (carbData.cal * carbAmount) / 100;
-      totalP += carbData.perUnit ? carbData.p * carbAmount : (carbData.p * carbAmount) / 100;
-      totalF += carbData.perUnit ? carbData.f * carbAmount : (carbData.f * carbAmount) / 100;
-    }
-
-    if (vegData) {
-      totalCal += (vegData.cal * vegAmount) / 100;
-      totalP += (vegData.p * vegAmount) / 100;
-      totalC += (vegData.c * vegAmount) / 100;
-      totalF += (vegData.f * vegAmount) / 100;
-    }
-
-    const newMeal = {
-      name: `${editedComponents.style} ${editedComponents.protein}${carbData.name !== 'No carb' ? ' + ' + editedComponents.carb : ''}${
-        vegData ? ' + ' + editedComponents.veg : ''
-      }`,
-      protein: Math.round(totalP),
-      cal: Math.round(totalCal),
-      macros: { p: Math.round(totalP), c: Math.round(totalC), f: Math.round(totalF) },
-      components: {
-        protein: editedComponents.protein,
-        amount: proteinAmount,
-        carb: editedComponents.carb,
-        carbAmount,
-        veg: vegData ? editedComponents.veg : null,
-        vegAmount,
-        style: editedComponents.style
-      }
-    };
-
-    appendMealEvent({
-      type: 'edit',
-      dateKey: selectedDateKey,
-      mealType: currentModalMealType,
-      originalMealName,
-      updatedMealName: newMeal.name,
-      isManualEntry: false
-    });
-
-    updateSelectedPlan((prev) => ({ ...prev, [currentModalMealType]: newMeal }));
-    setShowEditModal(false);
-    showNotification(`✓ Meal updated: ${newMeal.name}`);
-  };
-
-  const handleCustom = (mealType) => {
-    if (!requireWriteAccess('Adding custom meals')) return;
-    setCurrentModalMealType(mealType);
-    setCustomMealText('');
-    setShowCustomModal(true);
-  };
-
-  const saveCustomMeal = () => {
-    if (!requireWriteAccess('Saving custom meals')) return;
-    if (!customMealText.trim()) {
-      showNotification('⚠️ Please enter a meal description');
-      return;
-    }
-    const trimmedCustomText = customMealText.trim();
-
-    const customMeal = {
-      name: `Custom: ${trimmedCustomText}`,
-      protein: 15,
-      cal: 0,
-      macros: { p: 15, c: 0, f: 0 },
-      isCustom: true
-    };
-
-    updateSelectedPlan((prev) => ({ ...prev, [currentModalMealType]: customMeal }));
-
-    const newHistory = { ...mealHistory };
-    if (!newHistory[selectedDateKey]) newHistory[selectedDateKey] = {};
-
-    const existingPlanned = newHistory[selectedDateKey][currentModalMealType]?.planned || selectedDayPlan[currentModalMealType].name;
-
-    newHistory[selectedDateKey][currentModalMealType] = {
-      planned: existingPlanned,
-      actual: trimmedCustomText,
-      meal: trimmedCustomText,
-      protein: 15,
-      confirmed: true,
-      isCustom: true,
-      timestamp: new Date().toISOString()
-    };
-
-    const customEvent = appendMealEvent({
-      type: 'custom',
-      dateKey: selectedDateKey,
-      mealType: currentModalMealType,
-      originalMealName: existingPlanned,
-      customMealText: trimmedCustomText
-    });
-    const updatedEventStream = [...mealEvents, customEvent];
-    const customCount = getCustomMealOccurrenceCount(updatedEventStream, trimmedCustomText, 45);
-
-    setMealHistory(newHistory);
-    saveToStorage('meal-history', newHistory);
-    setShowCustomModal(false);
-    if (customCount === 3) {
-      showNotification(`✓ Custom meal recorded: ${trimmedCustomText} (3x in 45 days, ready to add to database)`);
-    } else {
-      showNotification(`✓ Custom meal recorded: ${trimmedCustomText}`);
+      // Delay the scroll slightly to allow the mobile virtual keyboard to render
+      // Then scroll it so the Omnibox is slightly above the exact center of the screen
+      setTimeout(() => {
+        if (omniboxRef.current) {
+          const y = omniboxRef.current.getBoundingClientRect().top + window.scrollY - 100;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 300);
     }
   };
 
-  const handleConfirm = async (mealType) => {
-    if (!requireWriteAccess('Confirming meals')) return;
-    const confirmedMeal = selectedDayPlan[mealType];
+  const handleSkip = async (mealType) => {
+    if (!requireWriteAccess('Skipping meals')) return;
 
     const newHistory = { ...mealHistory };
     if (!newHistory[selectedDateKey]) newHistory[selectedDateKey] = {};
 
     newHistory[selectedDateKey][mealType] = {
-      planned: confirmedMeal.name,
-      actual: confirmedMeal.name,
-      meal: confirmedMeal.name,
-      protein: confirmedMeal.protein,
-      confirmed: true,
+      skipped: true,
       timestamp: new Date().toISOString()
     };
 
@@ -923,20 +819,19 @@ const MealPlannerApp = () => {
     await saveToStorage('meal-history', newHistory);
 
     appendMealEvent({
-      type: 'confirm',
+      type: 'skip',
       dateKey: selectedDateKey,
-      mealType,
-      mealName: confirmedMeal.name
+      mealType
     });
 
-    showNotification(`✓ Confirmed: ${confirmedMeal.name}`);
+    showNotification(`⊘ Skipped ${mealTypeLabels[mealType]}`);
   };
 
-  const undoConfirmedForSelectedDay = async () => {
+  const undoSkippedForSelectedDay = async () => {
     if (!requireWriteAccess('Undoing meals')) return;
     const dayHistory = mealHistory[selectedDateKey];
     if (!dayHistory) {
-      showNotification('⚠️ No confirmed meals to undo for this day');
+      showNotification('⚠️ No skipped meals to undo for this day');
       return;
     }
 
@@ -947,7 +842,7 @@ const MealPlannerApp = () => {
     const mealTypesForDay = getMealTypeOrder(selectedDayPlan, dayHistory);
     for (const mealType of mealTypesForDay) {
       const entry = nextDayHistory[mealType];
-      if (!entry?.confirmed) continue;
+      if (!entry?.skipped) continue;
 
       delete nextDayHistory[mealType];
       undoneCount += 1;
@@ -955,7 +850,7 @@ const MealPlannerApp = () => {
     }
 
     if (!undoneCount) {
-      showNotification('⚠️ No confirmed meals to undo for this day');
+      showNotification('⚠️ No skipped meals to undo for this day');
       return;
     }
 
@@ -975,7 +870,7 @@ const MealPlannerApp = () => {
       affectedSlots
     });
 
-    showNotification(`↩️ Undid ${undoneCount} confirmed meal${undoneCount > 1 ? 's' : ''}`);
+    showNotification(`↩️ Undid ${undoneCount} skipped meal${undoneCount > 1 ? 's' : ''}`);
   };
 
   const selectOrderOutOption = (option) => {
@@ -990,7 +885,7 @@ const MealPlannerApp = () => {
 
     updateSelectedPlan((prev) => ({ ...prev, [currentModalMealType]: newMeal }));
     setShowOrderOutModal(false);
-    showNotification(`✓ Ordered: ${option.name}`);
+    showNotification(`✓ Ordered: ${option.name} `);
   };
 
   const processQuickAction = (action) => {
@@ -1050,21 +945,46 @@ const MealPlannerApp = () => {
           break;
         }
         updateSelectedPlan((prev) => ({ ...prev, snack: snackMeals[0] }));
-        showNotification(`✓ Snack added: ${snackMeals[0].name}`);
+        showNotification(`✓ Snack added: ${snackMeals[0].name} `);
         break;
       default:
         break;
     }
   };
 
+  const handleDiningOut = async (slot) => {
+    if (!requireWriteAccess('Dining Out')) return;
+
+    updateSelectedPlan((prev) => ({
+      ...prev,
+      [slot]: {
+        id: 'dining_out',
+        name: 'Dining Out',
+        protein: 0,
+        cal: 0,
+        macros: { p: 0, c: 0, f: 0 },
+        cuisine: 'any',
+        type: [slot],
+        parts: []
+      }
+    }));
+    showNotification(`🍽️ Logged Dining Out for ${slot}`);
+  };
+
   const getTotalProtein = () => {
     const mealTypes = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
-    return mealTypes.reduce((sum, mealType) => sum + (selectedDayPlan[mealType]?.protein || 0), 0);
+    return mealTypes.reduce((sum, mealType) => {
+      if (selectedDayHistory[mealType]?.skipped) return sum;
+      return sum + (selectedDayPlan[mealType]?.protein || selectedDayHistory[mealType]?.protein || 0);
+    }, 0);
   };
 
   const getTotalCalories = () => {
     const mealTypes = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
-    return mealTypes.reduce((sum, mealType) => sum + (selectedDayPlan[mealType]?.cal || 0), 0);
+    return mealTypes.reduce((sum, mealType) => {
+      if (selectedDayHistory[mealType]?.skipped) return sum;
+      return sum + (selectedDayPlan[mealType]?.cal || selectedDayHistory[mealType]?.cal || 0);
+    }, 0);
   };
 
   const getWeeklyStats = () => {
@@ -1074,7 +994,10 @@ const MealPlannerApp = () => {
       const dayData = mealHistory[day] || {};
       const plan = mealPlans[day] || {};
       const mealTypesForDay = getMealTypeOrder(plan, dayData);
-      return mealTypesForDay.reduce((sum, mealType) => sum + (dayData[mealType]?.protein || 0), 0);
+      return mealTypesForDay.reduce((sum, mealType) => {
+        if (dayData[mealType]?.skipped) return sum;
+        return sum + (dayData[mealType]?.protein || plan[mealType]?.protein || 0);
+      }, 0);
     });
 
     const avg = proteinTotals.reduce((a, b) => a + b, 0) / (proteinTotals.length || 1);
@@ -1089,8 +1012,15 @@ const MealPlannerApp = () => {
     const dayData = mealHistory[dateKey] || {};
     const dayPlan = mealPlans[dateKey] || {};
     const mealTypesForDay = getMealTypeOrder(dayPlan, dayData);
-    const confirmedCount = mealTypesForDay.filter((m) => dayData[m]?.confirmed).length;
-    const protein = mealTypesForDay.reduce((sum, mealType) => sum + (dayData[mealType]?.protein || 0), 0);
+
+    // In Zero-Touch UX, a slot is considered 'confirmed' if it exists and wasn't explicitly skipped.
+    const confirmedCount = mealTypesForDay.filter((m) => !dayData[m]?.skipped).length;
+
+    const protein = mealTypesForDay.reduce((sum, mealType) => {
+      if (dayData[mealType]?.skipped) return sum;
+      return sum + (dayData[mealType]?.protein || dayPlan[mealType]?.protein || 0);
+    }, 0);
+
     return { confirmedCount, protein, totalSlots: mealTypesForDay.length };
   };
 
@@ -1107,12 +1037,12 @@ const MealPlannerApp = () => {
         const meal = selectedDayPlan[mealType];
         if (!meal) return null;
         const header = mealHeaderByType[mealType] || mealType.toUpperCase();
-        return `${header}: ${meal.name}\nProtein: ${meal.protein}g`;
+        return `${header}: ${meal.name} \nProtein: ${meal.protein} g`;
       })
       .filter(Boolean);
 
     const total = getTotalProtein();
-    const text = `📅 MEAL PLAN (${formatDateLabel(selectedDateKey)})\n\n${planLines.join('\n\n')}\n\n💪 TOTAL PROTEIN: ${total}g`;
+    const text = `📅 MEAL PLAN(${formatDateLabel(selectedDateKey)}) \n\n${planLines.join('\n\n')} \n\n💪 TOTAL PROTEIN: ${total} g`;
 
     const copyWithTextareaFallback = () => {
       try {
@@ -1211,7 +1141,7 @@ const MealPlannerApp = () => {
       contextMeals: Array.from(new Set(chosenMealNames))
     });
 
-    showNotification(`✓ Regenerated ${regeneratedDays} day(s)${keptLockedDays > 0 ? `, kept ${keptLockedDays} locked` : ''}`);
+    showNotification(`✓ Regenerated ${regeneratedDays} day(s)${keptLockedDays > 0 ? `, kept ${keptLockedDays} locked` : ''} `);
   };
   const todayKey = getDateKey();
   const weekDateKeys = getWeekDateKeys(selectedDateKey);
@@ -1257,59 +1187,27 @@ const MealPlannerApp = () => {
           <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-pulse">{notification}</div>
         )}
 
-        {showCustomModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowCustomModal(false)}>
+        {showDiningOutModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowDiningOutModal(false)}>
             <div className="bg-white rounded-lg p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-800">Custom Meal</h3>
-                <button onClick={() => setShowCustomModal(false)} className="text-gray-500 hover:text-gray-700">
+                <h3 className="text-lg font-bold text-gray-800">Select Meal Slot</h3>
+                <button onClick={() => setShowDiningOutModal(false)} className="text-gray-500 hover:text-gray-700">
                   <X size={24} />
                 </button>
               </div>
-              <p className="text-sm text-gray-600 mb-4">Enter what you ate (nutrition tracking not needed - just for weekly analysis)</p>
-              <input
-                type="text"
-                placeholder="e.g., Sushi + miso soup, Burger + fries, etc."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm mb-4 focus:outline-none focus:border-blue-500"
-                value={customMealText}
-                onChange={(e) => setCustomMealText(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && saveCustomMeal()}
-                autoFocus
-              />
-              <button
-                onClick={saveCustomMeal}
-                className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isViewerMode}
-              >
-                Save Custom Meal
-              </button>
-            </div>
-          </div>
-        )}
-
-        {showOrderOutModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowOrderOutModal(false)}>
-            <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-96 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-800">Order Out - {currentModalMealType}</h3>
-                <button onClick={() => setShowOrderOutModal(false)} className="text-gray-500 hover:text-gray-700">
-                  <X size={24} />
-                </button>
-              </div>
-              <div className="space-y-3">
-                {orderOutOptions[currentModalMealType]?.map((option, idx) => (
+              <p className="text-sm text-gray-600 mb-4">Which meal are you dining out for?</p>
+              <div className="grid gap-3">
+                {['breakfast', 'lunch', 'dinner'].map((slot) => (
                   <button
-                    key={idx}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      selectOrderOutOption(option);
+                    key={slot}
+                    onClick={() => {
+                      handleDiningOut(slot);
+                      setShowDiningOutModal(false);
                     }}
-                    className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors active:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isViewerMode}
+                    className="w-full bg-indigo-50 text-indigo-700 py-3 rounded-lg font-semibold hover:bg-indigo-100 transition-colors capitalize"
                   >
-                    <div className="font-semibold text-gray-800">{option.name}</div>
-                    <div className="text-sm text-blue-600 font-bold mt-1">P: {option.protein}g | {option.cal} kcal</div>
-                    <div className="text-xs text-gray-600 mt-1">{option.note}</div>
+                    {slot}
                   </button>
                 ))}
               </div>
@@ -1317,116 +1215,30 @@ const MealPlannerApp = () => {
           </div>
         )}
 
-        {showEditModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowEditModal(false)}>
-            <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-96 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-800">
-                  <Edit3 className="inline mr-2" size={20} />
-                  Edit Meal Components
-                </h3>
-                <button onClick={() => setShowEditModal(false)} className="text-gray-500 hover:text-gray-700">
-                  <X size={24} />
-                </button>
-              </div>
-              <p className="text-sm text-gray-600 mb-3">If manual entry is filled, dropdown selections are ignored. Leave manual entry blank to use dropdown editing.</p>
-              <div className="mb-4 p-3 rounded-lg border border-blue-100 bg-blue-50">
-                <label className="text-xs font-semibold text-blue-800">Quick Manual Entry</label>
-                <p className="text-xs text-blue-700 mt-1 mb-2">
-                  Type your meal/components here. Matching is temporarily disabled while we stabilize this input.
-                </p>
-                <textarea
-                  className="w-full px-3 py-2 border border-blue-200 rounded text-sm bg-white"
-                  rows={2}
-                  placeholder="Type meal components here..."
-                  value={manualEditText}
-                  onChange={(e) => setManualEditText(e.target.value)}
-                />
-              </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-700">Protein</label>
-                  <select
-                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm"
-                    value={editedComponents.protein}
-                    onChange={(e) => setEditedComponents((prev) => ({ ...prev, protein: e.target.value }))}
-                  >
-                    {componentOptions.protein.map((opt, idx) => (
-                      <option key={idx} value={opt.name}>
-                        {opt.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-700">Carb/Base</label>
-                  <select
-                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm"
-                    value={editedComponents.carb}
-                    onChange={(e) => setEditedComponents((prev) => ({ ...prev, carb: e.target.value }))}
-                  >
-                    <option value="No carb">None</option>
-                    {componentOptions.carb
-                      .filter((c) => c.name !== 'No carb')
-                      .map((opt, idx) => (
-                        <option key={idx} value={opt.name}>
-                          {opt.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-700">Vegetable/Side</label>
-                  <select
-                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm"
-                    value={editedComponents.veg}
-                    onChange={(e) => setEditedComponents((prev) => ({ ...prev, veg: e.target.value }))}
-                  >
-                    <option value="None">None</option>
-                    {componentOptions.vegetable.map((opt, idx) => (
-                      <option key={idx} value={opt.name}>
-                        {opt.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-700">Cooking Style</label>
-                  <select
-                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm"
-                    value={editedComponents.style}
-                    onChange={(e) => setEditedComponents((prev) => ({ ...prev, style: e.target.value }))}
-                  >
-                    {componentOptions.style.map((opt, idx) => (
-                      <option key={idx} value={opt.name}>
-                        {opt.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  onClick={applyComponentEdit}
-                  className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isViewerMode}
-                >
-                  Apply Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
+
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-4">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">🍽️ My Meal Companion</h1>
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-2xl font-bold text-gray-800">🍽️ My MealMap</h1>
+            <span className="text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold shrink-0">
+              Goal: {getOnboardingGoalLabel(onboardingProfile?.goal)}
+            </span>
+          </div>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-gray-600">{formatDateLabel(selectedDateKey)}</p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">{formatWeekSnapshotDateLabel(selectedDateKey)}</span>
+              {isViewerMode && (
+                <span className="text-[11px] px-2 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">Read-only</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
               <button onClick={copyTodaysPlan} className="text-xs px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold whitespace-nowrap">
                 📋 Share Day
               </button>
               <button
-                onClick={undoConfirmedForSelectedDay}
+                onClick={undoSkippedForSelectedDay}
                 className="text-[11px] px-2 py-1 bg-amber-100 text-amber-800 rounded-md hover:bg-amber-200 font-semibold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isViewerMode}
               >
@@ -1434,37 +1246,20 @@ const MealPlannerApp = () => {
               </button>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold">
-              Mode: {getOnboardingModeLabel(onboardingProfile?.mode)}
-            </span>
-            <span className="text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold">
-              Goal: {getOnboardingGoalLabel(onboardingProfile?.goal)}
-            </span>
-            {isViewerMode && (
-              <span className="text-[11px] px-2 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">Read-only</span>
-            )}
-            <button
-              onClick={() => setShowOnboardingEditor(true)}
-              className="ml-auto text-xs px-3 py-1.5 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 font-semibold"
-            >
-              Edit Preferences
-            </button>
-          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-4">
-          {selectedMealTypeOrder.map((mealType) => {
+          {selectedMealTypeOrder.map((mealType, index) => {
             const historyEntry = selectedDayHistory?.[mealType];
             const meal =
               selectedDayPlan[mealType] ||
               (historyEntry
                 ? {
-                    name: historyEntry.meal || historyEntry.actual || historyEntry.planned || 'Logged meal',
-                    protein: historyEntry.protein || 0,
-                    cal: 0,
-                    macros: { p: historyEntry.protein || 0, c: 0, f: 0 }
-                  }
+                  name: historyEntry.meal || historyEntry.actual || historyEntry.planned || 'Logged meal',
+                  protein: historyEntry.protein || 0,
+                  cal: 0,
+                  macros: { p: historyEntry.protein || 0, c: 0, f: 0 }
+                }
                 : null);
 
             if (!meal) return null;
@@ -1472,69 +1267,37 @@ const MealPlannerApp = () => {
             const isSkipped = selectedDayHistory?.[mealType]?.skipped;
 
             return (
-              <div key={mealType} className="mb-4 pb-4 border-b border-gray-200 last:border-0">
+              <div key={mealType} className={`pb-3 ${index === selectedMealTypeOrder.length - 1 ? 'mb-2' : 'mb-3 border-b border-gray-200'}`}>
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-gray-600">{mealTypeLabels[mealType]}:</span>
                     <span className="ml-2 text-gray-800">{formatMealName(meal)}</span>
-                    <span className="ml-3 text-blue-600 font-bold">P: {meal.protein}g</span>
                     {meal.orderOut && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">OO</span>}
                     {isConfirmed && <Check className="inline ml-2 text-green-500" size={16} />}
                     {isSkipped && <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">⊘ Skipped</span>}
                   </div>
                 </div>
-                <div className="flex gap-2 mb-2 flex-wrap">
-                  <button
-                    onClick={() => handleConfirm(mealType)}
-                    className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isViewerMode || isConfirmed || isSkipped}
-                  >
-                    {isConfirmed ? '✓ Confirmed' : 'Confirm'}
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded">P: {meal.protein}g</span>
+                  <button onClick={() => toggleExpand(mealType)} className="text-xs text-blue-600 flex items-center gap-1 hover:text-blue-800">
+                    Details {expandedMeals[mealType] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                   <button
-                    onClick={() => handleSwap(mealType)}
-                    className="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isViewerMode || isConfirmed || isSkipped}
+                    onClick={() => handleSkip(mealType)}
+                    className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isViewerMode || isSkipped}
                   >
-                    Swap
+                    {isSkipped ? '⊘ Skipped' : 'Skip Meal'}
                   </button>
-                  {mealType !== 'snack' && meal.components && (
-                    <button
-                      onClick={() => handleEdit(mealType)}
-                      className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isViewerMode || isConfirmed || isSkipped}
-                    >
-                      <Edit3 className="inline mr-1" size={12} />
-                      Edit
-                    </button>
-                  )}
-                  {mealType !== 'snack' && (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setCurrentModalMealType(mealType);
-                        setShowOrderOutModal(true);
-                      }}
-                      className="text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isViewerMode || isConfirmed || isSkipped}
-                    >
-                      Order out
-                    </button>
-                  )}
-                  {mealType !== 'snack' && (
-                    <button
-                      onClick={() => handleCustom(mealType)}
-                      className="text-xs px-3 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isViewerMode || isConfirmed || isSkipped}
-                    >
-                      Custom
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleEditClick(mealType)}
+                    className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isViewerMode || isSkipped}
+                  >
+                    <Edit3 className="inline mr-1" size={12} />
+                    Edit
+                  </button>
                 </div>
-                <button onClick={() => toggleExpand(mealType)} className="text-xs text-blue-600 flex items-center gap-1 hover:text-blue-800">
-                  Details {expandedMeals[mealType] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
                 {expandedMeals[mealType] && (
                   <div className="mt-3 pl-4 border-l-2 border-blue-200">
                     <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
@@ -1546,9 +1309,27 @@ const MealPlannerApp = () => {
             );
           })}
 
-          <div className="mb-4 border-t border-gray-200 pt-4">
-            <p className="text-xs font-semibold text-gray-700 mb-2">⚡ Quick Actions:</p>
-            <div className="grid grid-cols-4 gap-2 mb-2">
+          <div className="mb-3 border-t-2 border-gray-200 pt-3 mt-1">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-700">⚡ Quick Actions:</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => processQuickAction('addsnack')}
+                  className="text-xs px-3 py-2 bg-teal-100 text-teal-700 rounded-full hover:bg-teal-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  disabled={isViewerMode}
+                >
+                  ➕ Snack
+                </button>
+                <button
+                  onClick={() => setShowDiningOutModal(true)}
+                  className="text-xs px-3 py-2 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  disabled={isViewerMode}
+                >
+                  🍽️ Dining Out
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-2">
               <button
                 onClick={() => processQuickAction('light')}
                 className="text-[11px] px-2 py-1.5 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1570,15 +1351,16 @@ const MealPlannerApp = () => {
               >
                 🎲 Surprise
               </button>
-              <button
-                onClick={() => processQuickAction('addsnack')}
-                className="text-[11px] px-2 py-1.5 bg-teal-100 text-teal-700 rounded-full hover:bg-teal-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isViewerMode}
-              >
-                ➕ Snack
-              </button>
             </div>
           </div>
+
+          <Omnibox
+            onAIAction={handleAIAction}
+            disabled={isViewerMode}
+            activeContext={activeOmniboxContext}
+            onClearContext={() => setActiveOmniboxContext(null)}
+            externalInputRef={omniboxRef}
+          />
 
           {customCandidates.length > 0 && (
             <div className="mb-4 border-t border-gray-200 pt-4">
@@ -1617,13 +1399,21 @@ const MealPlannerApp = () => {
           </div>
         </div>
 
-        <button
-          onClick={regenerateRestOfWeek}
-          className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold mb-4 hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isViewerMode}
-        >
-          ♻️ Regen Rest Of Week
-        </button>
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={regenerateRestOfWeek}
+            className="w-[60%] bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isViewerMode}
+          >
+            ♻️ Regen Rest Of Week
+          </button>
+          <button
+            onClick={() => setShowOnboardingEditor(true)}
+            className="w-[40%] bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+          >
+            ⚙️ Edit Prefs
+          </button>
+        </div>
 
         <div className="bg-white rounded-lg shadow-md p-4 mb-4">
           <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -1662,15 +1452,14 @@ const MealPlannerApp = () => {
                 <button
                   key={dateKey}
                   onClick={() => setSelectedDateKey(dateKey)}
-                  className={`rounded p-2 text-center border ${
-                    isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 hover:bg-gray-50'
-                  }`}
+                  className={`rounded p - 2 text - center border ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 hover:bg-gray-50'
+                    } `}
                 >
                   <div className="text-[10px] font-semibold">
                     {parseDateKey(dateKey).toLocaleDateString('en-US', { weekday: 'short', timeZone: IST_TIME_ZONE })}
                   </div>
                   <div className="text-xs">{parseDateKey(dateKey).getUTCDate()}</div>
-                  <div className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                  <div className={`text - [10px] ${isSelected ? 'text-blue-100' : 'text-gray-500'} `}>
                     {completion.confirmedCount}/{completion.totalSlots}
                   </div>
                   {isToday && <div className="text-[9px]">Today</div>}
@@ -1736,7 +1525,7 @@ const MealPlannerApp = () => {
                 const dayData = mealHistory[dateKey] || {};
                 const completion = getDayCompletion(dateKey);
                 return (
-                  <div key={dateKey} className={`border rounded p-3 ${dateKey === selectedDateKey ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                  <div key={dateKey} className={`border rounded p - 3 ${dateKey === selectedDateKey ? 'border-blue-300 bg-blue-50' : 'border-gray-200'} `}>
                     <div className="flex justify-between items-center mb-2">
                       <button onClick={() => setSelectedDateKey(dateKey)} className="font-semibold text-gray-700 hover:text-blue-700">
                         {formatWeekSnapshotDateLabel(dateKey)}

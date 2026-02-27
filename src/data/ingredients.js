@@ -24,7 +24,7 @@ export const userProfile = {
 export const STANDARD_PORTIONS = {
   protein_meat: { qty: 150, unit: "g", description: "Yields ~35-45g protein (chicken, fish, mutton)" },
   protein_veg: { qty: 150, unit: "g", description: "Legumes, paneer, tofu (often requires pairing to hit targets)" },
-  carbs_grain: { qty: 120, unit: "g", description: "Cooked rice, pasta, or noodles" },
+  carbs_grain: { qty: 100, unit: "g", description: "Cooked rice, pasta, or noodles" },
   carbs_bread: { qty: 2, unit: "piece", description: "Jowar roti, slices of toast, paratha" },
   vegetables: { qty: 150, unit: "g", description: "Mixed salad, sautéed greens, or sabzi" },
   fats_oils: { qty: 15, unit: "g", description: "Cooking oil, butter, or dressing per meal" }
@@ -77,7 +77,7 @@ export const ingredients = {
   lamb_seekh_kabab: {
     name: "Lamb seekh kabab",
     per100g: { kcal: 280, p: 17, c: 2, f: 22 },
-    defaultPortion: { qty: 150, unit: "g" },
+    defaultPortion: { qty: 2, unit: "piece", pieceWeightG: 75 },
     source: "IFCT Reference"
   },
   egg_whole: {
@@ -91,6 +91,12 @@ export const ingredients = {
     per100g: { kcal: 52, p: 11, c: 0.7, f: 0.2 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 33 },
     source: "USDA #01124"
+  },
+  egg_yolk: {
+    name: "Egg yolk",
+    per100g: { kcal: 322, p: 15.8, c: 3.6, f: 26.5 },
+    defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 17 },
+    source: "USDA #01125"
   },
   paneer: {
     name: "Paneer",
@@ -145,7 +151,7 @@ export const ingredients = {
   cooked_rice: {
     name: "Cooked white rice",
     per100g: { kcal: 130, p: 2.4, c: 28, f: 0.3 },
-    defaultPortion: { qty: 80, unit: "g" },
+    defaultPortion: { qty: 100, unit: "g" },
     source: "USDA #20445"
   },
   garlic_rice: {
@@ -157,7 +163,7 @@ export const ingredients = {
   jowar_roti: {
     name: "Jowar roti",
     per100g: { kcal: 312, p: 6.7, c: 60, f: 3.2 },
-    defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 40 },
+    defaultPortion: { qty: 2, unit: "piece", pieceWeightG: 40 },
     source: "IFCT Reference"
   },
   whole_wheat_toast: {
@@ -175,7 +181,7 @@ export const ingredients = {
   rice_noodles: {
     name: "Rice noodles (cooked)",
     per100g: { kcal: 109, p: 0.9, c: 24, f: 0.2 },
-    defaultPortion: { qty: 120, unit: "g" },
+    defaultPortion: { qty: 100, unit: "g" },
     source: "USDA #20133"
   },
   spaghetti_aglio_olio: {
@@ -199,7 +205,7 @@ export const ingredients = {
   aloo_paratha: {
     name: "Aloo paratha",
     per100g: { kcal: 260, p: 6.5, c: 38, f: 9 },
-    defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 120 },
+    defaultPortion: { qty: 2, unit: "piece", pieceWeightG: 120 },
     source: "IFCT Reference"
   },
 

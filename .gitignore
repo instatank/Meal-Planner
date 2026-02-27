@@ -11,3 +11,6 @@ meal_database.numbers
 meal_database.xlsx
 .vite-from-truth-unites/
 .vercel
+.env
+.env.*
+.env.local
