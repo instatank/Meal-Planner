@@ -1357,21 +1357,21 @@ const MealPlannerApp = () => {
               <button
                 onClick={() => processQuickAction('light')}
                 className="text-[11px] px-2 py-1.5 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isViewerMode}
+                disabled={true}
               >
                 🥗 Go Light
               </button>
               <button
                 onClick={() => processQuickAction('indian')}
                 className="text-[11px] px-2 py-1.5 bg-orange-100 text-orange-700 rounded-full hover:bg-orange-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isViewerMode}
+                disabled={true}
               >
                 🍛 Indian
               </button>
               <button
                 onClick={() => processQuickAction('surprise')}
                 className="text-[11px] px-2 py-1.5 bg-pink-100 text-pink-700 rounded-full hover:bg-pink-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isViewerMode}
+                disabled={true}
               >
                 🎲 Surprise
               </button>
