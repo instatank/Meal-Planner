@@ -155,3 +155,88 @@ export const parseMealIntent = async (userInput, contextSlot = null) => {
     throw error;
   }
 };
+
+export const generateWeeklyPlan = async ({
+  targetDateKeys,
+  mealDatabase,
+  preferences,
+  historyMap,
+  dailyProteinTarget
+}) => {
+  if (!ai) throw new Error("Gemini API key is missing. Add VITE_GEMINI_API_KEY to .env.local");
+
+  // Flatten and compress available meals so we don't blow up the context window
+  const availableMeals = [
+    ...(mealDatabase.breakfast || []),
+    ...(mealDatabase.lunch || []),
+    ...(mealDatabase.dinner || []),
+    ...(mealDatabase.snack || [])
+  ].map(m => ({
+    name: m.canonical_name,
+    type: (mealDatabase.breakfast || []).includes(m) ? 'breakfast' : ((mealDatabase.lunch || []).includes(m) || (mealDatabase.dinner || []).includes(m) ? 'lunch/dinner' : 'snack'),
+    p: m.protein || 0,
+    cal: m.cal || 0,
+    c: m.cuisine || 'general'
+  }));
+
+  const prompt = `
+You are an expert, world-class nutrition planner.
+You are tasked with generating a meal plan for the user across multiple upcoming days.
+
+AVAILABLE MEAL CATALOG (JSON format):
+${JSON.stringify(availableMeals)}
+
+(You MUST ONLY select meals that perfectly match the \`name\` from this catalog. NEVER invent new meals yourself. Select meals that align with the \`type\` field if possible.)
+
+USER PREFERENCES:
+Accepts (Prioritize these): ${JSON.stringify(preferences?.accepts || {})}
+Edits (Tweak these): ${JSON.stringify(preferences?.edits || {})}
+Avoids (NEVER select these under any circumstances): ${JSON.stringify(preferences?.avoids || {})}
+
+RECENT HISTORY:
+The user has recently eaten the following meals. Use this explicitly to find patterns of repetition they like, or meals they want spaced out:
+${JSON.stringify(historyMap)}
+
+DATES TO GENERATE:
+${JSON.stringify(targetDateKeys)}
+
+DAILY GOAL:
+Target Protein per day: ${dailyProteinTarget}g
+
+CRITICAL RULES:
+1. INTELLIGENT PATTERN MATCHING (Repetition vs. Variety):
+   - Analyze the \`RECENT HISTORY\`. Identify meals the user explicitly loves to repeat (e.g. eating the same breakfast multiple days) vs. meals that are clearly meant to be spaced out.
+   - If a meal is historically static (eaten >4 times a week), KEEP REPEATING IT. Consistency is key for habit formation.
+   - If a meal is historically sporadic, ensure it is spaced by at least 3 days.
+2. PROTEIN ANCHORING: Ensure the combined total of the generated Breakfast, Lunch, and Dinner mathematically hits the user's Target Protein per day as closely as possible.
+3. CALORIC TAPERING: Structure the day so the heaviest, highest-carb meal is either Breakfast or Lunch. Dinner should be significantly lighter and leaner by comparison, unless the user's history dictates otherwise.
+4. LEAN MEAT PRIORITIZATION: Lean heavily towards Chicken and Fish (including Salmon) meals throughout the week.
+5. RED MEAT CAP: Red meats (Pork, Steak, Lamb) must NEVER exceed 2-3 meals *total* combined across the entire calculated week.
+6. CUISINE SEQUENCING: Do not schedule the same heavy cuisine for Lunch and Dinner on the same day (e.g., no Mexican for Lunch and Mexican for Dinner) unless the user historically does this.
+7. FORMAT: You must output STRICTLY valid JSON in this exact format (no markdown formatting, no backticks, JSON array only):
+[
+  { "dateKey": "YYYY-MM-DD", "breakfast": "canonical_name", "lunch": "canonical_name", "dinner": "canonical_name" }
+]
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        temperature: 0.4, // Slight variance allowed for macro balancing
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const outputString = response.text;
+    if (!outputString) throw new Error("Empty response from AI");
+
+    const parsed = JSON.parse(outputString);
+    if (!Array.isArray(parsed)) throw new Error("Expected JSON array");
+    return parsed;
+  } catch (error) {
+    console.error("Gemini Weekly Generation Error:", error);
+    throw error;
+  }
+};

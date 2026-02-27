@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Check, TrendingUp, X, Edit3 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Check, TrendingUp, X, Edit3, Loader2 } from 'lucide-react';
 import { mealDatabase } from './data/mealDatabase';
 import OnboardingFlow from './components/OnboardingFlow';
 import Omnibox from './components/Omnibox';
@@ -253,6 +253,7 @@ const MealPlannerApp = () => {
   const [mealEvents, setMealEvents] = useState([]);
   const [onboardingProfile, setOnboardingProfile] = useState(null);
   const [showOnboardingEditor, setShowOnboardingEditor] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const safeParseJson = (value, fallback = null) => {
     if (value == null) return fallback;
@@ -1121,7 +1122,7 @@ const MealPlannerApp = () => {
 
 
 
-  const regenerateRestOfWeek = () => {
+  const regenerateRestOfWeek = async () => {
     if (!requireWriteAccess('Regenerating plans')) return;
     const weekKeys = getWeekDateKeys(selectedDateKey).sort();
     const remainingWeekKeys = weekKeys.filter((k) => k > selectedDateKey);
@@ -1131,41 +1132,78 @@ const MealPlannerApp = () => {
       return;
     }
 
+    const targetDateKeys = remainingWeekKeys.filter(k => !hasLockedHistoryForDate(k, mealHistory));
+    const keptLockedDays = remainingWeekKeys.length - targetDateKeys.length;
+
+    if (targetDateKeys.length === 0) {
+      showNotification(keptLockedDays > 0 ? '⚠️ All remaining days are locked (confirmed)' : '⚠️ No days to regenerate');
+      return;
+    }
+
     const chosenMealNames = getMealTypeOrder(selectedDayPlan, selectedDayHistory)
       .map((mealType) => selectedDayPlan[mealType]?.name)
       .filter(Boolean);
 
-    const nextPlans = { ...mealPlans };
-    let regeneratedDays = 0;
-    let keptLockedDays = 0;
+    setIsRegenerating(true);
+    showNotification('🧠 AI is drafting your weekly plan...');
 
-    for (const dayKey of remainingWeekKeys) {
-      if (hasLockedHistoryForDate(dayKey, mealHistory)) {
-        keptLockedDays += 1;
-        continue;
+    try {
+      // Build 7-day lookback for pattern engine
+      const historyMap = {};
+      for (let i = 0; i < 7; i++) {
+        const d = shiftDateKey(selectedDateKey, -i);
+        if (mealHistory[d]) historyMap[d] = mealHistory[d];
+        else if (mealPlans[d]) historyMap[d] = mealPlans[d];
       }
 
-      nextPlans[dayKey] = generatePlanForDate(dayKey, nextPlans, preferences);
-      regeneratedDays += 1;
+      const { generateWeeklyPlan } = await import('./lib/geminiService.js');
+      const generatedDays = await generateWeeklyPlan({
+        targetDateKeys,
+        mealDatabase: mergedMealDatabase,
+        preferences: normalizePreferences(preferences),
+        historyMap,
+        dailyProteinTarget: onboardingProfile?.goal?.dailyProteinTarget || 120
+      });
+
+      const nextPlans = { ...mealPlans };
+
+      // Re-hydrate the canonical string names from the AI back into full meal objects
+      const catalog = [
+        ...(mergedMealDatabase.breakfast || []),
+        ...(mergedMealDatabase.lunch || []),
+        ...(mergedMealDatabase.dinner || []),
+        ...(mergedMealDatabase.snack || [])
+      ];
+      const findMeal = (name) => catalog.find(m => m.canonical_name === name) || null;
+
+      for (const day of generatedDays) {
+        if (!day.dateKey) continue;
+        nextPlans[day.dateKey] = {
+          ...nextPlans[day.dateKey],
+          breakfast: findMeal(day.breakfast) || nextPlans[day.dateKey]?.breakfast,
+          lunch: findMeal(day.lunch) || nextPlans[day.dateKey]?.lunch,
+          dinner: findMeal(day.dinner) || nextPlans[day.dateKey]?.dinner
+        };
+      }
+
+      setMealPlans(nextPlans);
+      saveToStorage('meal-plans', nextPlans);
+      appendMealEvent({
+        type: 'regen',
+        dateKey: selectedDateKey,
+        mealType: 'week',
+        regeneratedDays: generatedDays.length,
+        keptLockedDays,
+        contextMeals: Array.from(new Set(chosenMealNames))
+      });
+
+      showNotification(`✓ AI Regenerated ${generatedDays.length} day(s)${keptLockedDays > 0 ? `, kept ${keptLockedDays} locked` : ''}`);
+    } catch (err) {
+      console.error(err);
+      showNotification('❌ AI Generation failed. Please try again.');
+    } finally {
+      setIsRegenerating(false);
     }
-
-    if (regeneratedDays === 0) {
-      showNotification(keptLockedDays > 0 ? '⚠️ All remaining days are locked (confirmed)' : '⚠️ No days regenerated');
-      return;
-    }
-
-    setMealPlans(nextPlans);
-    saveToStorage('meal-plans', nextPlans);
-    appendMealEvent({
-      type: 'regen',
-      dateKey: selectedDateKey,
-      mealType: 'week',
-      regeneratedDays,
-      keptLockedDays,
-      contextMeals: Array.from(new Set(chosenMealNames))
-    });
-
-    showNotification(`✓ Regenerated ${regeneratedDays} day(s)${keptLockedDays > 0 ? `, kept ${keptLockedDays} locked` : ''} `);
   };
   const todayKey = getDateKey();
   const weekDateKeys = getWeekDateKeys(selectedDateKey);
@@ -1428,10 +1466,11 @@ const MealPlannerApp = () => {
         <div className="flex gap-2 mb-4">
           <button
             onClick={regenerateRestOfWeek}
-            className="w-[60%] bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isViewerMode}
+            className="w-[60%] bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            disabled={isViewerMode || isRegenerating}
           >
-            ♻️ Regen Rest Of Week
+            {isRegenerating ? <Loader2 className="animate-spin" size={18} /> : '♻️'}
+            {isRegenerating ? 'Planning Week...' : 'Regen Rest Of Week'}
           </button>
           <button
             onClick={() => setShowOnboardingEditor(true)}
