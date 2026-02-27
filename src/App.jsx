@@ -1296,7 +1296,7 @@ const MealPlannerApp = () => {
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-gray-600">{mealTypeLabels[mealType]}:</span>
                     <span className="ml-2 text-gray-800">{formatMealName(meal)}</span>
-                    {meal.orderOut && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">DO</span>}
+                    {meal.orderOut && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">D.O.</span>}
                     {isConfirmed && <Check className="inline ml-2 text-green-500" size={16} />}
                     {isSkipped && <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">⊘ Skipped</span>}
                   </div>
@@ -1563,6 +1563,7 @@ const MealPlannerApp = () => {
                           <span className="text-gray-700 truncate">
                             {mealTypeLabels[mealType]}:{' '}
                             {formatMealName(plan[mealType] || dayData[mealType]?.meal || dayData[mealType]?.actual || 'Not set')}
+                            {(dayData[mealType]?.orderOut || plan[mealType]?.orderOut) && ' (Dine Out)'}
                           </span>
                           <span className="text-blue-600 font-semibold">{dayData[mealType]?.protein || plan[mealType]?.protein || 0}g</span>
                         </div>
