@@ -45,6 +45,7 @@ const MealPlannerApp = () => {
   const [userMealCatalog, setUserMealCatalog] = useState(DEFAULT_USER_CATALOG);
   const omniboxRef = React.useRef(null);
   const [activeOmniboxContext, setActiveOmniboxContext] = useState(null);
+  const [omniboxPrefill, setOmniboxPrefill] = useState('');
   const todayDate = new Date().toLocaleDateString('en-IN', {
     timeZone: IST_TIME_ZONE,
     weekday: 'long',
@@ -955,20 +956,18 @@ const MealPlannerApp = () => {
   const handleDiningOut = async (slot) => {
     if (!requireWriteAccess('Dining Out')) return;
 
-    updateSelectedPlan((prev) => ({
-      ...prev,
-      [slot]: {
-        id: 'dining_out',
-        name: 'Dining Out',
-        protein: 0,
-        cal: 0,
-        macros: { p: 0, c: 0, f: 0 },
-        cuisine: 'any',
-        type: [slot],
-        parts: []
-      }
-    }));
-    showNotification(`🍽️ Logged Dining Out for ${slot}`);
+    setActiveOmniboxContext(slot);
+    setOmniboxPrefill('Dine out ');
+
+    if (omniboxRef.current) {
+      omniboxRef.current.focus();
+      setTimeout(() => {
+        if (omniboxRef.current) {
+          const y = omniboxRef.current.getBoundingClientRect().top + window.scrollY - 100;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 300);
+    }
   };
 
   const getTotalProtein = () => {
@@ -1360,6 +1359,8 @@ const MealPlannerApp = () => {
             activeContext={activeOmniboxContext}
             onClearContext={() => setActiveOmniboxContext(null)}
             externalInputRef={omniboxRef}
+            prefill={omniboxPrefill}
+            onClearPrefill={() => setOmniboxPrefill('')}
           />
 
           {customCandidates.length > 0 && (
@@ -1459,9 +1460,6 @@ const MealPlannerApp = () => {
                     {parseDateKey(dateKey).toLocaleDateString('en-US', { weekday: 'short', timeZone: IST_TIME_ZONE })}
                   </div>
                   <div className="text-xs">{parseDateKey(dateKey).getUTCDate()}</div>
-                  <div className={`text - [10px] ${isSelected ? 'text-blue-100' : 'text-gray-500'} `}>
-                    {completion.confirmedCount}/{completion.totalSlots}
-                  </div>
                   {isToday && <div className="text-[9px]">Today</div>}
                 </button>
               );
@@ -1535,7 +1533,7 @@ const MealPlannerApp = () => {
                       </span>
                     </div>
                     <div className="text-xs space-y-1">
-                      {getMealTypeOrder(plan, dayData).map((mealType) => (
+                      {getMealTypeOrder(plan, dayData).filter((mealType) => !dayData[mealType]?.skipped).map((mealType) => (
                         <div key={mealType} className="flex justify-between gap-2">
                           <span className="text-gray-700 truncate">
                             {mealTypeLabels[mealType]}:{' '}

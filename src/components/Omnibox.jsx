@@ -3,7 +3,7 @@ import { Send, Sparkles, Loader2, X, Check } from 'lucide-react';
 import { parseMealIntent, isGeminiConfigured } from '../lib/geminiService';
 import { mealDatabase } from '../data/mealDatabase';
 
-const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, externalInputRef }) => {
+const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, externalInputRef, prefill = "", onClearPrefill }) => {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -13,6 +13,13 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
     const inputRef = externalInputRef || internalInputRef;
 
     const isConfigured = isGeminiConfigured();
+
+    useEffect(() => {
+        if (prefill) {
+            setInput(prefill);
+            if (onClearPrefill) onClearPrefill();
+        }
+    }, [prefill, onClearPrefill]);
 
     const handleProcessIntent = async (e) => {
         e.preventDefault();
