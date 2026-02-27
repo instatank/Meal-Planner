@@ -650,6 +650,21 @@ const MealPlannerApp = () => {
           [targetSlot]: mealData
         }));
 
+        setMealHistory((prev) => ({
+          ...prev,
+          [selectedDateKey]: {
+            ...prev[selectedDateKey],
+            [targetSlot]: { meal: payload.data.name, confirmed: true, orderOut: true }
+          }
+        }));
+
+        appendMealEvent({
+          type: 'custom',
+          dateKey: selectedDateKey,
+          mealType: targetSlot,
+          mealName: payload.data.name
+        });
+
         showNotification(`🍱 Cheated: ${payload.data.name}`);
       }
 
