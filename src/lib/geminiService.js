@@ -207,7 +207,8 @@ CRITICAL RULES:
 1. INTELLIGENT PATTERN MATCHING (Repetition vs. Variety):
    - Analyze the \`RECENT HISTORY\`. Identify meals the user explicitly loves to repeat (e.g. eating the same breakfast multiple days) vs. meals that are clearly meant to be spaced out.
    - If a meal is historically static (eaten >4 times a week), KEEP REPEATING IT. Consistency is key for habit formation.
-   - If a meal is historically sporadic, ensure it is spaced by at least 3 days.
+   - STRICT ANTI-REPETITION: Do NOT repeat the exact same Lunch or Dinner within the \`DATES TO GENERATE\`. Every generated Lunch and Dinner in this batch must be completely unique from the others.
+   - Ensure the generated meals do not overlap with any lunches or dinners eaten in the last 2 days of \`RECENT HISTORY\`.
 2. PROTEIN ANCHORING: Ensure the combined total of the generated Breakfast, Lunch, and Dinner mathematically hits the user's Target Protein per day as closely as possible.
 3. CALORIC TAPERING: Structure the day so the heaviest, highest-carb meal is either Breakfast or Lunch. Dinner should be significantly lighter and leaner by comparison, unless the user's history dictates otherwise.
 4. LEAN MEAT PRIORITIZATION: Lean heavily towards Chicken and Fish (including Salmon) meals throughout the week.
@@ -224,7 +225,7 @@ CRITICAL RULES:
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        temperature: 0.4, // Slight variance allowed for macro balancing
+        temperature: 0.7, // Increased variance to force diverse selection
         responseMimeType: 'application/json'
       }
     });
