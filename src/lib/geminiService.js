@@ -77,7 +77,10 @@ If the user is dining out / cheat meal:
   "intent": "DINING_OUT",
   "data": {
     "name": "Restaurant Name / Meal",
-    "estimatedCalories": 1200
+    "estimatedCalories": 1200,
+    "estimatedProtein": 45,
+    "estimatedCarbs": 60,
+    "estimatedFats": 35
   }
 }
 
