@@ -640,8 +640,12 @@ const MealPlannerApp = () => {
         const mealData = {
           name: payload.data.name,
           cal: payload.data.estimatedCalories || 0,
-          protein: 0,
-          macros: { p: 0, c: 0, f: 0 },
+          protein: payload.data.estimatedProtein || 0,
+          macros: {
+            p: payload.data.estimatedProtein || 0,
+            c: payload.data.estimatedCarbs || 0,
+            f: payload.data.estimatedFats || 0
+          },
           orderOut: true
         };
 
@@ -654,7 +658,13 @@ const MealPlannerApp = () => {
           ...prev,
           [selectedDateKey]: {
             ...prev[selectedDateKey],
-            [targetSlot]: { meal: payload.data.name, confirmed: true, orderOut: true }
+            [targetSlot]: {
+              meal: payload.data.name,
+              confirmed: true,
+              orderOut: true,
+              protein: payload.data.estimatedProtein || 0,
+              cal: payload.data.estimatedCalories || 0
+            }
           }
         }));
 
@@ -1286,7 +1296,7 @@ const MealPlannerApp = () => {
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-gray-600">{mealTypeLabels[mealType]}:</span>
                     <span className="ml-2 text-gray-800">{formatMealName(meal)}</span>
-                    {meal.orderOut && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">OO</span>}
+                    {meal.orderOut && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">DO</span>}
                     {isConfirmed && <Check className="inline ml-2 text-green-500" size={16} />}
                     {isSkipped && <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">⊘ Skipped</span>}
                   </div>
