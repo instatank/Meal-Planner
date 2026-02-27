@@ -205,11 +205,11 @@ Target Protein per day: ${dailyProteinTarget}g
 
 CRITICAL RULES:
 1. INTELLIGENT PATTERN MATCHING (Repetition vs. Variety):
-   - Analyze the \`RECENT HISTORY\`. Identify meals the user explicitly loves to repeat (e.g. eating the same breakfast multiple days) vs. meals that are clearly meant to be spaced out.
-   - If a meal is historically static (eaten >4 times a week), KEEP REPEATING IT. Consistency is key for habit formation.
-   - STRICT ANTI-REPETITION: Do NOT repeat the exact same Lunch or Dinner within the \`DATES TO GENERATE\`. Every generated Lunch and Dinner in this batch must be completely unique from the others.
-   - Ensure the generated meals do not overlap with any lunches or dinners eaten in the last 2 days of \`RECENT HISTORY\`.
-2. PROTEIN ANCHORING: Ensure the combined total of the generated Breakfast, Lunch, and Dinner mathematically hits the user's Target Protein per day as closely as possible.
+   - Analyze the \`RECENT HISTORY\`. Identify meals the user explicitly loves to repeat (e.g. eating the same Breakfast) vs. meals that are meant to be varied.
+   - If a meal is historically static (eaten >4 times a week), KEEP REPEATING IT.
+   - If a lunch or dinner was eaten only once recently, ensure it is spaced by at least 3-4 days. Do not blindly repeat it simply because it fits the macros.
+   - NOVELTY PRIORITIZATION: If a valid meal from the catalog (e.g., Fish Curry, Grilled Salmon) has *not* been eaten in the last 7 days, strongly prioritize introducing it to maintain a diverse weekly palate.
+2. FLEXIBLE PROTEIN ANCHORING (10% Concession): The combined total of the generated Breakfast, Lunch, and Dinner does NOT need to be mathematically perfect. You have a ±10% flexible envelope around the user's Target Protein per day. Prioritize culinary variety and logical human sequencing over strict mathematical perfection.
 3. CALORIC TAPERING: Structure the day so the heaviest, highest-carb meal is either Breakfast or Lunch. Dinner should be significantly lighter and leaner by comparison, unless the user's history dictates otherwise.
 4. LEAN MEAT PRIORITIZATION: Lean heavily towards Chicken and Fish (including Salmon) meals throughout the week.
 5. RED MEAT CAP: Red meats (Pork, Steak, Lamb) must NEVER exceed 2-3 meals *total* combined across the entire calculated week.
