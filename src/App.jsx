@@ -973,18 +973,18 @@ const MealPlannerApp = () => {
 
   const getTotalProtein = () => {
     const mealTypes = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
-    return mealTypes.reduce((sum, mealType) => {
+    return Math.round(mealTypes.reduce((sum, mealType) => {
       if (selectedDayHistory[mealType]?.skipped) return sum;
       return sum + (selectedDayPlan[mealType]?.protein || selectedDayHistory[mealType]?.protein || 0);
-    }, 0);
+    }, 0));
   };
 
   const getTotalCalories = () => {
     const mealTypes = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
-    return mealTypes.reduce((sum, mealType) => {
+    return Math.round(mealTypes.reduce((sum, mealType) => {
       if (selectedDayHistory[mealType]?.skipped) return sum;
       return sum + (selectedDayPlan[mealType]?.cal || selectedDayHistory[mealType]?.cal || 0);
-    }, 0);
+    }, 0));
   };
 
   const getWeeklyStats = () => {
@@ -1016,10 +1016,10 @@ const MealPlannerApp = () => {
     // In Zero-Touch UX, a slot is considered 'confirmed' if it exists and wasn't explicitly skipped.
     const confirmedCount = mealTypesForDay.filter((m) => !dayData[m]?.skipped).length;
 
-    const protein = mealTypesForDay.reduce((sum, mealType) => {
+    const protein = Math.round(mealTypesForDay.reduce((sum, mealType) => {
       if (dayData[mealType]?.skipped) return sum;
       return sum + (dayData[mealType]?.protein || dayPlan[mealType]?.protein || 0);
-    }, 0);
+    }, 0));
 
     return { confirmedCount, protein, totalSlots: mealTypesForDay.length };
   };
