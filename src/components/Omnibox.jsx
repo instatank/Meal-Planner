@@ -5,6 +5,8 @@ import { mealDatabase } from '../data/mealDatabase';
 
 const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, externalInputRef, prefill = "", onClearPrefill }) => {
     const [input, setInput] = useState('');
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [pendingIntent, setPendingIntent] = useState(null);
@@ -20,6 +22,43 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
             if (onClearPrefill) onClearPrefill();
         }
     }, [prefill, onClearPrefill]);
+
+    useEffect(() => {
+        if (!input.trim() || input.trim().length < 2) {
+            setSuggestions([]);
+            return;
+        }
+
+        const lowerInput = input.trim().toLowerCase();
+        const results = [];
+
+        for (const [slot, meals] of Object.entries(mealDatabase)) {
+            for (const m of meals) {
+                if (
+                    m.name.toLowerCase().includes(lowerInput) ||
+                    m.display_name.toLowerCase().includes(lowerInput) ||
+                    m.canonical_name.toLowerCase().includes(lowerInput)
+                ) {
+                    if (!results.some(existing => existing.canonical_name === m.canonical_name)) {
+                        results.push({ ...m, matchedSlot: slot === 'lunchDinner' ? 'lunch_dinner' : slot });
+                    }
+                }
+            }
+        }
+
+        setSuggestions(results.slice(0, 5));
+    }, [input]);
+
+    const handleSuggestionClick = (meal) => {
+        onAIAction({
+            intent: 'ADD_DB_MEAL',
+            slot: meal.matchedSlot,
+            data: meal
+        });
+        setInput('');
+        setSuggestions([]);
+        setShowSuggestions(false);
+    };
 
     const handleProcessIntent = async (e) => {
         e.preventDefault();
@@ -167,8 +206,14 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
                             ref={inputRef}
                             type="text"
                             value={input}
-                            onFocus={() => setIsFocused(true)}
-                            onBlur={() => setIsFocused(false)}
+                            onFocus={() => {
+                                setIsFocused(true);
+                                setShowSuggestions(true);
+                            }}
+                            onBlur={() => {
+                                setIsFocused(false);
+                                setTimeout(() => setShowSuggestions(false), 200);
+                            }}
                             onChange={(e) => setInput(e.target.value)}
                             disabled={disabled || loading || !!pendingIntent}
                             placeholder={loading ? "Thinking..." : "Tell me what you ate, or what you want to change..."}
@@ -186,6 +231,29 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
                             <Send className="w-4 h-4" />
                         </button>
                     </div>
+
+                    {/* Suggestions Dropdown */}
+                    {showSuggestions && suggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-emerald-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                            {suggestions.map((meal) => (
+                                <button
+                                    key={meal.canonical_name + '_' + meal.matchedSlot}
+                                    type="button"
+                                    onClick={() => handleSuggestionClick(meal)}
+                                    className="w-full text-left px-4 py-3 hover:bg-emerald-50 focus:bg-emerald-50 transition-colors flex items-center justify-between border-b border-gray-50 last:border-0"
+                                >
+                                    <div>
+                                        <div className="font-medium text-gray-800 text-sm">{meal.display_name || meal.name}</div>
+                                        <div className="text-xs text-gray-400 capitalize mt-0.5 font-medium">{meal.matchedSlot.replace('_', ' ')}</div>
+                                    </div>
+                                    <div className="flex gap-2 text-xs font-semibold shrink-0">
+                                        <span className="text-emerald-700 bg-emerald-100 flex items-center justify-center min-w-[50px] py-1 rounded-md">{meal.protein}g P</span>
+                                        <span className="text-orange-700 bg-orange-100 flex items-center justify-center min-w-[60px] py-1 rounded-md">{meal.cal} kcal</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     {
                         error && (
