@@ -206,13 +206,13 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
                             ref={inputRef}
                             type="text"
                             value={input}
-                            onFocus={(e) => {
+                            onPointerDown={(e) => {
                                 if (!activeContext && onRequestContext) {
                                     e.preventDefault();
-                                    inputRef.current?.blur();
                                     onRequestContext();
-                                    return;
                                 }
+                            }}
+                            onFocus={() => {
                                 setIsFocused(true);
                                 setShowSuggestions(true);
                             }}
