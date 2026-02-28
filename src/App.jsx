@@ -257,6 +257,11 @@ const MealPlannerApp = () => {
   const [showOnboardingEditor, setShowOnboardingEditor] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
+  const isViewerMode = onboardingProfile?.mode === ONBOARDING_MODE.VIEWER;
+  const onboardingDraft = onboardingProfile
+    ? { mode: onboardingProfile.mode, goal: onboardingProfile.goal }
+    : getDefaultOnboardingDraft();
+
   const safeParseJson = (value, fallback = null) => {
     if (value == null) return fallback;
     if (typeof value !== 'string') return value;
@@ -523,10 +528,6 @@ const MealPlannerApp = () => {
 
   const selectedDayPlan = mealPlans[selectedDateKey] || createDefaultPlan();
   const selectedDayHistory = mealHistory[selectedDateKey] || {};
-  const isViewerMode = onboardingProfile?.mode === ONBOARDING_MODE.VIEWER;
-  const onboardingDraft = onboardingProfile
-    ? { mode: onboardingProfile.mode, goal: onboardingProfile.goal }
-    : getDefaultOnboardingDraft();
   const customCandidates = useMemo(
     () => getCustomMealCandidates(mealEvents, allExistingMealNames, { lookbackDays: 45, minCount: 3 }),
     [mealEvents, allExistingMealNames]
