@@ -210,11 +210,17 @@ CRITICAL RULES:
    - LUNCH (HIGH VARIETY): Every lunch suggestion should ideally be unique for the generated week. A specific lunch meal may be repeated AT MOST once during the week, and this exception can only happen for ONE meal across the whole week. Otherwise, prioritize strict diversity for lunches.
    - DINNER (MODERATE REPETITION): Repetition for dinners is perfectly acceptable. Focus on balancing macros and sequenced cuisines over forced variety.
    - NOVELTY PRIORITIZATION: If a valid meal from the catalog (e.g., Fish Curry, Grilled Salmon) has *not* been eaten in the last 7 days, strongly prioritize introducing it to maintain a diverse weekly palate (especially for Lunch).
-2. FLEXIBLE PROTEIN ANCHORING (10% Concession): The combined total of the generated Breakfast, Lunch, and Dinner does NOT need to be mathematically perfect. You have a ±10% flexible envelope around the user's Target Protein per day. Prioritize culinary variety and logical human sequencing over strict mathematical perfection.
-3. CALORIC TAPERING: Structure the day so the heaviest, highest-carb meal is either Breakfast or Lunch. Dinner should be significantly lighter and leaner by comparison, unless the user's history dictates otherwise.
-4. LEAN MEAT PRIORITIZATION: Lean heavily towards Chicken and Fish (including Salmon) meals throughout the week.
-5. RED MEAT CAP: Red meats (Pork, Steak, Lamb) must NEVER exceed 2-3 meals *total* combined across the entire calculated week.
-6. CUISINE SEQUENCING: Do not schedule the same heavy cuisine for Lunch and Dinner on the same day (e.g., no Mexican for Lunch and Mexican for Dinner) unless the user historically does this.
+2. HARD DAILY LIMITS:
+   - HEAVY LIMITS: Only a maximum of ONE meal per day can be "Carb Heavy" or "Fat Heavy" (use your common sense based on the meal name).
+   - CALORIE LIMIT: Only a maximum of ONE meal per day can exceed 600 calories.
+3. FLEXIBLE PROTEIN ANCHORING (10% Concession): The combined total of the generated Breakfast, Lunch, and Dinner does NOT need to be mathematically perfect. You have a ±10% flexible envelope around the user's Target Protein per day. Prioritize culinary variety and logical human sequencing over strict mathematical perfection.
+4. PROTEIN DIVERSITY:
+   - No single meal can contain two of the same primary protein families (e.g., no chicken and turkey in the same bowl).
+   - Try to use different primary protein families for Lunch and Dinner (e.g., if Lunch is Fish, Dinner should ideally not be Fish). You can be flexible on this if required to meet daily targets.
+   - LEAN MEAT PRIORITIZATION: Lean heavily towards Chicken and Fish (including Salmon) meals throughout the week.
+   - RED MEAT CAP: Red meats (Pork, Steak, Lamb) must NEVER exceed 2-3 meals *total* combined across the entire calculated week.
+5. CALORIC TAPERING: Structure the day so the heaviest, highest-carb meal is either Breakfast or Lunch. Dinner should be significantly lighter and leaner by comparison, unless the user's history dictates otherwise.
+6. CUISINE SEQUENCING: Lunch and Dinner cannot *both* be Indian cuisine. Do not schedule the same heavy cuisine for Lunch and Dinner on the same day unless the user historically does this.
 7. FORMAT: You must output STRICTLY valid JSON in this exact format (no markdown formatting, no backticks, JSON array only):
 [
   { "dateKey": "YYYY-MM-DD", "breakfast": "canonical_name", "lunch": "canonical_name", "dinner": "canonical_name" }
