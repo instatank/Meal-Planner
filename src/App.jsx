@@ -1376,21 +1376,27 @@ const MealPlannerApp = () => {
                     {isConfirmed && <Check className="inline ml-2 text-green-500" size={16} />}
                   </div>
                 </div>
-                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                  <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded">P: {meal.protein}g</span>
-                  <button onClick={() => toggleExpand(mealType)} className="text-xs text-blue-600 flex items-center gap-1 hover:text-blue-800">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-2 overflow-x-auto hide-scrollbar shrink-0">
+                  <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded whitespace-nowrap">P: {meal.protein}g</span>
+                  <button onClick={() => toggleExpand(mealType)} className="text-xs text-blue-600 flex items-center gap-0.5 hover:text-blue-800 whitespace-nowrap">
                     Details {expandedMeals[mealType] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                   <button
                     onClick={() => handleSkip(mealType)}
-                    className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`text-xs px-2.5 py-1 rounded transition-colors whitespace-nowrap disabled:cursor-not-allowed ${isSkipped
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                      }`}
                     disabled={isViewerMode || isSkipped}
                   >
                     {isSkipped ? '⊘ Skipped' : 'Skip Meal'}
                   </button>
                   <button
                     onClick={() => handleEditClick(mealType)}
-                    className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`text-xs px-2.5 py-1 rounded transition-colors whitespace-nowrap flex items-center disabled:cursor-not-allowed ${isSkipped
+                        ? 'bg-gray-100 text-gray-400'
+                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                      }`}
                     disabled={isViewerMode || isSkipped}
                   >
                     <Edit3 className="inline mr-1" size={12} />
