@@ -818,18 +818,20 @@ const MealPlannerApp = () => {
 
   const handleEditClick = (mealType) => {
     setActiveOmniboxContext(mealType);
-    if (omniboxRef.current) {
-      omniboxRef.current.focus();
+    setTimeout(() => {
+      if (omniboxRef.current) {
+        omniboxRef.current.focus();
 
-      // Delay the scroll slightly to allow the mobile virtual keyboard to render
-      // Then scroll it so the Omnibox is slightly above the exact center of the screen
-      setTimeout(() => {
-        if (omniboxRef.current) {
-          const y = omniboxRef.current.getBoundingClientRect().top + window.scrollY - 100;
-          window.scrollTo({ top: y, behavior: 'smooth' });
-        }
-      }, 300);
-    }
+        // Delay the scroll slightly to allow the mobile virtual keyboard to render
+        // Then scroll it so the Omnibox is slightly above the exact center of the screen
+        setTimeout(() => {
+          if (omniboxRef.current) {
+            const y = omniboxRef.current.getBoundingClientRect().top + window.scrollY - 100;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+          }
+        }, 300);
+      }
+    }, 10);
   };
 
   const handleSkip = async (mealType) => {
@@ -986,15 +988,17 @@ const MealPlannerApp = () => {
     setActiveOmniboxContext(slot);
     setOmniboxPrefill('Dine out ');
 
-    if (omniboxRef.current) {
-      omniboxRef.current.focus();
-      setTimeout(() => {
-        if (omniboxRef.current) {
-          const y = omniboxRef.current.getBoundingClientRect().top + window.scrollY - 100;
-          window.scrollTo({ top: y, behavior: 'smooth' });
-        }
-      }, 300);
-    }
+    setTimeout(() => {
+      if (omniboxRef.current) {
+        omniboxRef.current.focus();
+        setTimeout(() => {
+          if (omniboxRef.current) {
+            const y = omniboxRef.current.getBoundingClientRect().top + window.scrollY - 100;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+          }
+        }, 300);
+      }
+    }, 10);
   };
 
   const handleOmniboxSlotSelection = (slot) => {
