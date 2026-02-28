@@ -1367,11 +1367,11 @@ const MealPlannerApp = () => {
             const isSkipped = selectedDayHistory?.[mealType]?.skipped;
 
             return (
-              <div key={mealType} className={`pb-3 ${index === selectedMealTypeOrder.length - 1 ? 'mb-2' : 'mb-3 border-b border-gray-200'}`}>
+              <div key={mealType} className={`pb-3 ${index === selectedMealTypeOrder.length - 1 ? 'mb-2' : 'mb-3 border-b border-gray-200'} ${isSkipped ? 'opacity-70 bg-gray-50 rounded-lg p-3 border-transparent' : ''}`}>
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-gray-600">{mealTypeLabels[mealType]}:</span>
-                    <span className="ml-2 text-gray-800">{formatMealName(meal)}</span>
+                    <span className={`ml-2 text-gray-800 ${isSkipped ? 'line-through text-gray-400' : ''}`}>{formatMealName(meal)}</span>
                     {meal.orderOut && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">D.O.</span>}
                     {isConfirmed && <Check className="inline ml-2 text-green-500" size={16} />}
                     {isSkipped && <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">⊘ Skipped</span>}
@@ -1636,16 +1636,19 @@ const MealPlannerApp = () => {
                       </span>
                     </div>
                     <div className="text-xs space-y-1">
-                      {getMealTypeOrder(plan, dayData).filter((mealType) => !dayData[mealType]?.skipped).map((mealType) => (
-                        <div key={mealType} className="flex justify-between gap-2">
-                          <span className="text-gray-700 truncate">
-                            {mealTypeLabels[mealType]}:{' '}
-                            {formatMealName(plan[mealType] || dayData[mealType]?.meal || dayData[mealType]?.actual || 'Not set')}
-                            {(dayData[mealType]?.orderOut || plan[mealType]?.orderOut) && ' (Dine Out)'}
-                          </span>
-                          <span className="text-blue-600 font-semibold">{dayData[mealType]?.protein || plan[mealType]?.protein || 0}g</span>
-                        </div>
-                      ))}
+                      {getMealTypeOrder(plan, dayData).map((mealType) => {
+                        const isSkipped = dayData[mealType]?.skipped;
+                        return (
+                          <div key={mealType} className="flex justify-between gap-2">
+                            <span className={`text-gray-700 truncate ${isSkipped ? 'line-through text-gray-400 opacity-70' : ''}`}>
+                              {mealTypeLabels[mealType]}:{' '}
+                              {formatMealName(plan[mealType] || dayData[mealType]?.meal || dayData[mealType]?.actual || 'Not set')}
+                              {(dayData[mealType]?.orderOut || plan[mealType]?.orderOut) && ' (Dine Out)'}
+                            </span>
+                            <span className={`${isSkipped ? 'text-gray-400 opacity-60' : 'text-blue-600'} font-semibold`}>{dayData[mealType]?.protein || plan[mealType]?.protein || 0}g</span>
+                          </div>
+                        )
+                      })}
                     </div>
                     <div className="mt-2 pt-2 border-t text-xs text-gray-600">Recorded protein: {completion.protein}g</div>
                   </div>
