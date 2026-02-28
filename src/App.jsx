@@ -41,6 +41,7 @@ const MealPlannerApp = () => {
   const [showProgress, setShowProgress] = useState(false);
   const [notification, setNotification] = useState('');
   const [showDiningOutModal, setShowDiningOutModal] = useState(false);
+  const [showOmniboxSlotModal, setShowOmniboxSlotModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userMealCatalog, setUserMealCatalog] = useState(DEFAULT_USER_CATALOG);
   const omniboxRef = React.useRef(null);
@@ -996,6 +997,14 @@ const MealPlannerApp = () => {
     }
   };
 
+  const handleOmniboxSlotSelection = (slot) => {
+    setActiveOmniboxContext(slot);
+    setShowOmniboxSlotModal(false);
+    if (omniboxRef.current) {
+      setTimeout(() => omniboxRef.current.focus(), 100);
+    }
+  };
+
   const getTotalProtein = () => {
     const mealTypes = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
     return Math.round(mealTypes.reduce((sum, mealType) => {
@@ -1277,6 +1286,31 @@ const MealPlannerApp = () => {
           </div>
         )}
 
+        {showOmniboxSlotModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowOmniboxSlotModal(false)}>
+            <div className="bg-white rounded-lg p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Select Meal Slot</h3>
+                <button onClick={() => setShowOmniboxSlotModal(false)} className="text-gray-500 hover:text-gray-700">
+                  <X size={24} />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Which meal are you logging?</p>
+              <div className="grid gap-3">
+                {['breakfast', 'lunch', 'dinner', 'snack'].map((slot) => (
+                  <button
+                    key={slot}
+                    onClick={() => handleOmniboxSlotSelection(slot)}
+                    className="w-full bg-emerald-50 text-emerald-700 py-3 rounded-lg font-semibold hover:bg-emerald-100 transition-colors capitalize border border-emerald-200"
+                  >
+                    {slot}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
 
 
 
@@ -1421,6 +1455,7 @@ const MealPlannerApp = () => {
             disabled={isViewerMode}
             activeContext={activeOmniboxContext}
             onClearContext={() => setActiveOmniboxContext(null)}
+            onRequestContext={() => setShowOmniboxSlotModal(true)}
             externalInputRef={omniboxRef}
             prefill={omniboxPrefill}
             onClearPrefill={() => setOmniboxPrefill('')}
@@ -1616,7 +1651,7 @@ const MealPlannerApp = () => {
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 
