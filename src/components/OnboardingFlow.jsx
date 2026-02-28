@@ -37,13 +37,18 @@ const OnboardingFlow = ({ initialDraft, isEditing = false, onComplete, onCancel 
           <div className="space-y-3">
             {ONBOARDING_GOAL_OPTIONS.map((option) => {
               const selected = goal === option.value;
+              const disabled = option.disabled;
+
+              let buttonStyle = 'border-gray-200 hover:border-blue-300';
+              if (selected) buttonStyle = 'border-blue-500 bg-blue-50';
+              if (disabled) buttonStyle = 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed';
+
               return (
                 <button
                   key={option.value}
-                  onClick={() => setGoal(option.value)}
-                  className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                    selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
-                  }`}
+                  onClick={() => !disabled && setGoal(option.value)}
+                  disabled={disabled}
+                  className={`w-full rounded-lg border p-4 text-left transition-colors ${buttonStyle}`}
                 >
                   <div className="font-semibold text-gray-800">{option.title}</div>
                   <div className="text-sm text-gray-600 mt-1">{option.subtitle}</div>

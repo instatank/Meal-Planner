@@ -8,7 +8,8 @@ export const ONBOARDING_MODE = {
 export const ONBOARDING_GOAL = {
   HIGH_PROTEIN: 'high_protein',
   LOW_CARB: 'low_carb',
-  TWO_MEALS_DAY: 'two_meals_day'
+  TWO_MEALS_DAY: 'two_meals_day',
+  VEGETARIAN: 'vegetarian'
 };
 
 export const ONBOARDING_MODE_OPTIONS = [
@@ -32,13 +33,21 @@ export const ONBOARDING_GOAL_OPTIONS = [
   },
   {
     value: ONBOARDING_GOAL.LOW_CARB,
-    title: 'Low-Carb',
-    subtitle: 'Deprioritize carb-heavy meals.'
+    title: 'Low-Carb (Coming Soon)',
+    subtitle: 'Deprioritize carb-heavy meals.',
+    disabled: true
   },
   {
     value: ONBOARDING_GOAL.TWO_MEALS_DAY,
-    title: '2 Meals/Day',
-    subtitle: 'Lunch + dinner focused planning by default.'
+    title: '2 Meals/Day (Coming Soon)',
+    subtitle: 'Lunch + dinner focused planning by default.',
+    disabled: true
+  },
+  {
+    value: ONBOARDING_GOAL.VEGETARIAN,
+    title: 'Vegetarian (Coming Soon)',
+    subtitle: 'Plant-based meal planning.',
+    disabled: true
   }
 ];
 
@@ -50,7 +59,8 @@ const MODE_LABELS = {
 const GOAL_LABELS = {
   [ONBOARDING_GOAL.HIGH_PROTEIN]: 'High-Protein',
   [ONBOARDING_GOAL.LOW_CARB]: 'Low-Carb',
-  [ONBOARDING_GOAL.TWO_MEALS_DAY]: '2 Meals/Day'
+  [ONBOARDING_GOAL.TWO_MEALS_DAY]: '2 Meals/Day',
+  [ONBOARDING_GOAL.VEGETARIAN]: 'Vegetarian'
 };
 
 const asIsoString = (value) => {
