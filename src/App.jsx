@@ -43,6 +43,7 @@ const MealPlannerApp = () => {
   const [showDiningOutModal, setShowDiningOutModal] = useState(false);
   const [showOmniboxSlotModal, setShowOmniboxSlotModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pendingAutoGeneration, setPendingAutoGeneration] = useState(false);
   const [userMealCatalog, setUserMealCatalog] = useState(DEFAULT_USER_CATALOG);
   const omniboxRef = React.useRef(null);
   const [activeOmniboxContext, setActiveOmniboxContext] = useState(null);
@@ -360,6 +361,7 @@ const MealPlannerApp = () => {
         const eventsResult = await storageGet('meal-events');
         const userCatalogResult = await storageGet('meal-user-catalog');
         const onboardingResult = await storageGet(ONBOARDING_PROFILE_STORAGE_KEY);
+        const autoGenResult = await storageGet('last-auto-gen-week');
 
         const parsedHistory = normalizeDateMap(safeParseJson(historyResult, historyResult) || {});
         const parsedPrefs = normalizePreferences(safeParseJson(prefsResult, prefsResult) || {});
@@ -397,6 +399,11 @@ const MealPlannerApp = () => {
         void saveToStorage('meal-user-catalog', parsedUserCatalog);
         if (parsedOnboarding) {
           void saveToStorage(ONBOARDING_PROFILE_STORAGE_KEY, parsedOnboarding);
+        }
+
+        const currentWeekMonday = getWeekDateKeys(getDateKey(new Date()))[0];
+        if (autoGenResult !== currentWeekMonday && parsedOnboarding?.mode !== ONBOARDING_MODE.VIEWER) {
+          setPendingAutoGeneration(true);
         }
       } catch (error) {
         console.log('No stored data', error);
@@ -446,6 +453,73 @@ const MealPlannerApp = () => {
     void saveToStorage('meal-events', mealEvents);
     void saveToStorage('meal-preferences', nextPreferences);
   }, [mealEvents, loading]);
+
+  useEffect(() => {
+    if (!loading && pendingAutoGeneration && mergedMealDatabase && !isViewerMode) {
+      setPendingAutoGeneration(false);
+
+      const today = getDateKey(new Date());
+      const currentWeekKeys = getWeekDateKeys(today).sort();
+      const currentWeekMonday = currentWeekKeys[0];
+
+      void saveToStorage('last-auto-gen-week', currentWeekMonday);
+
+      const runAutoGeneration = async () => {
+        // Target all days in this week that are >= today and not locked
+        const targetDateKeys = currentWeekKeys
+          .filter(k => k >= today)
+          .filter(k => !hasLockedHistoryForDate(k, mealHistory));
+
+        if (targetDateKeys.length === 0) return;
+
+        showNotification('✨ New week detected! Auto-generating your meal plan...');
+
+        try {
+          const historyMap = {};
+          for (let i = 0; i < 7; i++) {
+            const d = shiftDateKey(today, -i);
+            if (mealHistory[d]) historyMap[d] = mealHistory[d];
+            else if (mealPlans[d]) historyMap[d] = mealPlans[d];
+          }
+
+          const { generateWeeklyPlan } = await import('./lib/geminiService.js');
+          const generatedDays = await generateWeeklyPlan({
+            targetDateKeys,
+            mealDatabase: mergedMealDatabase,
+            preferences: normalizePreferences(preferences),
+            historyMap,
+            dailyProteinTarget: onboardingProfile?.goal?.dailyProteinTarget || 120
+          });
+
+          const nextPlans = { ...mealPlans };
+          const catalog = [
+            ...(mergedMealDatabase.breakfast || []),
+            ...(mergedMealDatabase.lunch || []),
+            ...(mergedMealDatabase.dinner || []),
+            ...(mergedMealDatabase.snack || [])
+          ];
+          const findMeal = (name) => catalog.find(m => m.canonical_name === name) || null;
+
+          generatedDays.forEach(day => {
+            const newPlan = { ...nextPlans[day.dateKey] };
+            if (day.breakfast) newPlan.breakfast = findMeal(day.breakfast) || { name: day.breakfast, protein: 0, cal: 0, macros: { p: 0, c: 0, f: 0 } };
+            if (day.lunch) newPlan.lunch = findMeal(day.lunch) || { name: day.lunch, protein: 0, cal: 0, macros: { p: 0, c: 0, f: 0 } };
+            if (day.dinner) newPlan.dinner = findMeal(day.dinner) || { name: day.dinner, protein: 0, cal: 0, macros: { p: 0, c: 0, f: 0 } };
+            if (day.snack) newPlan.snack = findMeal(day.snack) || { name: day.snack, protein: 0, cal: 0, macros: { p: 0, c: 0, f: 0 } };
+            nextPlans[day.dateKey] = newPlan;
+          });
+
+          setMealPlans(nextPlans);
+          saveToStorage('meal-plans', nextPlans);
+          showNotification(`✓ Successfully auto-generated ${generatedDays.length} days for the new week!`);
+        } catch (error) {
+          console.error("Auto-generation failed", error);
+        }
+      };
+
+      runAutoGeneration();
+    }
+  }, [loading, pendingAutoGeneration, mergedMealDatabase, isViewerMode, mealHistory, mealPlans, preferences, onboardingProfile]);
 
   const selectedDayPlan = mealPlans[selectedDateKey] || createDefaultPlan();
   const selectedDayHistory = mealHistory[selectedDateKey] || {};
@@ -1384,8 +1458,8 @@ const MealPlannerApp = () => {
                   <button
                     onClick={() => handleSkip(mealType)}
                     className={`text-xs px-2.5 py-1 rounded transition-colors whitespace-nowrap disabled:cursor-not-allowed ${isSkipped
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                      ? 'bg-orange-100 text-orange-700'
+                      : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
                       }`}
                     disabled={isViewerMode || isSkipped}
                   >
@@ -1394,8 +1468,8 @@ const MealPlannerApp = () => {
                   <button
                     onClick={() => handleEditClick(mealType)}
                     className={`text-xs px-2.5 py-1 rounded transition-colors whitespace-nowrap flex items-center disabled:cursor-not-allowed ${isSkipped
-                        ? 'bg-gray-100 text-gray-400'
-                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                      ? 'bg-gray-100 text-gray-400'
+                      : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
                       }`}
                     disabled={isViewerMode || isSkipped}
                   >
