@@ -205,10 +205,11 @@ Target Protein per day: ${dailyProteinTarget}g
 
 CRITICAL RULES:
 1. INTELLIGENT PATTERN MATCHING (Repetition vs. Variety):
-   - Analyze the \`RECENT HISTORY\`. Identify meals the user explicitly loves to repeat (e.g. eating the same Breakfast) vs. meals that are meant to be varied.
-   - If a meal is historically static (eaten >4 times a week), KEEP REPEATING IT.
-   - If a lunch or dinner was eaten only once recently, ensure it is spaced by at least 3-4 days. Do not blindly repeat it simply because it fits the macros.
-   - NOVELTY PRIORITIZATION: If a valid meal from the catalog (e.g., Fish Curry, Grilled Salmon) has *not* been eaten in the last 7 days, strongly prioritize introducing it to maintain a diverse weekly palate.
+   - Analyze the \`RECENT HISTORY\`.
+   - BREAKFAST (HIGH REPETITION): The user prefers repetition here. If a breakfast is historically static (eaten >3 times a week), KEEP REPEATING IT.
+   - LUNCH (HIGH VARIETY): Every lunch suggestion should ideally be unique for the generated week. A specific lunch meal may be repeated AT MOST once during the week, and this exception can only happen for ONE meal across the whole week. Otherwise, prioritize strict diversity for lunches.
+   - DINNER (MODERATE REPETITION): Repetition for dinners is perfectly acceptable. Focus on balancing macros and sequenced cuisines over forced variety.
+   - NOVELTY PRIORITIZATION: If a valid meal from the catalog (e.g., Fish Curry, Grilled Salmon) has *not* been eaten in the last 7 days, strongly prioritize introducing it to maintain a diverse weekly palate (especially for Lunch).
 2. FLEXIBLE PROTEIN ANCHORING (10% Concession): The combined total of the generated Breakfast, Lunch, and Dinner does NOT need to be mathematically perfect. You have a ±10% flexible envelope around the user's Target Protein per day. Prioritize culinary variety and logical human sequencing over strict mathematical perfection.
 3. CALORIC TAPERING: Structure the day so the heaviest, highest-carb meal is either Breakfast or Lunch. Dinner should be significantly lighter and leaner by comparison, unless the user's history dictates otherwise.
 4. LEAN MEAT PRIORITIZATION: Lean heavily towards Chicken and Fish (including Salmon) meals throughout the week.
