@@ -1374,7 +1374,6 @@ const MealPlannerApp = () => {
                     <span className={`ml-2 text-gray-800 ${isSkipped ? 'line-through text-gray-400' : ''}`}>{formatMealName(meal)}</span>
                     {meal.orderOut && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">D.O.</span>}
                     {isConfirmed && <Check className="inline ml-2 text-green-500" size={16} />}
-                    {isSkipped && <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">⊘ Skipped</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 mb-2 flex-wrap">
