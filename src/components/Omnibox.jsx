@@ -3,7 +3,7 @@ import { Send, Sparkles, Loader2, X, Check } from 'lucide-react';
 import { parseMealIntent, isGeminiConfigured } from '../lib/geminiService';
 import { mealDatabase } from '../data/mealDatabase';
 
-const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, externalInputRef, prefill = "", onClearPrefill }) => {
+const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, onRequestContext, externalInputRef, prefill = "", onClearPrefill }) => {
     const [input, setInput] = useState('');
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -206,7 +206,13 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
                             ref={inputRef}
                             type="text"
                             value={input}
-                            onFocus={() => {
+                            onFocus={(e) => {
+                                if (!activeContext && onRequestContext) {
+                                    e.preventDefault();
+                                    inputRef.current?.blur();
+                                    onRequestContext();
+                                    return;
+                                }
                                 setIsFocused(true);
                                 setShowSuggestions(true);
                             }}
