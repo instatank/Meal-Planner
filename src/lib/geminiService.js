@@ -168,12 +168,11 @@ export const generateWeeklyPlan = async ({
   // Flatten and compress available meals so we don't blow up the context window
   const availableMeals = [
     ...(mealDatabase.breakfast || []),
-    ...(mealDatabase.lunch || []),
-    ...(mealDatabase.dinner || []),
+    ...(mealDatabase.lunchDinner || []),
     ...(mealDatabase.snack || [])
   ].map(m => ({
     name: m.canonical_name,
-    type: (mealDatabase.breakfast || []).includes(m) ? 'breakfast' : ((mealDatabase.lunch || []).includes(m) || (mealDatabase.dinner || []).includes(m) ? 'lunch/dinner' : 'snack'),
+    type: (mealDatabase.breakfast || []).includes(m) ? 'breakfast' : ((mealDatabase.lunchDinner || []).includes(m) ? 'lunch/dinner' : 'snack'),
     p: m.protein || 0,
     cal: m.cal || 0,
     c: m.cuisine || 'general'

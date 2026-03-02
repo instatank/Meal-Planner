@@ -506,8 +506,7 @@ const MealPlannerApp = () => {
           const nextPlans = { ...mealPlans };
           const catalog = [
             ...(mergedMealDatabase.breakfast || []),
-            ...(mergedMealDatabase.lunch || []),
-            ...(mergedMealDatabase.dinner || []),
+            ...(mergedMealDatabase.lunchDinner || []),
             ...(mergedMealDatabase.snack || [])
           ];
           const findMeal = (name) => catalog.find(m => m.canonical_name === name) || null;
@@ -1271,8 +1270,7 @@ const MealPlannerApp = () => {
       // Re-hydrate the canonical string names from the AI back into full meal objects
       const catalog = [
         ...(mergedMealDatabase.breakfast || []),
-        ...(mergedMealDatabase.lunch || []),
-        ...(mergedMealDatabase.dinner || []),
+        ...(mergedMealDatabase.lunchDinner || []),
         ...(mergedMealDatabase.snack || [])
       ];
       const findMeal = (name) => catalog.find(m => m.canonical_name === name) || null;
