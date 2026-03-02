@@ -419,6 +419,52 @@ const MealPlannerApp = () => {
     loadStoredData();
   }, []);
 
+  // Implicit Auto-Confirmation for Past Days
+  useEffect(() => {
+    if (loading || isViewerMode) return;
+
+    setMealHistory(prevHistory => {
+      let historyChanged = false;
+      const nextHistory = { ...prevHistory };
+
+      Object.keys(mealPlans).forEach(dateKey => {
+        if (dateKey < todayKey) {
+          const plan = mealPlans[dateKey];
+          if (!plan) return;
+
+          let dayHistoryChanged = false;
+          const dayHistory = { ...(nextHistory[dateKey] || {}) };
+
+          ['breakfast', 'lunch', 'dinner', 'snack'].forEach(mealType => {
+            if (plan[mealType]) {
+              if (!dayHistory[mealType] || (!dayHistory[mealType].confirmed && !dayHistory[mealType].skipped)) {
+                dayHistory[mealType] = {
+                  meal: plan[mealType].name,
+                  protein: plan[mealType].protein,
+                  cal: plan[mealType].cal,
+                  confirmed: true,
+                  autoConfirmed: true
+                };
+                dayHistoryChanged = true;
+              }
+            }
+          });
+
+          if (dayHistoryChanged) {
+            nextHistory[dateKey] = dayHistory;
+            historyChanged = true;
+          }
+        }
+      });
+
+      if (historyChanged) {
+        saveToStorage('meal-history', nextHistory);
+        return nextHistory;
+      }
+      return prevHistory;
+    });
+  }, [loading, todayKey, mealPlans, isViewerMode]);
+
   useEffect(() => {
     if (loading) return;
 
@@ -1090,11 +1136,43 @@ const MealPlannerApp = () => {
     }
   };
 
+  const handleConfirm = (mealType) => {
+    if (isViewerMode) return;
+    const plan = mealPlans[selectedDateKey]?.[mealType] || createDefaultPlan()[mealType];
+    const newEntry = {
+      meal: plan.name,
+      protein: plan.protein,
+      cal: plan.cal,
+      confirmed: true
+    };
+
+    const updatedHistory = {
+      ...mealHistory,
+      [selectedDateKey]: {
+        ...(mealHistory[selectedDateKey] || {}),
+        [mealType]: newEntry
+      }
+    };
+    setMealHistory(updatedHistory);
+    saveToStorage('meal-history', updatedHistory);
+
+    appendMealEvent({
+      type: 'confirm',
+      dateKey: selectedDateKey,
+      mealType,
+      mealName: plan.name,
+      protein: plan.protein
+    });
+
+    showNotification(`✅ Confirmed ${mealTypeLabels[mealType]}`);
+  };
+
   const getTotalProtein = () => {
     const mealTypes = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
     return Math.round(mealTypes.reduce((sum, mealType) => {
       if (selectedDayHistory[mealType]?.skipped) return sum;
-      return sum + (selectedDayPlan[mealType]?.protein || selectedDayHistory[mealType]?.protein || 0);
+      if (selectedDateKey <= todayKey && !selectedDayHistory[mealType]?.confirmed) return sum;
+      return sum + (selectedDayHistory[mealType]?.protein || selectedDayPlan[mealType]?.protein || 0);
     }, 0));
   };
 
@@ -1102,7 +1180,8 @@ const MealPlannerApp = () => {
     const mealTypes = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
     return Math.round(mealTypes.reduce((sum, mealType) => {
       if (selectedDayHistory[mealType]?.skipped) return sum;
-      return sum + (selectedDayPlan[mealType]?.cal || selectedDayHistory[mealType]?.cal || 0);
+      if (selectedDateKey <= todayKey && !selectedDayHistory[mealType]?.confirmed) return sum;
+      return sum + (selectedDayHistory[mealType]?.cal || selectedDayPlan[mealType]?.cal || 0);
     }, 0));
   };
 
@@ -1115,6 +1194,7 @@ const MealPlannerApp = () => {
       const mealTypesForDay = getMealTypeOrder(plan, dayData);
       return mealTypesForDay.reduce((sum, mealType) => {
         if (dayData[mealType]?.skipped) return sum;
+        if (day <= todayKey && !dayData[mealType]?.confirmed) return sum;
         return sum + (dayData[mealType]?.protein || plan[mealType]?.protein || 0);
       }, 0);
     });
@@ -1132,11 +1212,11 @@ const MealPlannerApp = () => {
     const dayPlan = mealPlans[dateKey] || {};
     const mealTypesForDay = getMealTypeOrder(dayPlan, dayData);
 
-    // In Zero-Touch UX, a slot is considered 'confirmed' if it exists and wasn't explicitly skipped.
-    const confirmedCount = mealTypesForDay.filter((m) => !dayData[m]?.skipped).length;
+    const confirmedCount = mealTypesForDay.filter((m) => dayData[m]?.confirmed).length;
 
     const protein = Math.round(mealTypesForDay.reduce((sum, mealType) => {
       if (dayData[mealType]?.skipped) return sum;
+      if (dateKey <= todayKey && !dayData[mealType]?.confirmed) return sum;
       return sum + (dayData[mealType]?.protein || dayPlan[mealType]?.protein || 0);
     }, 0));
 
@@ -1478,27 +1558,26 @@ const MealPlannerApp = () => {
                   <button onClick={() => toggleExpand(mealType)} className="text-xs text-blue-600 flex items-center gap-0.5 hover:text-blue-800 whitespace-nowrap">
                     Details {expandedMeals[mealType] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
-                  <button
-                    onClick={() => handleSkip(mealType)}
-                    className={`text-xs px-2.5 py-1 rounded transition-colors whitespace-nowrap disabled:cursor-not-allowed ${isSkipped
-                      ? 'bg-orange-100 text-orange-700'
-                      : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                      }`}
-                    disabled={isViewerMode || isSkipped}
-                  >
-                    {isSkipped ? '⊘ Skipped' : 'Skip Meal'}
-                  </button>
-                  <button
-                    onClick={() => handleEditClick(mealType)}
-                    className={`text-xs px-2.5 py-1 rounded transition-colors whitespace-nowrap flex items-center disabled:cursor-not-allowed ${isSkipped
-                      ? 'bg-gray-100 text-gray-400'
-                      : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                      }`}
-                    disabled={isViewerMode || isSkipped}
-                  >
-                    <Edit3 className="inline mr-1" size={12} />
-                    Edit
-                  </button>
+                  {!isConfirmed && !isSkipped && (
+                    <div className="flex gap-2 ml-auto">
+                      <button
+                        onClick={() => handleConfirm(mealType)}
+                        className="text-sm px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100 transition-colors disabled:opacity-50 flex items-center justify-center"
+                        disabled={isViewerMode}
+                        title="Confirm Meal"
+                      >
+                        ✅
+                      </button>
+                      <button
+                        onClick={() => handleSkip(mealType)}
+                        className="text-sm px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center justify-center"
+                        disabled={isViewerMode}
+                        title="Skip Meal"
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {expandedMeals[mealType] && (
                   <div className="mt-3 pl-4 border-l-2 border-blue-200">
@@ -1530,29 +1609,6 @@ const MealPlannerApp = () => {
                   🍽️ Dining Out
                 </button>
               </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2 mb-2">
-              <button
-                onClick={() => processQuickAction('light')}
-                className="text-[11px] px-2 py-1.5 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={true}
-              >
-                🥗 Go Light
-              </button>
-              <button
-                onClick={() => processQuickAction('indian')}
-                className="text-[11px] px-2 py-1.5 bg-orange-100 text-orange-700 rounded-full hover:bg-orange-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={true}
-              >
-                🍛 Indian
-              </button>
-              <button
-                onClick={() => processQuickAction('surprise')}
-                className="text-[11px] px-2 py-1.5 bg-pink-100 text-pink-700 rounded-full hover:bg-pink-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={true}
-              >
-                🎲 Surprise
-              </button>
             </div>
           </div>
 
