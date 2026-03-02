@@ -42,6 +42,7 @@ const MealPlannerApp = () => {
   const [notification, setNotification] = useState('');
   const [showDiningOutModal, setShowDiningOutModal] = useState(false);
   const [showOmniboxSlotModal, setShowOmniboxSlotModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pendingAutoGeneration, setPendingAutoGeneration] = useState(false);
   const [userMealCatalog, setUserMealCatalog] = useState(DEFAULT_USER_CATALOG);
