@@ -1550,21 +1550,21 @@ const MealPlannerApp = () => {
               Goal: {getOnboardingGoalLabel(onboardingProfile?.goal)}
             </span>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center justify-between gap-1 sm:gap-3 mb-4 whitespace-nowrap overflow-hidden">
             <button
               onClick={() => setShowCalendarModal(true)}
-              className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors border border-gray-200 w-fit"
+              className="flex items-center gap-1 text-[11px] sm:text-sm font-semibold text-gray-800 bg-gray-100 hover:bg-gray-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-colors border border-gray-200 min-w-0 flex-shrink"
             >
-              📅 {formatWeekSnapshotDateLabel(selectedDateKey)}
-              <ChevronDown size={14} className="text-gray-500" />
+              <span className="truncate">📅 {formatWeekSnapshotDateLabel(selectedDateKey)}</span>
+              <ChevronDown size={14} className="text-gray-500 shrink-0" />
             </button>
-            <div className="flex flex-wrap items-center gap-2">
-              <button onClick={copyTodaysPlan} className="text-xs px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 font-semibold flex items-center gap-1 transition-colors">
-                📋 Share Day
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <button onClick={copyTodaysPlan} className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 font-semibold flex items-center gap-1 transition-colors">
+                📋 Share
               </button>
               <button
                 onClick={undoSkippedForSelectedDay}
-                className="text-[11px] px-2 py-1 bg-amber-100 text-amber-800 rounded-md hover:bg-amber-200 font-semibold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-[9px] sm:text-[11px] px-1.5 sm:px-2 py-1 bg-amber-100 text-amber-800 rounded-md hover:bg-amber-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isViewerMode}
               >
                 Undo
@@ -1618,7 +1618,7 @@ const MealPlannerApp = () => {
                     Details {expandedMeals[mealType] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                   {!isConfirmed && !isSkipped && (
-                    <div className="flex gap-2 ml-auto">
+                    <div className="flex gap-4 ml-auto items-center">
                       <button
                         onClick={() => handleConfirm(mealType)}
                         className="text-sm px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100 transition-colors disabled:opacity-50 flex items-center justify-center"
@@ -1629,7 +1629,7 @@ const MealPlannerApp = () => {
                       </button>
                       <button
                         onClick={() => handleSkip(mealType)}
-                        className="text-sm px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center justify-center"
+                        className="text-[10px] px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center justify-center opacity-80"
                         disabled={isViewerMode}
                         title="Skip Meal"
                       >
