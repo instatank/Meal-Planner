@@ -487,13 +487,20 @@ const MealPlannerApp = () => {
             else if (mealPlans[d]) historyMap[d] = mealPlans[d];
           }
 
+          const { preferences: adjustedPrefs, dailyProteinTarget: adjustedProtein } = buildGoalAdjustedPlannerInput({
+            goal: onboardingProfile?.goal,
+            preferences: normalizePreferences(preferences),
+            mealDatabase: mergedMealDatabase,
+            dailyProteinTarget: 120
+          });
+
           const { generateWeeklyPlan } = await import('./lib/geminiService.js');
           const generatedDays = await generateWeeklyPlan({
             targetDateKeys,
             mealDatabase: mergedMealDatabase,
-            preferences: normalizePreferences(preferences),
+            preferences: adjustedPrefs,
             historyMap,
-            dailyProteinTarget: onboardingProfile?.goal?.dailyProteinTarget || 120
+            dailyProteinTarget: adjustedProtein
           });
 
           const nextPlans = { ...mealPlans };
@@ -1236,7 +1243,6 @@ const MealPlannerApp = () => {
     showNotification('🧠 AI is drafting your weekly plan...');
 
     try {
-      // Build 7-day lookback for pattern engine
       const historyMap = {};
       for (let i = 0; i < 7; i++) {
         const d = shiftDateKey(selectedDateKey, -i);
@@ -1244,13 +1250,20 @@ const MealPlannerApp = () => {
         else if (mealPlans[d]) historyMap[d] = mealPlans[d];
       }
 
+      const { preferences: adjustedPrefs, dailyProteinTarget: adjustedProtein } = buildGoalAdjustedPlannerInput({
+        goal: onboardingProfile?.goal,
+        preferences: normalizePreferences(preferences),
+        mealDatabase: mergedMealDatabase,
+        dailyProteinTarget: 120
+      });
+
       const { generateWeeklyPlan } = await import('./lib/geminiService.js');
       const generatedDays = await generateWeeklyPlan({
         targetDateKeys,
         mealDatabase: mergedMealDatabase,
-        preferences: normalizePreferences(preferences),
+        preferences: adjustedPrefs,
         historyMap,
-        dailyProteinTarget: onboardingProfile?.goal?.dailyProteinTarget || 120
+        dailyProteinTarget: adjustedProtein
       });
 
       const nextPlans = { ...mealPlans };

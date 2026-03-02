@@ -186,7 +186,7 @@ You are tasked with generating a meal plan for the user across multiple upcoming
 AVAILABLE MEAL CATALOG (JSON format):
 ${JSON.stringify(availableMeals)}
 
-(You MUST ONLY select meals that perfectly match the \`name\` from this catalog. NEVER invent new meals yourself. Select meals that align with the \`type\` field if possible.)
+(You MUST ONLY select meals that perfectly match the \`name\` from this catalog. NEVER invent new meals yourself. STRICTLY OBSERVE MEAL TYPES: You must NEVER schedule a 'breakfast' item for lunch or dinner. You must NEVER schedule a 'lunch/dinner' item for breakfast.)
 
 USER PREFERENCES:
 Accepts (Prioritize these): ${JSON.stringify(preferences?.accepts || {})}
@@ -206,20 +206,21 @@ Target Protein per day: ${dailyProteinTarget}g
 CRITICAL RULES:
 1. INTELLIGENT PATTERN MATCHING (Repetition vs. Variety):
    - Analyze the \`RECENT HISTORY\`.
-   - BREAKFAST (HIGH REPETITION): The user prefers repetition here. If a breakfast is historically static (eaten >3 times a week), KEEP REPEATING IT.
-   - LUNCH (HIGH VARIETY): Every lunch suggestion should ideally be unique for the generated week. A specific lunch meal may be repeated AT MOST once during the week, and this exception can only happen for ONE meal across the whole week. Otherwise, prioritize strict diversity for lunches.
-   - DINNER (MODERATE REPETITION): Repetition for dinners is perfectly acceptable. Focus on balancing macros and sequenced cuisines over forced variety.
+   - ABSOLUTE REPETITION CEILINGS: A specific 'breakfast' meal can be repeated a MAXIMUM of 4 times in a week. A specific 'lunch/dinner' meal can be repeated a MAXIMUM of 2 times in the entire week.
+   - LUNCH AND DINNER VARIETY: Prioritize strict diversity. Do not blindly repeat the same meal just because it fits the macros. Force yourself to find alternative options in the catalog first.
    - NOVELTY PRIORITIZATION: If a valid meal from the catalog (e.g., Fish Curry, Grilled Salmon) has *not* been eaten in the last 7 days, strongly prioritize introducing it to maintain a diverse weekly palate (especially for Lunch).
-2. HARD DAILY LIMITS:
-   - HEAVY LIMITS: Only a maximum of ONE meal per day can be "Carb Heavy" or "Fat Heavy" (use your common sense based on the meal name).
-   - CALORIE LIMIT: Only a maximum of ONE meal per day can exceed 600 calories.
+2. HARD MATHEMATICAL LIMITS:
+   - DAILY CARB CAP: The total estimated carbohydrates for the ENTIRE day (Breakfast + Lunch + Dinner) MUST NEVER exceed 130g.
+   - MINIMUM MEAL PROTEIN: Every single meal (Breakfast, Lunch, Dinner) MUST contain at least 20g of protein.
+   - FAT HEAVY CAP: Only a maximum of ONE meal per day can be "Fat Heavy" (e.g. Cheese/Cream based).
 3. FLEXIBLE PROTEIN ANCHORING (10% Concession): The combined total of the generated Breakfast, Lunch, and Dinner does NOT need to be mathematically perfect. You have a ±10% flexible envelope around the user's Target Protein per day. Prioritize culinary variety and logical human sequencing over strict mathematical perfection.
 4. PROTEIN DIVERSITY:
    - No single meal can contain two of the same primary protein families (e.g., no chicken and turkey in the same bowl).
-   - Try to use different primary protein families for Lunch and Dinner (e.g., if Lunch is Fish, Dinner should ideally not be Fish). You can be flexible on this if required to meet daily targets.
-   - LEAN MEAT PRIORITIZATION: Lean heavily towards Chicken and Fish (including Salmon) meals throughout the week.
+   - MEAT & FIBRE RULE: Any meal containing Chicken, Red Meat, or Fish MUST be paired with a high-fibre ingredient (e.g. Vegetables, Salad, or Lentils/Dal). Do not serve plain meat and rice without a vegetable component.
+   - Try to use different primary protein families for Lunch and Dinner.
+   - LEAN MEAT PRIORITIZATION: Lean heavily towards Chicken and Fish meals throughout the week.
    - RED MEAT CAP: Red meats (Pork, Steak, Lamb) must NEVER exceed 2-3 meals *total* combined across the entire calculated week.
-5. CALORIC TAPERING: Structure the day so the heaviest, highest-carb meal is either Breakfast or Lunch. Dinner should be significantly lighter and leaner by comparison, unless the user's history dictates otherwise.
+5. CALORIC TAPERING: Structure the day so the heaviest, highest-carb meal is either Breakfast or Lunch. Dinner should be significantly lighter and leaner by comparison.
 6. CUISINE SEQUENCING: Lunch and Dinner cannot *both* be Indian cuisine. Do not schedule the same heavy cuisine for Lunch and Dinner on the same day unless the user historically does this.
 7. FORMAT: You must output STRICTLY valid JSON in this exact format (no markdown formatting, no backticks, JSON array only):
 [
