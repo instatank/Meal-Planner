@@ -1543,7 +1543,7 @@ const MealPlannerApp = () => {
 
 
 
-        <div className="bg-white rounded-lg shadow-md px-5 pt-3 pb-3 mb-4">
+        <div className="bg-white rounded-lg shadow-md px-5 pt-3 pb-3 mb-3">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-2xl font-bold text-gray-800">🍽️ My MealMap</h1>
             <span className="text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold shrink-0">
