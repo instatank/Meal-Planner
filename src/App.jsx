@@ -1543,7 +1543,7 @@ const MealPlannerApp = () => {
 
 
 
-        <div className="bg-white rounded-lg shadow-md px-5 pt-5 pb-3 mb-4">
+        <div className="bg-white rounded-lg shadow-md px-5 pt-3 pb-3 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-2xl font-bold text-gray-800">🍽️ My MealMap</h1>
             <span className="text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold shrink-0">
@@ -1603,7 +1603,7 @@ const MealPlannerApp = () => {
             const isSkipped = selectedDayHistory?.[mealType]?.skipped;
 
             return (
-              <div key={mealType} className={`pb-3 ${index === selectedMealTypeOrder.length - 1 ? 'mb-2' : 'mb-3 border-b border-gray-200'} ${isSkipped ? 'opacity-70 bg-gray-50 rounded-lg p-3 border-transparent' : ''}`}>
+              <div key={mealType} className={`pb-2 ${index === selectedMealTypeOrder.length - 1 ? 'mb-1' : 'mb-2 border-b border-gray-200'} ${isSkipped ? 'opacity-70 bg-gray-50 rounded-lg p-2 border-transparent' : ''}`}>
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-gray-600">{mealTypeLabels[mealType]}:</span>
