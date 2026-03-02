@@ -248,6 +248,7 @@ const MealPlannerApp = () => {
 
   const normalizePreferences = (prefs = {}) => plannerNormalizePreferences(prefs);
 
+  const todayKey = getDateKey();
   const [selectedDateKey, setSelectedDateKey] = useState(getDateKey());
   const [mealPlans, setMealPlans] = useState({});
   const [mealHistory, setMealHistory] = useState({});
@@ -1384,7 +1385,6 @@ const MealPlannerApp = () => {
       setIsRegenerating(false);
     }
   };
-  const todayKey = getDateKey();
   const weekDateKeys = getWeekDateKeys(selectedDateKey);
   const selectedMealTypeOrder = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
   const mealTypeLabels = {
