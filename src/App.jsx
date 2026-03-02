@@ -1434,6 +1434,17 @@ const MealPlannerApp = () => {
           </div>
         </div>
 
+        <Omnibox
+          onAIAction={handleAIAction}
+          disabled={isViewerMode}
+          activeContext={activeOmniboxContext}
+          onClearContext={() => setActiveOmniboxContext(null)}
+          onRequestContext={() => setShowOmniboxSlotModal(true)}
+          externalInputRef={omniboxRef}
+          prefill={omniboxPrefill}
+          onClearPrefill={() => setOmniboxPrefill('')}
+        />
+
         <div className="bg-white rounded-lg shadow-md p-6 mb-4">
           {selectedMealTypeOrder.map((mealType, index) => {
             const historyEntry = selectedDayHistory?.[mealType];
@@ -1545,17 +1556,6 @@ const MealPlannerApp = () => {
             </div>
           </div>
 
-          <Omnibox
-            onAIAction={handleAIAction}
-            disabled={isViewerMode}
-            activeContext={activeOmniboxContext}
-            onClearContext={() => setActiveOmniboxContext(null)}
-            onRequestContext={() => setShowOmniboxSlotModal(true)}
-            externalInputRef={omniboxRef}
-            prefill={omniboxPrefill}
-            onClearPrefill={() => setOmniboxPrefill('')}
-          />
-
           {customCandidates.length > 0 && (
             <div className="mb-4 border-t border-gray-200 pt-4">
               <p className="text-xs font-semibold text-gray-700 mb-2">🧠 Frequent custom meals:</p>
@@ -1610,56 +1610,7 @@ const MealPlannerApp = () => {
           </button>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <button
-              onClick={() => setSelectedDateKey((prev) => shiftDateKey(prev, -1))}
-              className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"
-            >
-              ◀ Prev
-            </button>
-            <button
-              onClick={() => setSelectedDateKey(todayKey)}
-              className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => setSelectedDateKey((prev) => shiftDateKey(prev, 1))}
-              className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"
-            >
-              Next ▶
-            </button>
-            <input
-              type="date"
-              value={selectedDateKey}
-              onChange={(e) => setSelectedDateKey(e.target.value)}
-              className="ml-auto text-xs px-2 py-1.5 border border-gray-300 rounded"
-            />
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {weekDateKeys.map((dateKey) => {
-              const completion = getDayCompletion(dateKey);
-              const isSelected = dateKey === selectedDateKey;
-              const isToday = dateKey === todayKey;
-              return (
-                <button
-                  key={dateKey}
-                  onClick={() => setSelectedDateKey(dateKey)}
-                  className={`rounded p - 2 text - center border ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } `}
-                >
-                  <div className="text-[10px] font-semibold">
-                    {parseDateKey(dateKey).toLocaleDateString('en-US', { weekday: 'short', timeZone: IST_TIME_ZONE })}
-                  </div>
-                  <div className="text-xs">{parseDateKey(dateKey).getUTCDate()}</div>
-                  {isToday && <div className="text-[9px]">Today</div>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {/* Calendar strip moved to weekly view */}
 
         <button
           onClick={() => setShowProgress(!showProgress)}
@@ -1745,6 +1696,62 @@ const MealPlannerApp = () => {
                   </div>
                 );
               })}
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Calendar Layout</h3>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <button
+                  onClick={() => setSelectedDateKey((prev) => shiftDateKey(prev, -1))}
+                  className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"
+                >
+                  ◀ Prev
+                </button>
+                <button
+                  onClick={() => setSelectedDateKey(todayKey)}
+                  className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => setSelectedDateKey((prev) => shiftDateKey(prev, 1))}
+                  className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"
+                >
+                  Next ▶
+                </button>
+                <input
+                  type="date"
+                  value={selectedDateKey}
+                  onChange={(e) => setSelectedDateKey(e.target.value)}
+                  className="ml-auto text-xs px-2 py-1.5 border border-gray-300 rounded"
+                />
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {weekDateKeys.map((dateKey) => {
+                  const completion = getDayCompletion(dateKey);
+                  const isSelected = dateKey === selectedDateKey;
+                  const isToday = dateKey === todayKey;
+                  return (
+                    <button
+                      key={dateKey}
+                      onClick={() => {
+                        setSelectedDateKey(dateKey);
+                        // Optional: close the weekly calendar when they pick a day to jump back to Daily view
+                        setShowWeekly(false);
+                      }}
+                      className={`rounded p-2 text-center border ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                    >
+                      <div className="text-[10px] font-semibold">
+                        {parseDateKey(dateKey).toLocaleDateString('en-US', { weekday: 'short', timeZone: IST_TIME_ZONE })}
+                      </div>
+                      <div className="text-xs">{parseDateKey(dateKey).getUTCDate()}</div>
+                      {isToday && <div className="text-[9px]">Today</div>}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
