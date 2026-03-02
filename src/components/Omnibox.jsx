@@ -136,7 +136,7 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
     }
 
     return (
-        <div className="w-full mt-6 mb-2">
+        <div className="w-full mt-1 mb-2">
 
             {/* Pending Confirmation Card */}
             {pendingIntent && (

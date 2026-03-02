@@ -1543,14 +1543,14 @@ const MealPlannerApp = () => {
 
 
 
-        <div className="bg-white rounded-lg shadow-md p-6 mb-4">
+        <div className="bg-white rounded-lg shadow-md px-5 pt-5 pb-3 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-2xl font-bold text-gray-800">🍽️ My MealMap</h1>
             <span className="text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold shrink-0">
               Goal: {getOnboardingGoalLabel(onboardingProfile?.goal)}
             </span>
           </div>
-          <div className="flex items-center justify-between gap-1 sm:gap-3 mb-4 whitespace-nowrap overflow-hidden">
+          <div className="flex items-center justify-between gap-1 sm:gap-3 mb-0 whitespace-nowrap overflow-hidden">
             <button
               onClick={() => setShowCalendarModal(true)}
               className="flex items-center gap-1 text-[11px] sm:text-sm font-semibold text-gray-800 bg-gray-100 hover:bg-gray-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-colors border border-gray-200 min-w-0 flex-shrink"
