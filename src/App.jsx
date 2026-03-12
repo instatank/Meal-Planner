@@ -203,11 +203,11 @@ const MealPlannerApp = () => {
     if (Number.isNaN(center.getTime())) {
       return Array.from({ length: 7 }, (_, idx) => shiftDateKey(getDateKey(), idx));
     }
-    const dayIndex = center.getUTCDay(); // Sunday = 0
-    const sundayOffset = -dayIndex; // e.g. Wednesday (3) -> -3 to hit prior Sunday
+    const dayIndex = center.getUTCDay();
+    const mondayOffset = dayIndex === 0 ? -6 : 1 - dayIndex;
     return Array.from({ length: 7 }, (_, idx) => {
       const d = new Date(center);
-      d.setUTCDate(center.getUTCDate() + sundayOffset + idx);
+      d.setUTCDate(center.getUTCDate() + mondayOffset + idx);
       return formatDateKeyFromUtcDate(d);
     });
   };
