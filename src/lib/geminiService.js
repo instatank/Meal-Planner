@@ -173,9 +173,11 @@ export const generateWeeklyPlan = async ({
   ].map(m => ({
     name: m.canonical_name,
     type: (mealDatabase.breakfast || []).includes(m) ? 'breakfast' : ((mealDatabase.lunchDinner || []).includes(m) ? 'lunch/dinner' : 'snack'),
-    p: m.protein || 0,
-    cal: m.cal || 0,
-    c: m.cuisine || 'general'
+    p: Math.round(m.protein || m.p || 0),
+    c: Math.round(m.c || 0),
+    f: Math.round(m.f || 0),
+    cal: Math.round(m.cal || 0),
+    cuis: m.cuisine || 'general'
   }));
 
   const prompt = `
