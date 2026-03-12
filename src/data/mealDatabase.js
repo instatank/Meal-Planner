@@ -626,9 +626,49 @@ const baseMealsList = {
   ]
 };
 
+const csvTagsMap = {
+  "Scrambled eggs + toast": { cuisine: "Continental", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
+  "Boiled eggs + ham sandwich": { cuisine: "Continental", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
+  "Smoked salmon + avocado on toast": { cuisine: "Continental", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
+  "Poha + kabab/protein shake": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
+  "Egg white omelette + avocado": { cuisine: "Continental", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
+  "Aloo paratha + curd": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Heavy" },
+  "Idli, Mysore masala dosa + sambar + chutney": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Chicken curry + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Heavy" },
+  "Grilled salmon fillet + sauteed veg + spaghetti aglio e olio": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Rajma chawal + raita": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
+  "Chole + jowar roti + raita": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Vietnamese chicken pho": { cuisine: "Asian", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
+  "Grilled steak + mixed greens salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
+  "Thai pad krapow + rice": { cuisine: "Asian", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
+  "Mutton keema + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Heavy" },
+  "Arhar dal + rice + matar paneer": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Chicken curry + jowar roti + dal": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Grilled fish + pumpkin salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
+  "Grilled salmon + sauteed veg + garlic rice": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
+  "Chicken soup + smoked salmon salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
+  "Paneer sabzi + dal + raita": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Pork chop + pumpkin salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Pork chop + mixed greens salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
+  "Tandoori chicken + smoked chicken + avocado salad": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
+  "Broccoli soup + grilled fish + spaghetti aglio e olio": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
+  "Saag meat + jowar roti + dal": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Kofta + dal + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Kababs + dal + gobi + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Fish curry + rice": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
+  "Sweet potato curry + kaala chanaa sabzi + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
+  "Chicken red curry + rice": { cuisine: "Asian", is_fat_heavy: true, has_fibre: false, meal_weight: "Medium" },
+  "Greek yogurt + berry bowl": { cuisine: "International", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
+  "Carrot halwa (sugar-free) + protein shake": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
+  "Nuts, seeds + protein shake": { cuisine: "International", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
+  "Sweet potato chaat": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
+  "Kaala chana chaat": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
+  "Avocado/cheese toast": { cuisine: "Continental", is_fat_heavy: true, has_fibre: false, meal_weight: "Light" }
+};
+
 // Auto-inject computed macros to maintain strict backward compatibility
 export const mealDatabase = {
-  breakfast: baseMealsList.breakfast.map(meal => enrichMealForDataLayer({ ...meal, ...computeMacros(meal.parts) }, 'breakfast')),
-  lunchDinner: baseMealsList.lunchDinner.map(meal => enrichMealForDataLayer({ ...meal, ...computeMacros(meal.parts) }, 'lunch_dinner')),
-  snack: baseMealsList.snack.map(meal => enrichMealForDataLayer({ ...meal, ...computeMacros(meal.parts) }, 'snack'))
+  breakfast: baseMealsList.breakfast.map(meal => enrichMealForDataLayer({ ...meal, ...(csvTagsMap[meal.canonical_name] || {}), ...computeMacros(meal.parts) }, 'breakfast')),
+  lunchDinner: baseMealsList.lunchDinner.map(meal => enrichMealForDataLayer({ ...meal, ...(csvTagsMap[meal.canonical_name] || {}), ...computeMacros(meal.parts) }, 'lunch_dinner')),
+  snack: baseMealsList.snack.map(meal => enrichMealForDataLayer({ ...meal, ...(csvTagsMap[meal.canonical_name] || {}), ...computeMacros(meal.parts) }, 'snack'))
 };

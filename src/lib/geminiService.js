@@ -177,7 +177,10 @@ export const generateWeeklyPlan = async ({
     c: Math.round(m.c || 0),
     f: Math.round(m.f || 0),
     cal: Math.round(m.cal || 0),
-    cuis: m.cuisine || 'general'
+    cuis: m.cuisine || 'general',
+    is_fat_heavy: !!m.is_fat_heavy,
+    has_fibre: !!m.has_fibre,
+    meal_weight: m.meal_weight || 'Medium'
   }));
 
   const prompt = `
@@ -187,46 +190,66 @@ You are tasked with generating a meal plan for the user across multiple upcoming
 AVAILABLE MEAL CATALOG (JSON format):
 ${JSON.stringify(availableMeals)}
 
-(You MUST ONLY select meals that perfectly match the \`name\` from this catalog. NEVER invent new meals yourself. STRICTLY OBSERVE MEAL TYPES: You must NEVER schedule a 'breakfast' item for lunch or dinner. You must NEVER schedule a 'lunch/dinner' item for breakfast.)
+IMPORTANT CATALOG RULES:
+- You MUST ONLY select meals whose 'name' exactly matches a name in the catalog. NEVER invent meals.
+- You MUST NEVER schedule a 'breakfast' item for lunch or dinner, and MUST NEVER schedule a 'lunch/dinner' item for breakfast.
+- For this goal, EXCLUDE any meal where Protein(g) is below 20g.
 
 USER PREFERENCES:
 Accepts (Prioritize these): ${JSON.stringify(preferences?.accepts || {})}
-Edits (Tweak these): ${JSON.stringify(preferences?.edits || {})}
-Avoids (NEVER select these under any circumstances): ${JSON.stringify(preferences?.avoids || {})}
+Edits (Apply these modifications): ${JSON.stringify(preferences?.edits || {})}
+Avoids (NEVER select these): ${JSON.stringify(preferences?.avoids || {})}
 
 RECENT HISTORY:
-The user has recently eaten the following meals. Use this explicitly to find patterns of repetition they like, or meals they want spaced out:
 ${JSON.stringify(historyMap)}
+Use this history strictly to enforce repetition ceilings. Do not use it to introduce or force meals that have not appeared recently.
 
 DATES TO GENERATE:
 ${JSON.stringify(targetDateKeys)}
 
 DAILY GOAL:
-Target Protein per day: ${dailyProteinTarget}g
+Target Protein: ${dailyProteinTarget}g per day. Acceptable range: ${Math.round(Number(dailyProteinTarget) * 0.9)}g–${Math.round(Number(dailyProteinTarget) * 1.1)}g.
 
-CRITICAL RULES:
-1. INTELLIGENT PATTERN MATCHING (Repetition vs. Variety):
-   - Analyze the \`RECENT HISTORY\`.
-   - ABSOLUTE REPETITION CEILINGS: A specific 'breakfast' meal can be repeated a MAXIMUM of 4 times in a week. A specific 'lunch/dinner' meal can be repeated a MAXIMUM of 2 times in the entire week.
-   - LUNCH AND DINNER VARIETY: Prioritize strict diversity. Do not blindly repeat the same meal just because it fits the macros. Force yourself to find alternative options in the catalog first.
-   - NOVELTY PRIORITIZATION: If a valid meal from the catalog (e.g., Fish Curry, Grilled Salmon) has *not* been eaten in the last 7 days, strongly prioritize introducing it to maintain a diverse weekly palate (especially for Lunch).
-2. HARD MATHEMATICAL LIMITS:
-   - DAILY CARB CAP: The total estimated carbohydrates for the ENTIRE day (Breakfast + Lunch + Dinner) MUST NEVER exceed 130g.
-   - MINIMUM MEAL PROTEIN: Every single meal (Breakfast, Lunch, Dinner) MUST contain at least 20g of protein.
-   - FAT HEAVY CAP: Only a maximum of ONE meal per day can be "Fat Heavy" (e.g. Cheese/Cream based).
-3. FLEXIBLE PROTEIN ANCHORING (10% Concession): The combined total of the generated Breakfast, Lunch, and Dinner does NOT need to be mathematically perfect. You have a ±10% flexible envelope around the user's Target Protein per day. Prioritize culinary variety and logical human sequencing over strict mathematical perfection.
-4. PROTEIN DIVERSITY:
-   - No single meal can contain two of the same primary protein families (e.g., no chicken and turkey in the same bowl).
-   - MEAT & FIBRE RULE: Any meal containing Chicken, Red Meat, or Fish MUST be paired with a high-fibre ingredient (e.g. Vegetables, Salad, or Lentils/Dal). Do not serve plain meat and rice without a vegetable component.
-   - Try to use different primary protein families for Lunch and Dinner.
-   - LEAN MEAT PRIORITIZATION: Lean heavily towards Chicken and Fish meals throughout the week.
-   - RED MEAT CAP: Red meats (Pork, Steak, Lamb) must NEVER exceed 2-3 meals *total* combined across the entire calculated week.
-5. CALORIC TAPERING: Structure the day so the heaviest, highest-carb meal is either Breakfast or Lunch. Dinner should be significantly lighter and leaner by comparison.
-6. CUISINE SEQUENCING: Lunch and Dinner cannot *both* be Indian cuisine. Do not schedule the same heavy cuisine for Lunch and Dinner on the same day unless the user historically does this.
-7. FORMAT: You must output STRICTLY valid JSON in this exact format (no markdown formatting, no backticks, JSON array only):
-[
-  { "dateKey": "YYYY-MM-DD", "breakfast": "canonical_name", "lunch": "canonical_name", "dinner": "canonical_name" }
-]
+---
+
+RULES — FOLLOW ALL OF THESE WITHOUT EXCEPTION:
+
+1. REPETITION CEILINGS
+   - A single breakfast meal may appear a MAXIMUM of 4 times in the generated week.
+   - A single lunchDinner meal may appear a MAXIMUM of 2 times in the entire generated week.
+   - Do not blindly repeat a meal just because it fits the macros. Always check the catalog for an unused or underused alternative first.
+
+2. HARD DAILY LIMITS
+   - CARB CAP: Total carbohydrates across Breakfast + Lunch + Dinner MUST NOT exceed 130g for the day. Use the 'c' field from the catalog to calculate this.
+   - MINIMUM MEAL PROTEIN: Every scheduled meal (Breakfast, Lunch, Dinner) MUST contain at least 20g of protein. Any catalog meal below this threshold is ineligible and must not be selected.
+   - FAT HEAVY CAP: A maximum of ONE meal per day may have is_fat_heavy = true. Never schedule two fat-heavy meals on the same day.
+   - CALORIC FLOOR: The combined total of Breakfast + Lunch + Dinner MUST NOT fall below 1,600 kcal per day.
+   - CALORIC CEILING: The combined total of Breakfast + Lunch + Dinner MUST NOT exceed 2,200 kcal per day.
+
+3. PROTEIN ANCHORING
+   - The daily combined protein total does not need to be exactly ${dailyProteinTarget}g. You have a flexible envelope: ${Math.round(Number(dailyProteinTarget) * 0.9)}g–${Math.round(Number(dailyProteinTarget) * 1.1)}g is acceptable.
+   - Within that range, prioritize culinary variety and logical meal sequencing over mathematical precision. Do not sacrifice variety to hit exactly ${dailyProteinTarget}g.
+
+4. PROTEIN DIVERSITY
+   - No single meal may contain two of the same primary protein family (e.g. no chicken + turkey in one bowl).
+   - MEAT & FIBRE RULE: Any catalog meal where the Primary Protein is Chicken, Fish, or Red Meat MUST have has_fibre = true. Never schedule a meat or fish meal where has_fibre = false.
+   - Lunch and Dinner MUST use different primary protein families each day. This is not a suggestion — if no valid alternative exists in the catalog, flag it; do not silently violate this rule.
+   - LEAN MEAT REQUIREMENT: At least 4 of the 7 scheduled lunches AND at least 4 of the 7 scheduled dinners must have Chicken or Fish as the Primary Protein.
+   - RED MEAT CAP: Meals where Primary Protein is Pork, Beef, Lamb, or Mutton must not exceed 3 meals total combined across the entire generated week.
+
+5. CALORIC TAPERING
+   - The highest-calorie, highest-carb meal of the day must be either Breakfast or Lunch — never Dinner.
+   - Dinner MUST be selected from meals tagged meal_weight = Light or Medium. Never schedule a meal_weight = Heavy meal for Dinner.
+
+6. CUISINE SEQUENCING
+   - Lunch and Dinner MUST NOT both be tagged cuis = Indian on the same day.
+   - Do not schedule the same Cuisine value for both Lunch and Dinner on the same day unless no valid alternative exists in the catalog.
+
+7. OUTPUT FORMAT
+   Output STRICTLY valid JSON. No markdown, no backticks, no explanation — JSON array only:
+   [
+     { "dateKey": "YYYY-MM-DD", "breakfast": "exact_meal_name", "lunch": "exact_meal_name", "dinner": "exact_meal_name" }
+   ]
   `;
 
   try {
