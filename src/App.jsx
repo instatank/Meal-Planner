@@ -123,7 +123,7 @@ const MealPlannerApp = () => {
 
   const getMealsForType = (mealType) => plannerGetMealsForType(mergedMealDatabase, mealType);
 
-  const createDefaultPlan = () => plannerCreateDefaultPlan(mergedMealDatabase);
+  // We longer use the deterministic fallback generator
 
   const formatDateKeyFromUtcDate = (date) => {
     const year = String(date.getUTCFullYear());
@@ -408,10 +408,7 @@ const MealPlannerApp = () => {
           void saveToStorage(ONBOARDING_PROFILE_STORAGE_KEY, parsedOnboarding);
         }
 
-        const currentWeekMonday = getWeekDateKeys(getDateKey(new Date()))[0];
-        if (autoGenResult !== currentWeekMonday && parsedOnboarding?.mode !== ONBOARDING_MODE.VIEWER) {
-          setPendingAutoGeneration(true);
-        }
+        // Dynamic week tracking replaces local storage boot triggers
       } catch (error) {
         console.log('No stored data', error);
       }
@@ -507,25 +504,42 @@ const MealPlannerApp = () => {
     void saveToStorage('meal-preferences', nextPreferences);
   }, [mealEvents, loading]);
 
+  // Dynamic Autonomous Blank Week Detector
+  useEffect(() => {
+    if (loading || isViewerMode || !mergedMealDatabase) return;
+    if (isRegenerating) return; // Don't trigger overlapping runs
+
+    const today = getDateKey(new Date());
+    const weekKeys = getWeekDateKeys(selectedDateKey).sort();
+
+    // Only auto-gen for current or future weeks
+    if (weekKeys[6] < today) return;
+
+    // Check if this week is completely empty (no plans exist)
+    const hasAnyPlan = weekKeys.some(k => mealPlans[k] && Object.keys(mealPlans[k]).length > 0);
+    if (!hasAnyPlan) {
+      setPendingAutoGeneration(true);
+    }
+  }, [loading, isViewerMode, mergedMealDatabase, selectedDateKey, mealPlans, isRegenerating]);
+
   useEffect(() => {
     if (!loading && pendingAutoGeneration && mergedMealDatabase && !isViewerMode) {
       setPendingAutoGeneration(false);
 
       const today = getDateKey(new Date());
-      const currentWeekKeys = getWeekDateKeys(today).sort();
-      const currentWeekMonday = currentWeekKeys[0];
-
-      void saveToStorage('last-auto-gen-week', currentWeekMonday);
+      const selectedWeekKeys = getWeekDateKeys(selectedDateKey).sort();
 
       const runAutoGeneration = async () => {
-        // Target all days in this week that are >= today and not locked
-        const targetDateKeys = currentWeekKeys
+        // Target all days in the currently viewed week that are >= today
+        const targetDateKeys = selectedWeekKeys
           .filter(k => k >= today)
           .filter(k => !hasLockedHistoryForDate(k, mealHistory));
 
         if (targetDateKeys.length === 0) return;
 
-        showNotification('✨ New week detected! Auto-generating your meal plan...');
+        // Use the existing manual regeneration state flag so the UI shows the spinner!
+        setIsRegenerating(true);
+        showNotification('✨ Generating intelligent meal plan for this week...');
 
         try {
           const historyMap = {};
@@ -570,17 +584,20 @@ const MealPlannerApp = () => {
 
           setMealPlans(nextPlans);
           saveToStorage('meal-plans', nextPlans);
-          showNotification(`✓ Successfully auto-generated ${generatedDays.length} days for the new week!`);
+          showNotification(`✓ Successfully auto-generated plan for the week!`);
         } catch (error) {
           console.error("Auto-generation failed", error);
+          showNotification('❌ Auto-generation failed. Please try "Regen Week" manually.');
+        } finally {
+          setIsRegenerating(false);
         }
       };
 
       runAutoGeneration();
     }
-  }, [loading, pendingAutoGeneration, mergedMealDatabase, isViewerMode, mealHistory, mealPlans, preferences, onboardingProfile]);
+  }, [loading, pendingAutoGeneration, mergedMealDatabase, isViewerMode, mealHistory, mealPlans, preferences, onboardingProfile, selectedDateKey]);
 
-  const selectedDayPlan = mealPlans[selectedDateKey] || createDefaultPlan();
+  const selectedDayPlan = mealPlans[selectedDateKey] || {};
   const selectedDayHistory = mealHistory[selectedDateKey] || {};
   const customCandidates = useMemo(
     () => getCustomMealCandidates(mealEvents, allExistingMealNames, { lookbackDays: 45, minCount: 3 }),
@@ -589,7 +606,7 @@ const MealPlannerApp = () => {
 
   const updateSelectedPlan = (updater) => {
     setMealPlans((prev) => {
-      const currentPlan = prev[selectedDateKey] || createDefaultPlan();
+      const currentPlan = prev[selectedDateKey] || {};
       const nextPlan = typeof updater === 'function' ? updater(currentPlan) : updater;
       const nextState = { ...prev, [selectedDateKey]: nextPlan };
       saveToStorage('meal-plans', nextState);
@@ -1140,7 +1157,7 @@ const MealPlannerApp = () => {
 
   const handleConfirm = (mealType) => {
     if (isViewerMode) return;
-    const plan = mealPlans[selectedDateKey]?.[mealType] || createDefaultPlan()[mealType];
+    const plan = mealPlans[selectedDateKey]?.[mealType] || {};
     const newEntry = {
       meal: plan.name,
       protein: plan.protein,
@@ -1779,7 +1796,7 @@ const MealPlannerApp = () => {
             </p>
             <div className="space-y-3">
               {weekDateKeys.map((dateKey) => {
-                const plan = mealPlans[dateKey] || createDefaultPlan();
+                const plan = mealPlans[dateKey] || {};
                 const dayData = mealHistory[dateKey] || {};
                 const completion = getDayCompletion(dateKey);
                 return (
