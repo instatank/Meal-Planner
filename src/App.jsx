@@ -1725,71 +1725,15 @@ const MealPlannerApp = () => {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={regenerateRestOfWeek}
-            className="w-[60%] bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            disabled={isViewerMode || isRegenerating}
-          >
-            {isRegenerating ? <Loader2 className="animate-spin" size={18} /> : '♻️'}
-            {isRegenerating ? 'Planning Week...' : 'Regen Rest Of Week'}
-          </button>
-          <button
-            onClick={() => setShowOnboardingEditor(true)}
-            className="w-[40%] bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-          >
-            ⚙️ Edit Prefs
-          </button>
-        </div>
-
-        {/* Calendar strip moved to weekly view */}
-
-        <button
-          onClick={() => setShowProgress(!showProgress)}
-          className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold mb-4 hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-        >
-          <TrendingUp size={20} />
-          {showProgress ? '▲ Hide' : '▼ Show'} Progress Tracker
-        </button>
-
-        {showProgress && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-4">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">📊 Your Progress</h2>
-            {Object.keys(mealHistory).length > 0 ? (
-              <>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-blue-50 p-4 rounded text-center">
-                    <div className="text-2xl font-bold text-blue-600">{getWeeklyStats().days}</div>
-                    <div className="text-xs text-gray-600">Days Tracked</div>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded text-center">
-                    <div className="text-2xl font-bold text-green-600">{getWeeklyStats().avgProtein}g</div>
-                    <div className="text-xs text-gray-600">Avg Protein/Day</div>
-                  </div>
-                  <div className="bg-purple-50 p-4 rounded text-center col-span-2">
-                    <div className="text-2xl font-bold text-purple-600">{getWeeklyStats().above100}</div>
-                    <div className="text-xs text-gray-600">Days ≥100g P</div>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-600 bg-yellow-50 p-3 rounded border-l-4 border-yellow-400">
-                  💬 <strong>Weekly Check-In:</strong> Ask me in chat to analyze your week and suggest new meals based on your preferences!
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-600 text-center py-8">Start confirming your meals to see progress tracking! 📈</p>
-            )}
-          </div>
-        )}
-
         <button
           onClick={() => setShowWeekly(!showWeekly)}
           className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold mb-4 hover:bg-indigo-700 transition-colors"
         >
-          {showWeekly ? '▲ Hide' : '▼ Show'} Weekly Calendar
+          {showWeekly ? '▲ Hide' : '▼ Show'} This Week's Plan
         </button>
 
         {showWeekly && (
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-6 mb-4">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Week Snapshot</h2>
             <p className="text-xs text-gray-600 mb-4 bg-blue-50 p-3 rounded border-l-4 border-blue-400">
               Planned and confirmed meals for the selected week.
@@ -1832,6 +1776,60 @@ const MealPlannerApp = () => {
 
           </div>
         )}
+
+        <button
+          onClick={() => setShowProgress(!showProgress)}
+          className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold mb-4 hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <TrendingUp size={20} />
+          {showProgress ? '▲ Hide' : '▼ Show'} Progress Tracker
+        </button>
+
+        {showProgress && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-4">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">📊 Your Progress</h2>
+            {Object.keys(mealHistory).length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-blue-50 p-4 rounded text-center">
+                    <div className="text-2xl font-bold text-blue-600">{getWeeklyStats().days}</div>
+                    <div className="text-xs text-gray-600">Days Tracked</div>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded text-center">
+                    <div className="text-2xl font-bold text-green-600">{getWeeklyStats().avgProtein}g</div>
+                    <div className="text-xs text-gray-600">Avg Protein/Day</div>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded text-center col-span-2">
+                    <div className="text-2xl font-bold text-purple-600">{getWeeklyStats().above100}</div>
+                    <div className="text-xs text-gray-600">Days ≥100g P</div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600 bg-yellow-50 p-3 rounded border-l-4 border-yellow-400">
+                  💬 <strong>Weekly Check-In:</strong> Ask me in chat to analyze your week and suggest new meals based on your preferences!
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-600 text-center py-8">Start confirming your meals to see progress tracking! 📈</p>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={regenerateRestOfWeek}
+            className="w-[60%] bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            disabled={isViewerMode || isRegenerating}
+          >
+            {isRegenerating ? <Loader2 className="animate-spin" size={18} /> : '♻️'}
+            {isRegenerating ? 'Planning Week...' : 'Regen Rest Of Week'}
+          </button>
+          <button
+            onClick={() => setShowOnboardingEditor(true)}
+            className="w-[40%] bg-yellow-500 text-white py-3 rounded-lg font-semibold hover:bg-yellow-600 transition-colors"
+          >
+            ⚙️ Edit Prefs
+          </button>
+        </div>
       </div>
     </div >
   );
