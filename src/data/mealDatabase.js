@@ -452,13 +452,13 @@ const baseMealsList = {
       "assumption_version": "assumptions_v2026_02_17",
       "name": "Kofta + dal + jowar roti",
       "parts": [
-        { "ingredientId": "lamb_seekh_kabab", "qty": 150, "unit": "g" },
+        { "ingredientId": "veg_kofta", "qty": 150, "unit": "g" },
         { "ingredientId": "arhar_dal", "qty": 150, "unit": "g" },
         { "ingredientId": "jowar_roti", "qty": 2, "unit": "piece" },
         { "ingredientId": "curry_base", "qty": 30, "unit": "g" }
       ],
       "components": {
-        "protein": "Lamb (seekh kabab)", "amount": 140, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": "Mixed veg sabzi", "vegAmount": 120, "style": "Curry style"
+        "protein": "Veg kofta", "amount": 150, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": "Mixed veg sabzi", "vegAmount": 120, "style": "Curry style"
       },
       "cuisine": "indian"
     },
