@@ -1746,7 +1746,7 @@ const MealPlannerApp = () => {
                 return (
                   <div key={dateKey} className={`border rounded p - 3 ${dateKey === selectedDateKey ? 'border-blue-300 bg-blue-50' : 'border-gray-200'} `}>
                     <div className="flex justify-between items-center mb-2">
-                      <button onClick={() => setSelectedDateKey(dateKey)} className="font-semibold text-gray-700 hover:text-blue-700">
+                      <button onClick={() => setSelectedDateKey(dateKey)} className="font-semibold text-blue-600 underline hover:text-blue-800 transition-colors">
                         {formatWeekSnapshotDateLabel(dateKey)}
                       </button>
                       <span className="text-xs text-gray-600">
