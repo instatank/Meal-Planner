@@ -1817,7 +1817,7 @@ const MealPlannerApp = () => {
         <div className="flex gap-2 mb-4">
           <button
             onClick={regenerateRestOfWeek}
-            className="w-[60%] bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-[60%] bg-orange-100 text-orange-700 py-3 rounded-lg font-semibold hover:bg-orange-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             disabled={isViewerMode || isRegenerating}
           >
             {isRegenerating ? <Loader2 className="animate-spin" size={18} /> : '♻️'}
@@ -1825,7 +1825,7 @@ const MealPlannerApp = () => {
           </button>
           <button
             onClick={() => setShowOnboardingEditor(true)}
-            className="w-[40%] bg-yellow-500 text-white py-3 rounded-lg font-semibold hover:bg-yellow-600 transition-colors"
+            className="w-[40%] bg-yellow-100 text-yellow-700 py-3 rounded-lg font-semibold hover:bg-yellow-200 transition-colors"
           >
             ⚙️ Edit Prefs
           </button>
