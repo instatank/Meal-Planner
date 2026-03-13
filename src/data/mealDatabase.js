@@ -535,6 +535,40 @@ const baseMealsList = {
   ],
   "snack": [
     {
+      "meal_id": "snack_fruit-almonds-plant-shake",
+      "canonical_name": "Fruit + Almonds + Plant Shake",
+      "display_name": "Fruit + Almonds + Plant Shake",
+      "nutrition_source": "USDA + custom user specs",
+      "assumption_version": "v1_custom",
+      "name": "Fruit + Almonds + Plant Shake",
+      "parts": [
+        { "ingredientId": "mixed_fruit_100g", "qty": 100, "unit": "g" },
+        { "ingredientId": "almonds_5pc", "qty": 5, "unit": "piece" },
+        { "ingredientId": "plant_protein_shake_25g", "qty": 25, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Plant Shake", "amount": 25, "carb": "Mixed Fruit", "carbAmount": 100, "veg": "Almonds", "vegAmount": 5, "style": "Snack"
+      },
+      "cuisine": "general"
+    },
+    {
+      "meal_id": "snack_chaat-bhel-protein-shake",
+      "canonical_name": "Chaat + Bhel + Protein Shake",
+      "display_name": "Chaat + Bhel + Protein Shake",
+      "nutrition_source": "IFCT/USDA + custom user specs",
+      "assumption_version": "v1_custom",
+      "name": "Chaat + Bhel + Protein Shake",
+      "parts": [
+        { "ingredientId": "half_bhel_puri_no_potato", "qty": 75, "unit": "g" },
+        { "ingredientId": "half_papdi_chaat_baked", "qty": 75, "unit": "g" },
+        { "ingredientId": "plant_protein_shake_25g", "qty": 25, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Plant Shake", "amount": 25, "carb": "Chaat & Bhel", "carbAmount": 150, "style": "Street Food Twist"
+      },
+      "cuisine": "indian"
+    },
+    {
       "meal_id": "snack_greek-yogurt-berry-bowl",
       "canonical_name": "Greek yogurt + berry bowl",
       "display_name": "Greek yogurt + berry bowl",
@@ -663,7 +697,9 @@ const csvTagsMap = {
   "Nuts, seeds + protein shake": { cuisine: "International", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
   "Sweet potato chaat": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
   "Kaala chana chaat": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
-  "Avocado/cheese toast": { cuisine: "Continental", is_fat_heavy: true, has_fibre: false, meal_weight: "Light" }
+  "Avocado/cheese toast": { cuisine: "Continental", is_fat_heavy: true, has_fibre: false, meal_weight: "Light" },
+  "Fruit + Almonds + Plant Shake": { cuisine: "General", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
+  "Chaat + Bhel + Protein Shake": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" }
 };
 
 // Auto-inject computed macros to maintain strict backward compatibility

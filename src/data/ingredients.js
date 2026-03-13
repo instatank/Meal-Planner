@@ -313,5 +313,37 @@ export const ingredients = {
     per100g: { kcal: 20, p: 1, c: 4, f: 0.1 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA"
+  },
+
+  // --- Custom Snacks ---
+  mixed_fruit_100g: {
+    name: "Mixed fruit (pomegranate, orange)",
+    per100g: { kcal: 65, p: 1.3, c: 15, f: 0.6 },
+    defaultPortion: { qty: 100, unit: "g" },
+    source: "USDA Custom Average"
+  },
+  almonds_5pc: {
+    name: "Almonds (5 pieces)",
+    per100g: { kcal: 579, p: 21, c: 21, f: 50 },
+    defaultPortion: { qty: 5, unit: "piece", pieceWeightG: 1.2 },
+    source: "USDA"
+  },
+  plant_protein_shake_25g: {
+    name: "Plant protein shake (water)",
+    per100g: { kcal: 400, p: 80, c: 10, f: 5 },
+    defaultPortion: { qty: 25, unit: "g" },
+    source: "Standard Supplement"
+  },
+  half_bhel_puri_no_potato: {
+    name: "Bhel puri (half portion, no potato)",
+    per100g: { kcal: 157, p: 3.3, c: 23.3, f: 5.3 },
+    defaultPortion: { qty: 75, unit: "g" },
+    source: "IFCT Derived Custom"
+  },
+  half_papdi_chaat_baked: {
+    name: "Papdi chaat (half portion, baked, no potato)",
+    per100g: { kcal: 170, p: 5.3, c: 24.6, f: 4.6 },
+    defaultPortion: { qty: 75, unit: "g" },
+    source: "IFCT Derived Custom"
   }
 };
