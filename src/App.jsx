@@ -345,9 +345,32 @@ const MealPlannerApp = () => {
   const saveToStorage = async (key, data) => {
     if (typeof window === 'undefined') return;
 
-    window.localStorage.setItem(key, JSON.stringify(data));
+    let payloadToSave = data;
+    if (key === 'meal-plans' && data && typeof data === 'object') {
+      const cutoff = new Date();
+      cutoff.setUTCDate(cutoff.getUTCDate() - 14);
+      const cutoffKey = cutoff.toISOString().split('T')[0];
+      payloadToSave = {};
+      for (const [k, v] of Object.entries(data)) {
+        if (k >= cutoffKey) payloadToSave[k] = v;
+      }
+    } else if (key === 'meal-history' && data && typeof data === 'object') {
+      const cutoff = new Date();
+      cutoff.setUTCDate(cutoff.getUTCDate() - 60);
+      const cutoffKey = cutoff.toISOString().split('T')[0];
+      payloadToSave = {};
+      for (const [k, v] of Object.entries(data)) {
+        if (k >= cutoffKey) payloadToSave[k] = v;
+      }
+    }
 
-    const apiSaved = await putToApiStorage(key, data);
+    try {
+      window.localStorage.setItem(key, JSON.stringify(payloadToSave));
+    } catch (e) {
+      console.warn('LocalStorage limit reached', e);
+    }
+
+    const apiSaved = await putToApiStorage(key, payloadToSave);
     if (apiSaved) return;
 
     if (window.storage?.set) {
