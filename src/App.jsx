@@ -323,6 +323,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     if (typeof window === 'undefined') return null;
 
     const localValue = safeParseJson(window.localStorage.getItem(key), null);
+    const localTs = window.localStorage.getItem(`${key}__ts`) || null;
 
     if (user) {
       try {
@@ -332,14 +333,32 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         if (docSnap.exists()) {
           const payload = docSnap.data();
           if (payload?.value != null) {
-            window.localStorage.setItem(key, JSON.stringify(payload.value));
-            return payload.value;
+            const firebaseTs = payload.updatedAt || null;
+
+            // Use whichever version is newer — local timestamp wins in case of tie
+            const localIsNewer = localTs && firebaseTs && localTs >= firebaseTs;
+            const localExists = localValue != null;
+
+            if (localIsNewer && localExists) {
+              // Local is newer: re-sync this newer version back to Firebase in background
+              console.info(`[storageGet] Local ${key} is newer (${localTs} vs ${firebaseTs}) — using local, syncing to Firebase`);
+              const safeLocal = JSON.parse(JSON.stringify(localValue));
+              setDoc(docRef, { value: safeLocal, updatedAt: localTs }, { merge: true }).catch(e =>
+                console.warn('[storageGet] Background Firebase re-sync failed:', e)
+              );
+              return localValue;
+            } else {
+              // Firebase is newer or local is absent: use Firebase value and update local
+              window.localStorage.setItem(key, JSON.stringify(payload.value));
+              if (firebaseTs) window.localStorage.setItem(`${key}__ts`, firebaseTs);
+              return payload.value;
+            }
           }
         } else if (localValue != null) {
           const safeLocalValue = JSON.parse(JSON.stringify(localValue));
           await setDoc(docRef, {
             value: safeLocalValue,
-            updatedAt: new Date().toISOString()
+            updatedAt: localTs || new Date().toISOString()
           });
         }
       } catch (error) {
@@ -385,8 +404,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       }
     }
 
+    const nowIso = new Date().toISOString();
+
+    // Always write to localStorage first with a timestamp for conflict resolution
     try {
       window.localStorage.setItem(key, JSON.stringify(payloadToSave));
+      window.localStorage.setItem(`${key}__ts`, nowIso);
     } catch (e) {
       console.warn('LocalStorage limit reached', e);
     }
@@ -398,11 +421,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         const docRef = doc(db, 'users', user.uid, 'metrics', key);
         await setDoc(docRef, {
           value: safePayload,
-          updatedAt: new Date().toISOString()
+          updatedAt: nowIso
         }, { merge: true });
         return;
       } catch (err) {
-        console.error('Failed pushing to Firebase', err);
+        console.error('Failed pushing to Firebase — local copy preserved:', err);
+        // Don't rethrow — local copy is safe, Firebase can sync later
       }
     }
 
