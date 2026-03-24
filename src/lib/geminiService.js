@@ -88,7 +88,8 @@ export const generateWeeklyPlan = async ({
   preferences,
   historyMap,
   dailyProteinTarget,
-  cloudConfig = null
+  cloudConfig = null,
+  goal = 'high_protein'
 }) => {
   if (!ai) throw new Error("Gemini API key is missing. Add VITE_GEMINI_API_KEY to .env.local");
 
@@ -111,7 +112,11 @@ export const generateWeeklyPlan = async ({
     meal_weight: m.meal_weight || 'Medium'
   }));
 
-  const systemPrompt = config.prompts.weeklyGeneration
+  const basePromptTemplate = typeof config.prompts.weeklyGeneration === 'string'
+    ? config.prompts.weeklyGeneration
+    : (config.prompts.weeklyGeneration[goal] || config.prompts.weeklyGeneration.high_protein || Object.values(config.prompts.weeklyGeneration)[0]);
+
+  const systemPrompt = basePromptTemplate
     .replace('{{AVAILABLE_MEALS}}', JSON.stringify(availableMeals))
     .replace('{{PREFS_ACCEPTS}}', JSON.stringify(preferences?.accepts || {}))
     .replace('{{PREFS_EDITS}}', JSON.stringify(preferences?.edits || {}))

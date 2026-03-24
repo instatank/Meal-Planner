@@ -619,7 +619,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             preferences: adjustedPrefs,
             historyMap,
             dailyProteinTarget: adjustedProtein,
-            cloudConfig: systemConfig
+            cloudConfig: systemConfig,
+            goal: onboardingProfile?.goal
           });
 
           const nextPlans = { ...mealPlans };
@@ -1419,7 +1420,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         preferences: adjustedPrefs,
         historyMap,
         dailyProteinTarget: adjustedProtein,
-        cloudConfig: systemConfig
+        cloudConfig: systemConfig,
+        goal: onboardingProfile?.goal
       });
 
       const nextPlans = { ...mealPlans };
@@ -1895,7 +1897,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           </button>
         </div>
 
-        <AdminTools user={user} />
+        <AdminTools user={user} systemConfig={systemConfig} />
       </div>
     </div >
   );

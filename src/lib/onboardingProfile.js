@@ -7,6 +7,7 @@ export const ONBOARDING_MODE = {
 
 export const ONBOARDING_GOAL = {
   HIGH_PROTEIN: 'high_protein',
+  STANDARD: 'standard',
   LOW_CARB: 'low_carb',
   TWO_MEALS_DAY: 'two_meals_day',
   VEGETARIAN: 'vegetarian'
@@ -30,6 +31,11 @@ export const ONBOARDING_GOAL_OPTIONS = [
     value: ONBOARDING_GOAL.HIGH_PROTEIN,
     title: 'High-Protein',
     subtitle: 'Prioritize meals with higher protein content.'
+  },
+  {
+    value: ONBOARDING_GOAL.STANDARD,
+    title: 'Standard / Balanced',
+    subtitle: 'A well-rounded, balanced macro setup.'
   },
   {
     value: ONBOARDING_GOAL.LOW_CARB,
