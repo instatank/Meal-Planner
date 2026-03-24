@@ -5,12 +5,13 @@ import { ingredients } from '../data/ingredients';
 import { mealDatabase } from '../data/mealDatabase';
 import { FALLBACK_PROMPTS } from '../data/fallbackPrompts';
 
-export default function AdminTools({ user }) {
+export default function AdminTools({ user, systemConfig }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
 
-  if (!user || user.email !== 'YOUR_EMAIL_HERE') {
-    // We will conditionally render this only for the admin
+  // Automatically hide the migration pane if the AI brains are successfully verified in Firestore
+  if (systemConfig && Object.keys(systemConfig).length > 0) {
+    return null;
   }
 
   const handleMigration = async () => {
