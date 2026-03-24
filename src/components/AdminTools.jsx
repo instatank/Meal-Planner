@@ -19,17 +19,22 @@ export default function AdminTools({ user }) {
     setLoading(true);
     setStatus('Migrating ingredients...');
     try {
+      // Deeply strip any undefined values which crash the Firebase GRPC socket layer
+      const safeIngredients = JSON.parse(JSON.stringify(ingredients));
+      const safeMeals = JSON.parse(JSON.stringify(mealDatabase));
+      const safePrompts = JSON.parse(JSON.stringify(FALLBACK_PROMPTS));
+
       // 1. Ingredients
-      await setDoc(doc(db, 'system_config', 'ingredients'), { data: ingredients });
+      await setDoc(doc(db, 'system_config', 'ingredients'), { data: safeIngredients });
       
       setStatus('Migrating meals...');
       // 2. Meals
-      await setDoc(doc(db, 'system_config', 'meals'), { data: mealDatabase });
+      await setDoc(doc(db, 'system_config', 'meals'), { data: safeMeals });
       
       setStatus('Migrating prompts...');
       // 3. Prompts
       await setDoc(doc(db, 'system_config', 'prompts'), { 
-        system_instructions: FALLBACK_PROMPTS 
+        system_instructions: safePrompts 
       });
 
       setStatus('✅ Migration Complete! You can now safely edit the AI from your Firebase Console.');
