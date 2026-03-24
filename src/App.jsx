@@ -309,8 +309,9 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             return payload.value;
           }
         } else if (localValue != null) {
+          const safeLocalValue = JSON.parse(JSON.stringify(localValue));
           await setDoc(docRef, {
-            value: localValue,
+            value: safeLocalValue,
             updatedAt: new Date().toISOString()
           });
         }
@@ -365,9 +366,11 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
 
     if (user) {
       try {
+        // Deeply strip any implicit undefined values which instantly crash Firebase setDoc
+        const safePayload = JSON.parse(JSON.stringify(payloadToSave));
         const docRef = doc(db, 'users', user.uid, 'metrics', key);
         await setDoc(docRef, {
-          value: payloadToSave,
+          value: safePayload,
           updatedAt: new Date().toISOString()
         }, { merge: true });
         return;
