@@ -1,119 +1,48 @@
 import { GoogleGenAI } from '@google/genai';
-import { ingredients, userProfile, STANDARD_PORTIONS } from '../data/ingredients.js';
+import { ingredients as localIngredients, userProfile as localUserProfile, STANDARD_PORTIONS as localPortions } from '../data/ingredients.js';
+import { FALLBACK_PROMPTS } from '../data/fallbackPrompts.js';
 
-// Initialize the Gemini client
-// Native Vite support via import.meta.env, fallback to process.env for Node testing
 const apiKey = (typeof import.meta !== 'undefined' && import.meta.env)
   ? import.meta.env.VITE_GEMINI_API_KEY
   : process.env.VITE_GEMINI_API_KEY;
 
-// Only initialize if we have a key (so it doesn't crash on boot if missing)
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const isGeminiConfigured = () => !!ai;
 
-// Build a lightweight catalog text for the LLM prompt to save tokens
-const catalogString = Object.entries(ingredients)
-  .map(([id, def]) => `- [${id}]: ${def.name} (Default: ${def.defaultPortion?.qty}${def.defaultPortion?.unit})`)
-  .join('\n');
+// Helper to safely extract or fallback to local files
+const getActiveConfig = (cloudConfig) => {
+  return {
+    prompts: cloudConfig?.prompts?.system_instructions || FALLBACK_PROMPTS,
+    ingredients: cloudConfig?.ingredients?.data || localIngredients,
+    userProfile: localUserProfile, // This remains hardcoded until they want a UI for it
+    portions: localPortions
+  };
+};
 
-const SYSTEM_PROMPT = `You are an intelligent meal parsing assistant.
-Your sole job is to translate natural language meal descriptions into a strict JSON payload.
-
-USER PROFILE:
-Gender: ${userProfile.gender}
-Age: ${userProfile.age}
-Weight: ${userProfile.weight_kg}kg
-Height: ${userProfile.height_cm}cm
-
-STANDARD BASELINE PORTIONS:
-Protein (Meat): ${STANDARD_PORTIONS.protein_meat.qty}${STANDARD_PORTIONS.protein_meat.unit}
-Protein (Veg): ${STANDARD_PORTIONS.protein_veg.qty}${STANDARD_PORTIONS.protein_veg.unit}
-Carbs (Grain): ${STANDARD_PORTIONS.carbs_grain.qty}${STANDARD_PORTIONS.carbs_grain.unit}
-Carbs (Bread): ${STANDARD_PORTIONS.carbs_bread.qty}${STANDARD_PORTIONS.carbs_bread.unit}
-Vegetables: ${STANDARD_PORTIONS.vegetables.qty}${STANDARD_PORTIONS.vegetables.unit}
-Oils/Fats: ${STANDARD_PORTIONS.fats_oils.qty}${STANDARD_PORTIONS.fats_oils.unit}
-
-If the user does not explicitly state a quantity, apply these baseline portions.
-If the user says "half portion" or "large portion", adjust the baseline accordingly.
-
-EGG PORTION RULES (CRITICAL):
-- Whenever the user mentions "eggs" (e.g. scrambled eggs, omelette, boiled eggs) without a quantity, ASSUME 3 EGGS total.
-- NEVER use the "egg_whole" ingredient.
-- ALWAYS split eggs into "egg_white" and "egg_yolk" using this exact ratio: 1 egg = 1 "egg_white" + 0.5 "egg_yolk".
-- For example: if the user eats 3 eggs, output { "ingredientId": "egg_white", "qty": 3 } AND { "ingredientId": "egg_yolk", "qty": 1.5 }. If they eat 4 eggs, output 4 whites and 2 yolks. If they eat 5 eggs, output 5 whites and 2.5 yolks.
-
-ALLOWED INGREDIENT IDs:
-The ONLY valid ingredient IDs you can output are from this list:
-${catalogString}
-
-OUTPUT FORMAT:
-Analyze the user's intent and return a JSON object wrapping ONE of the following actions.
-
-If the user wants to log or add a meal they ate/planned:
-{
-  "intent": "ADD_CUSTOM",
-  "data": {
-    "name": "A short, readable name for the meal (e.g. 'Scrambled Eggs & Toast')",
-    "parts": [
-      { "ingredientId": "egg_whole", "qty": 3, "unit": "piece" },
-      { "ingredientId": "whole_wheat_toast", "qty": 2, "unit": "piece" }
-    ]
-  }
-}
-
-If the user wants to edit/modify the current specific slot (requires context):
-{
-  "intent": "MODIFY",
-  "data": {
-    "additions": [ { "ingredientId": "...", "qty": 1, "unit": "piece" } ],
-    "removals": [ "ingredientId1" ],
-    "scale": 1.0 
-  }
-}
-
-If the user is dining out / cheat meal:
-{
-  "intent": "DINING_OUT",
-  "data": {
-    "name": "Restaurant Name / Meal",
-    "estimatedCalories": 1200,
-    "estimatedProtein": 45,
-    "estimatedCarbs": 60,
-    "estimatedFats": 35
-  }
-}
-
-If the user asks for a generic swap but didn't specify exactly what components:
-{
-  "intent": "GENERAL_SWAP",
-  "data": {
-    "effort": 1, // 1=easy, 2=med, 3=hard. E.g., "I'm exhausted" -> 1
-    "preference": "lighter", // or "heavier", "high-protein", "vegetarian"
-    "exclude": [] 
-  }
-}
-
-If the user asks for a complex or novel meal you CANNOT reasonably build using the EXACT allowed ingredient IDs, estimate the macros based on your knowledge and return:
-{
-  "intent": "UNVERIFIED_NOVEL_FOOD",
-  "data": {
-    "name": "A short, readable name for the meal (e.g. 'Mexican Lamb Burrito')",
-    "estimatedCalories": 850,
-    "estimatedProtein": 45,
-    "estimatedCarbs": 60,
-    "estimatedFats": 35
-  }
-}
-
-CRITICAL RULES:
-1. ONLY return the JSON. No markdown, no backticks, no conversational text.
-2. For ADD_CUSTOM, the "ingredientId" MUST perfectly match the ALLOWED INGREDIENT IDs list exactly. Do not invent IDs.
-3. Quantities should be numbers, units should be "g" or "piece" based on the catalog.
-`;
-
-export const parseMealIntent = async (userInput, contextSlot = null) => {
+export const parseMealIntent = async (userInput, contextSlot = null, cloudConfig = null) => {
   if (!ai) throw new Error("Gemini API key is missing. Add VITE_GEMINI_API_KEY to .env.local");
+
+  const config = getActiveConfig(cloudConfig);
+  
+  // Build the dynamic catalog string based on exactly what is structurally passed in
+  const catalogString = Object.entries(config.ingredients)
+    .map(([id, def]) => `- [${id}]: ${def.name} (Default: ${def.defaultPortion?.qty}${def.defaultPortion?.unit})`)
+    .join('\n');
+
+  // String Interpolation
+  const systemInstruction = config.prompts.intentParsing
+    .replace('{{GENDER}}', config.userProfile.gender)
+    .replace('{{AGE}}', config.userProfile.age)
+    .replace('{{WEIGHT}}', config.userProfile.weight_kg)
+    .replace('{{HEIGHT}}', config.userProfile.height_cm)
+    .replace('{{PORTION_MEAT}}', `${config.portions.protein_meat.qty}${config.portions.protein_meat.unit}`)
+    .replace('{{PORTION_VEG}}', `${config.portions.protein_veg.qty}${config.portions.protein_veg.unit}`)
+    .replace('{{PORTION_GRAIN}}', `${config.portions.carbs_grain.qty}${config.portions.carbs_grain.unit}`)
+    .replace('{{PORTION_BREAD}}', `${config.portions.carbs_bread.qty}${config.portions.carbs_bread.unit}`)
+    .replace('{{PORTION_VEG_BASE}}', `${config.portions.vegetables.qty}${config.portions.vegetables.unit}`)
+    .replace('{{PORTION_FATS}}', `${config.portions.fats_oils.qty}${config.portions.fats_oils.unit}`)
+    .replace('{{CATALOG_STRING}}', catalogString);
 
   try {
     const prompt = `
@@ -127,8 +56,8 @@ export const parseMealIntent = async (userInput, contextSlot = null) => {
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        systemInstruction: SYSTEM_PROMPT,
-        temperature: 0.1, // Keep it deterministic
+        systemInstruction: systemInstruction,
+        temperature: 0.1, 
         responseMimeType: 'application/json'
       }
     });
@@ -136,12 +65,9 @@ export const parseMealIntent = async (userInput, contextSlot = null) => {
     const outputString = response.text;
     if (!outputString) throw new Error("Empty response from AI");
 
-    // Parse the raw text as JSON safely
     try {
-      const payload = JSON.parse(outputString);
-      return payload;
+      return JSON.parse(outputString);
     } catch (parseError) {
-      // Fallback for markdown-wrapped JSON
       const codeBlockMatch = outputString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (codeBlockMatch) {
         return JSON.parse(codeBlockMatch[1]);
@@ -161,11 +87,13 @@ export const generateWeeklyPlan = async ({
   mealDatabase,
   preferences,
   historyMap,
-  dailyProteinTarget
+  dailyProteinTarget,
+  cloudConfig = null
 }) => {
   if (!ai) throw new Error("Gemini API key is missing. Add VITE_GEMINI_API_KEY to .env.local");
 
-  // Flatten and compress available meals so we don't blow up the context window
+  const config = getActiveConfig(cloudConfig);
+
   const availableMeals = [
     ...(mealDatabase.breakfast || []),
     ...(mealDatabase.lunchDinner || []),
@@ -183,81 +111,23 @@ export const generateWeeklyPlan = async ({
     meal_weight: m.meal_weight || 'Medium'
   }));
 
-  const prompt = `
-You are an expert, world-class nutrition planner.
-You are tasked with generating a meal plan for the user across multiple upcoming days.
-
-AVAILABLE MEAL CATALOG (JSON format):
-${JSON.stringify(availableMeals)}
-
-IMPORTANT CATALOG RULES:
-- You MUST ONLY select meals whose 'name' exactly matches a name in the catalog. NEVER invent meals.
-- You MUST NEVER schedule a 'breakfast' item for lunch or dinner, and MUST NEVER schedule a 'lunch/dinner' item for breakfast.
-- For this goal, EXCLUDE any meal where Protein(g) is below 20g.
-
-USER PREFERENCES:
-Accepts (Prioritize these): ${JSON.stringify(preferences?.accepts || {})}
-Edits (Apply these modifications): ${JSON.stringify(preferences?.edits || {})}
-Avoids (NEVER select these): ${JSON.stringify(preferences?.avoids || {})}
-
-RECENT HISTORY:
-${JSON.stringify(historyMap)}
-Use this history strictly to enforce repetition ceilings. Do not use it to introduce or force meals that have not appeared recently.
-
-DATES TO GENERATE:
-${JSON.stringify(targetDateKeys)}
-
-DAILY GOAL:
-Target Protein: ${dailyProteinTarget}g per day. Acceptable range: ${Math.round(Number(dailyProteinTarget) * 0.9)}g–${Math.round(Number(dailyProteinTarget) * 1.1)}g.
-
----
-
-RULES — FOLLOW ALL OF THESE WITHOUT EXCEPTION:
-
-1. REPETITION CEILINGS
-   - A single breakfast meal may appear a MAXIMUM of 4 times in the generated week.
-   - A single lunchDinner meal may appear a MAXIMUM of 2 times in the entire generated week.
-   - Do not blindly repeat a meal just because it fits the macros. Always check the catalog for an unused or underused alternative first.
-
-2. HARD DAILY LIMITS
-   - CARB CAP: Total carbohydrates across Breakfast + Lunch + Dinner MUST NOT exceed 130g for the day. Use the 'c' field from the catalog to calculate this.
-   - MINIMUM MEAL PROTEIN: Every scheduled meal (Breakfast, Lunch, Dinner) MUST contain at least 20g of protein. Any catalog meal below this threshold is ineligible and must not be selected.
-   - FAT HEAVY CAP: A maximum of ONE meal per day may have is_fat_heavy = true. Never schedule two fat-heavy meals on the same day.
-   - CALORIC FLOOR: The combined total of Breakfast + Lunch + Dinner MUST NOT fall below 1,600 kcal per day.
-   - CALORIC CEILING: The combined total of Breakfast + Lunch + Dinner MUST NOT exceed 2,200 kcal per day.
-
-3. PROTEIN ANCHORING
-   - The daily combined protein total does not need to be exactly ${dailyProteinTarget}g. You have a flexible envelope: ${Math.round(Number(dailyProteinTarget) * 0.9)}g–${Math.round(Number(dailyProteinTarget) * 1.1)}g is acceptable.
-   - Within that range, prioritize culinary variety and logical meal sequencing over mathematical precision. Do not sacrifice variety to hit exactly ${dailyProteinTarget}g.
-
-4. PROTEIN DIVERSITY
-   - No single meal may contain two of the same primary protein family (e.g. no chicken + turkey in one bowl).
-   - MEAT & FIBRE RULE: Any catalog meal where the Primary Protein is Chicken, Fish, or Red Meat MUST have has_fibre = true. Never schedule a meat or fish meal where has_fibre = false.
-   - Lunch and Dinner MUST use different primary protein families each day. This is not a suggestion — if no valid alternative exists in the catalog, flag it; do not silently violate this rule.
-   - LEAN MEAT REQUIREMENT: At least 4 of the 7 scheduled lunches AND at least 4 of the 7 scheduled dinners must have Chicken or Fish as the Primary Protein.
-   - RED MEAT CAP: Meals where Primary Protein is Pork, Beef, Lamb, or Mutton must not exceed 3 meals total combined across the entire generated week.
-
-5. CALORIC TAPERING
-   - The highest-calorie, highest-carb meal of the day must be either Breakfast or Lunch — never Dinner.
-   - Dinner MUST be selected from meals tagged meal_weight = Light or Medium. Never schedule a meal_weight = Heavy meal for Dinner.
-
-6. CUISINE SEQUENCING
-   - Lunch and Dinner MUST NOT both be tagged cuis = Indian on the same day.
-   - Do not schedule the same Cuisine value for both Lunch and Dinner on the same day unless no valid alternative exists in the catalog.
-
-7. OUTPUT FORMAT
-   Output STRICTLY valid JSON. No markdown, no backticks, no explanation — JSON array only:
-   [
-     { "dateKey": "YYYY-MM-DD", "breakfast": "exact_meal_name", "lunch": "exact_meal_name", "dinner": "exact_meal_name" }
-   ]
-  `;
+  const systemPrompt = config.prompts.weeklyGeneration
+    .replace('{{AVAILABLE_MEALS}}', JSON.stringify(availableMeals))
+    .replace('{{PREFS_ACCEPTS}}', JSON.stringify(preferences?.accepts || {}))
+    .replace('{{PREFS_EDITS}}', JSON.stringify(preferences?.edits || {}))
+    .replace('{{PREFS_AVOIDS}}', JSON.stringify(preferences?.avoids || {}))
+    .replace('{{RECENT_HISTORY}}', JSON.stringify(historyMap))
+    .replace('{{TARGET_DATES}}', JSON.stringify(targetDateKeys))
+    .replace(/{{PROTEIN_TARGET}}/g, String(dailyProteinTarget)) // Global replaces
+    .replace(/{{PROTEIN_MIN}}/g, String(Math.round(Number(dailyProteinTarget) * 0.9)))
+    .replace(/{{PROTEIN_MAX}}/g, String(Math.round(Number(dailyProteinTarget) * 1.1)));
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: systemPrompt,
       config: {
-        temperature: 0.7, // Increased variance to force diverse selection
+        temperature: 0.7, 
         responseMimeType: 'application/json'
       }
     });

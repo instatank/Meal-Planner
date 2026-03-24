@@ -33,11 +33,36 @@ import { computeMacros } from './lib/mealDataLayer';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from './lib/firebase';
+import AdminTools from './components/AdminTools';
 
 const MealPlannerMain = ({ user, handleSignOut }) => {
   const IST_TIME_ZONE = 'Asia/Kolkata';
   const ONBOARDING_PROFILE_STORAGE_KEY = 'meal-onboarding-profile';
   const DEFAULT_USER_CATALOG = { breakfast: [], lunchDinner: [], snack: [] };
+
+  const [systemConfig, setSystemConfig] = useState(null);
+
+  useEffect(() => {
+    const fetchSystemConfig = async () => {
+      try {
+        const promptsSnap = await getDoc(doc(db, 'system_config', 'prompts'));
+        const ingredientsSnap = await getDoc(doc(db, 'system_config', 'ingredients'));
+        const mealsSnap = await getDoc(doc(db, 'system_config', 'meals'));
+        
+        let config = {};
+        if (promptsSnap.exists()) config.prompts = promptsSnap.data().system_instructions;
+        if (ingredientsSnap.exists()) config.ingredients = ingredientsSnap.data().data;
+        if (mealsSnap.exists()) config.meals = mealsSnap.data().data;
+        
+        if (Object.keys(config).length > 0) {
+          setSystemConfig(config);
+        }
+      } catch (err) {
+        console.warn('Silent fail: using local immutable AI configuration.', err);
+      }
+    };
+    if (user) fetchSystemConfig();
+  }, [user]);
 
   const [expandedMeals, setExpandedMeals] = useState({});
   const [showWeekly, setShowWeekly] = useState(false);
@@ -106,13 +131,15 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     return 'Lunch/Dinner';
   };
 
+  const activeMealDatabase = systemConfig?.meals || mealDatabase;
+
   const mergedMealDatabase = useMemo(
     () => ({
-      breakfast: mergeMealsUniqueByCanonicalName(mealDatabase.breakfast || [], userMealCatalog.breakfast || []),
-      lunchDinner: mergeMealsUniqueByCanonicalName(mealDatabase.lunchDinner || [], userMealCatalog.lunchDinner || []),
-      snack: mergeMealsUniqueByCanonicalName(mealDatabase.snack || [], userMealCatalog.snack || [])
+      breakfast: mergeMealsUniqueByCanonicalName(activeMealDatabase.breakfast || [], userMealCatalog.breakfast || []),
+      lunchDinner: mergeMealsUniqueByCanonicalName(activeMealDatabase.lunchDinner || [], userMealCatalog.lunchDinner || []),
+      snack: mergeMealsUniqueByCanonicalName(activeMealDatabase.snack || [], userMealCatalog.snack || [])
     }),
-    [userMealCatalog]
+    [userMealCatalog, activeMealDatabase]
   );
 
   const allExistingMealNames = useMemo(
@@ -591,7 +618,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             mealDatabase: mergedMealDatabase,
             preferences: adjustedPrefs,
             historyMap,
-            dailyProteinTarget: adjustedProtein
+            dailyProteinTarget: adjustedProtein,
+            cloudConfig: systemConfig
           });
 
           const nextPlans = { ...mealPlans };
@@ -1390,7 +1418,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         mealDatabase: mergedMealDatabase,
         preferences: adjustedPrefs,
         historyMap,
-        dailyProteinTarget: adjustedProtein
+        dailyProteinTarget: adjustedProtein,
+        cloudConfig: systemConfig
       });
 
       const nextPlans = { ...mealPlans };
@@ -1633,6 +1662,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           externalInputRef={omniboxRef}
           prefill={omniboxPrefill}
           onClearPrefill={() => setOmniboxPrefill('')}
+          systemConfig={systemConfig}
         />
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-4">
@@ -1864,6 +1894,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             ⚙️ Edit Prefs
           </button>
         </div>
+
+        <AdminTools user={user} />
       </div>
     </div >
   );

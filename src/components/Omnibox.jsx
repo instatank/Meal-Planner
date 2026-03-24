@@ -3,7 +3,7 @@ import { Send, Sparkles, Loader2, X, Check } from 'lucide-react';
 import { parseMealIntent, isGeminiConfigured } from '../lib/geminiService';
 import { mealDatabase } from '../data/mealDatabase';
 
-const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, onRequestContext, externalInputRef, prefill = "", onClearPrefill }) => {
+const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, onRequestContext, externalInputRef, prefill = "", onClearPrefill, systemConfig = null }) => {
     const [input, setInput] = useState('');
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -31,8 +31,9 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
 
         const lowerInput = input.trim().toLowerCase();
         const results = [];
+        const activeDb = systemConfig?.meals || mealDatabase;
 
-        for (const [slot, meals] of Object.entries(mealDatabase)) {
+        for (const [slot, meals] of Object.entries(activeDb)) {
             for (const m of meals) {
                 if (
                     m.name.toLowerCase().includes(lowerInput) ||
@@ -71,8 +72,9 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
         const lowerInput = input.trim().toLowerCase();
         let matchedMeal = null;
         let matchedSlot = null;
+        const activeDb = systemConfig?.meals || mealDatabase;
 
-        for (const [slot, meals] of Object.entries(mealDatabase)) {
+        for (const [slot, meals] of Object.entries(activeDb)) {
             const found = meals.find(m =>
                 m.canonical_name.toLowerCase() === lowerInput ||
                 m.name.toLowerCase() === lowerInput ||
@@ -97,7 +99,7 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
         }
 
         try {
-            const intentPayload = await parseMealIntent(input, activeContext);
+            const intentPayload = await parseMealIntent(input, activeContext, systemConfig);
             setPendingIntent(intentPayload);
             setInput(''); // Clear input after successful parse
         } catch (err) {
