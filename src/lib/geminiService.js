@@ -95,13 +95,16 @@ export const generateWeeklyPlan = async ({
 
   const config = getActiveConfig(cloudConfig);
 
+  const breakfastSet = new Set((mealDatabase.breakfast || []).map(m => m.canonical_name));
+  const lunchDinnerSet = new Set((mealDatabase.lunchDinner || []).map(m => m.canonical_name));
+
   const availableMeals = [
     ...(mealDatabase.breakfast || []),
     ...(mealDatabase.lunchDinner || []),
     ...(mealDatabase.snack || [])
   ].map(m => ({
     name: m.canonical_name,
-    type: (mealDatabase.breakfast || []).includes(m) ? 'breakfast' : ((mealDatabase.lunchDinner || []).includes(m) ? 'lunch/dinner' : 'snack'),
+    type: breakfastSet.has(m.canonical_name) ? 'breakfast' : (lunchDinnerSet.has(m.canonical_name) ? 'lunch/dinner' : 'snack'),
     p: Math.round(m.protein || m.p || 0),
     c: Math.round(m.c || 0),
     f: Math.round(m.f || 0),
@@ -109,8 +112,22 @@ export const generateWeeklyPlan = async ({
     cuis: m.cuisine || 'general',
     is_fat_heavy: !!m.is_fat_heavy,
     has_fibre: !!m.has_fibre,
-    meal_weight: m.meal_weight || 'Medium'
+    meal_weight: m.meal_weight || 'Medium',
+    pp: m.components?.protein || m.primary_protein || null
   }));
+
+  // Slim history to just meal names per day — avoids sending full meal objects (~1-2k tokens saved)
+  const slimHistory = Object.fromEntries(
+    Object.entries(historyMap).map(([dateKey, dayData]) => {
+      const slim = {};
+      for (const slot of ['breakfast', 'lunch', 'dinner', 'snack']) {
+        const meal = dayData?.[slot];
+        const name = meal?.name || meal?.canonical_name || (typeof meal === 'string' ? meal : null);
+        if (name) slim[slot] = name;
+      }
+      return [dateKey, slim];
+    })
+  );
 
   const basePromptTemplate = typeof config.prompts.weeklyGeneration === 'string'
     ? config.prompts.weeklyGeneration
@@ -121,9 +138,9 @@ export const generateWeeklyPlan = async ({
     .replace('{{PREFS_ACCEPTS}}', JSON.stringify(preferences?.accepts || {}))
     .replace('{{PREFS_EDITS}}', JSON.stringify(preferences?.edits || {}))
     .replace('{{PREFS_AVOIDS}}', JSON.stringify(preferences?.avoids || {}))
-    .replace('{{RECENT_HISTORY}}', JSON.stringify(historyMap))
+    .replace('{{RECENT_HISTORY}}', JSON.stringify(slimHistory))
     .replace('{{TARGET_DATES}}', JSON.stringify(targetDateKeys))
-    .replace(/{{PROTEIN_TARGET}}/g, String(dailyProteinTarget)) // Global replaces
+    .replace(/{{PROTEIN_TARGET}}/g, String(dailyProteinTarget))
     .replace(/{{PROTEIN_MIN}}/g, String(Math.round(Number(dailyProteinTarget) * 0.9)))
     .replace(/{{PROTEIN_MAX}}/g, String(Math.round(Number(dailyProteinTarget) * 1.1)));
 
