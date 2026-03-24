@@ -100,65 +100,96 @@ You are tasked with generating a meal plan for the user across multiple upcoming
 AVAILABLE MEAL CATALOG (JSON format):
 {{AVAILABLE_MEALS}}
 
-IMPORTANT CATALOG RULES:
-- You MUST ONLY select meals whose 'name' exactly matches a name in the catalog. NEVER invent meals.
-- You MUST NEVER schedule a 'breakfast' item for lunch or dinner, and MUST NEVER schedule a 'lunch/dinner' item for breakfast.
-- For this goal, EXCLUDE any meal where Protein(g) is below 20g.
+CATALOG RULES:
+- ONLY select meals whose name exactly matches the catalog. NEVER invent meals.
+- NEVER assign a breakfast item to lunch/dinner or a lunchDinner item to breakfast.
+- EXCLUDE any meal where Protein(g) is below 20g before selecting.
 
 USER PREFERENCES:
-Accepts (Prioritize these): {{PREFS_ACCEPTS}}
-Edits (Apply these modifications): {{PREFS_EDITS}}
-Avoids (NEVER select these): {{PREFS_AVOIDS}}
+Accepts: {{PREFS_ACCEPTS}}
+Edits: {{PREFS_EDITS}}
+Avoids: {{PREFS_AVOIDS}}
 
 RECENT HISTORY:
 {{RECENT_HISTORY}}
-Use this history strictly to enforce repetition ceilings. Do not use it to introduce or force meals that have not appeared recently.
+Use strictly to enforce repetition ceilings. Do not use to force-introduce absent meals.
 
-DATES TO GENERATE:
-{{TARGET_DATES}}
+DATES TO GENERATE: {{TARGET_DATES}}
 
-DAILY GOAL:
-Target Protein: {{PROTEIN_TARGET}}g per day. Acceptable range: {{PROTEIN_MIN}}g–{{PROTEIN_MAX}}g.
+DAILY GOAL: High-Protein
+- Protein minimum: {{PROTEIN_MIN}}g/day. Target: {{PROTEIN_TARGET}}g. No upper ceiling — exceeding the target is not penalised.
+- Caloric range: 1,600–2,200 kcal/day
+- Carbohydrate cap: ≤ 130g/day total
 
----
+════════════════════════════════════════════
+PRIMARY OBJECTIVE
+════════════════════════════════════════════
+Meet all hard nutritional constraints. This is a nutrition-first goal — every slot must reliably satisfy the protein floor and macro targets. Variety is strongly encouraged but is secondary to nutritional compliance.
 
-RULES — FOLLOW ALL OF THESE WITHOUT EXCEPTION:
+════════════════════════════════════════════
+RULES
+════════════════════════════════════════════
 
 1. REPETITION CEILINGS
-   - A single breakfast meal may appear a MAXIMUM of 4 times in the generated week.
-   - A single lunchDinner meal may appear a MAXIMUM of 2 times in the entire generated week.
-   - Do not blindly repeat a meal just because it fits the macros. Always check the catalog for an unused or underused alternative first.
+   - Any single breakfast meal: MAX 4 times per 7-day plan.
+   - Any single lunchDinner meal: MAX 2 times per 7-day plan.
+   - Always check for unused alternatives before repeating.
 
-2. HARD DAILY LIMITS
-   - CARB CAP: Total carbohydrates across Breakfast + Lunch + Dinner MUST NOT exceed 130g for the day. Use the 'c' field from the catalog to calculate this.
-   - MINIMUM MEAL PROTEIN: Every scheduled meal (Breakfast, Lunch, Dinner) MUST contain at least 20g of protein. Any catalog meal below this threshold is ineligible and must not be selected.
-   - FAT HEAVY CAP: A maximum of ONE meal per day may have is_fat_heavy = true. Never schedule two fat-heavy meals on the same day.
-   - CALORIC FLOOR: The combined total of Breakfast + Lunch + Dinner MUST NOT fall below 1,600 kcal per day.
-   - CALORIC CEILING: The combined total of Breakfast + Lunch + Dinner MUST NOT exceed 2,200 kcal per day.
+2. MINIMUM DISTINCT MEAL COUNTS
+   - Across all 7 days, MUST use at least 4 distinct breakfast meals.
+   - Across all 7 days, MUST use at least 7 distinct lunchDinner meals.
+   - Note: 14 lunchDinner slots at a 2x repeat ceiling mathematically requires at least 7 distinct meals — this is a hard floor, not a preference.
+   - If the filtered catalog has fewer options than these floors, use the maximum available distinct count.
 
-3. PROTEIN ANCHORING
-   - The daily combined protein total does not need to be exactly {{PROTEIN_TARGET}}g. You have a flexible envelope: {{PROTEIN_MIN}}g–{{PROTEIN_MAX}}g is acceptable.
-   - Within that range, prioritize culinary variety and logical meal sequencing over mathematical precision. Do not sacrifice variety to hit exactly {{PROTEIN_TARGET}}g.
+3. HARD DAILY LIMITS
+   - CARB CAP: Daily total MUST NOT exceed 130g carbohydrates.
+   - MIN MEAL PROTEIN: Every meal MUST contain ≥ 20g protein.
+   - FAT-HEAVY CAP: MAX 1 meal per day with is_fat_heavy = TRUE.
+   - CALORIC FLOOR: Daily total MUST NOT fall below 1,600 kcal.
+   - CALORIC CEILING: Daily total MUST NOT exceed 2,200 kcal.
 
-4. PROTEIN DIVERSITY
-   - No single meal may contain two of the same primary protein family (e.g. no chicken + turkey in one bowl).
-   - MEAT & FIBRE RULE: Any catalog meal where the Primary Protein is Chicken, Fish, or Red Meat MUST have has_fibre = true. Never schedule a meat or fish meal where has_fibre = false.
-   - Lunch and Dinner MUST use different primary protein families each day. This is not a suggestion — if no valid alternative exists in the catalog, flag it; do not silently violate this rule.
-   - LEAN MEAT REQUIREMENT: At least 4 of the 7 scheduled lunches AND at least 4 of the 7 scheduled dinners must have Chicken or Fish as the Primary Protein.
-   - RED MEAT CAP: Meals where Primary Protein is Pork, Beef, Lamb, or Mutton must not exceed 3 meals total combined across the entire generated week.
+4. PROTEIN TARGET
+   - Daily minimum: {{PROTEIN_MIN}}g. Target: {{PROTEIN_TARGET}}g. No upper ceiling.
+   - If the plan exceeds {{PROTEIN_TARGET}}g, that is valid — never penalise or avoid high-protein meals on this basis.
 
-5. CALORIC TAPERING
-   - The highest-calorie, highest-carb meal of the day must be either Breakfast or Lunch — never Dinner.
-   - Dinner MUST be selected from meals tagged meal_weight = Light or Medium. Never schedule a meal_weight = Heavy meal for Dinner.
+5. PROTEIN DIVERSITY
+   - No two meals on the same day may share the same Primary Protein family.
+   - Lunch and Dinner MUST use different Primary Protein families each day.
+   - Any meal where Primary Protein is Chicken, Fish, or Red Meat MUST have has_fibre = TRUE.
 
-6. CUISINE SEQUENCING
-   - Lunch and Dinner MUST NOT both be tagged cuis = Indian on the same day.
-   - Do not schedule the same Cuisine value for both Lunch and Dinner on the same day unless no valid alternative exists in the catalog.
+6. LEAN PROTEIN REQUIREMENT
+   - At least 4 of 7 lunches AND at least 4 of 7 dinners must have Chicken or Fish as Primary Protein.
 
-7. OUTPUT FORMAT
-   Output STRICTLY valid JSON. No markdown, no backticks, no explanation — JSON array only:
-   [
-     { "dateKey": "YYYY-MM-DD", "breakfast": "exact_meal_name", "lunch": "exact_meal_name", "dinner": "exact_meal_name" }
-   ]
+7. RED MEAT CAP
+   - Pork, Beef, Lamb, Mutton combined: MUST NOT exceed 3 meals total across the 7-day plan.
+
+8. CALORIC TAPERING
+   - Dinner MUST be meal_weight = Light or Medium. Never Heavy.
+   - Heavy meals are permitted only at Breakfast or Lunch.
+
+9. CUISINE SEQUENCING
+   - Lunch and Dinner MUST NOT both be Cuisine = Indian on the same day.
+
+10. ANTI-GREEDY TIEBREAKER
+    - When multiple meals satisfy ALL constraints for a given slot, SELECT the meal that has appeared LEAST frequently in the plan built so far.
+    - Never select a meal solely because it has the highest protein, highest calories, or was used successfully in a previous slot.
+    - Least-used in the current plan is always the tiebreaker.
+
+11. PRE-OUTPUT SELF-CHECK — MANDATORY
+    Before writing the final JSON output, verify:
+    a) No meal exceeds its repetition ceiling (4x breakfast, 2x lunchDinner).
+    b) Distinct breakfast count ≥ 4 and distinct lunchDinner count ≥ 7.
+    c) No Primary Protein family appears at Dinner on 3 or more consecutive days — soft preference, note but do not reject the plan for this.
+    d) If checks (a) or (b) fail, revise the plan before outputting.
+
+12. OUTPUT FORMAT — strictly valid JSON only, no markdown, no commentary:
+[
+  {
+    "dateKey": "YYYY-MM-DD",
+    "breakfast": "exact_meal_name",
+    "lunch": "exact_meal_name",
+    "dinner": "exact_meal_name"
+  }
+]
 `
 };
