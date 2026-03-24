@@ -61,6 +61,8 @@ export const buildGoalAdjustedPlannerInput = ({ goal, preferences = {}, mealData
 
   if (goal === ONBOARDING_GOAL.HIGH_PROTEIN) {
     nextProteinTarget = Math.max(nextProteinTarget, HIGH_PROTEIN_DAILY_TARGET);
+  } else if (goal === ONBOARDING_GOAL.STANDARD) {
+    nextProteinTarget = 80;
   }
 
   nextProteinTarget = Math.min(nextProteinTarget, DAILY_PROTEIN_MAX);
