@@ -64,6 +64,7 @@ const MODE_LABELS = {
 
 const GOAL_LABELS = {
   [ONBOARDING_GOAL.HIGH_PROTEIN]: 'High-Protein',
+  [ONBOARDING_GOAL.STANDARD]: 'Standard / Balanced',
   [ONBOARDING_GOAL.LOW_CARB]: 'Low-Carb',
   [ONBOARDING_GOAL.TWO_MEALS_DAY]: '2 Meals/Day',
   [ONBOARDING_GOAL.VEGETARIAN]: 'Vegetarian'

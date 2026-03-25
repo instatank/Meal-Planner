@@ -653,7 +653,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             ...(mergedMealDatabase.lunchDinner || []),
             ...(mergedMealDatabase.snack || [])
           ];
-          const findMeal = (name) => catalog.find(m => m.canonical_name === name) || null;
+          const findMeal = (name) => { const n = String(name || '').trim().toLowerCase(); return catalog.find(m => m.canonical_name.toLowerCase() === n || m.name?.toLowerCase() === n) || null; };
 
           generatedDays.forEach(day => {
             const newPlan = { ...nextPlans[day.dateKey] };
@@ -1456,7 +1456,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         ...(mergedMealDatabase.lunchDinner || []),
         ...(mergedMealDatabase.snack || [])
       ];
-      const findMeal = (name) => catalog.find(m => m.canonical_name === name) || null;
+      const findMeal = (name) => { const n = String(name || '').trim().toLowerCase(); return catalog.find(m => m.canonical_name.toLowerCase() === n || m.name?.toLowerCase() === n) || null; };
 
       for (const day of generatedDays) {
         if (!day.dateKey) continue;

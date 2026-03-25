@@ -217,7 +217,7 @@ Use strictly to enforce repetition ceilings. Do not use to force-introduce absen
 DATES TO GENERATE: {{TARGET_DATES}}
 
 DAILY GOAL: Standard / Balanced
-- Protein minimum: 70g/day. Target: {{PROTEIN_TARGET}}g. No upper ceiling — exceeding the target is not penalised.
+- Protein minimum: {{PROTEIN_MIN}}g/day. Target: {{PROTEIN_TARGET}}g. No upper ceiling — exceeding the target is not penalised.
 - Caloric range: 1,800–2,400 kcal/day
 - Carbohydrate soft target: 220–280g/day from complex, fibre-rich sources. No hard ceiling — quality over quantity.
 - Fat soft target: 55–75g/day, prioritising unsaturated sources. No hard ceiling.
@@ -252,7 +252,7 @@ RULES
    - CALORIC CEILING: Daily total MUST NOT exceed 2,400 kcal.
 
 4. PROTEIN TARGET
-   - Daily minimum: 70g. Target: {{PROTEIN_TARGET}}g. No upper ceiling.
+   - Daily minimum: {{PROTEIN_MIN}}g. Target: {{PROTEIN_TARGET}}g. No upper ceiling.
    - If the plan exceeds {{PROTEIN_TARGET}}g, that is valid — never penalise a plan for high protein.
 
 5. FIBRE GUIDANCE

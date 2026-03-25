@@ -133,35 +133,79 @@ export const generateWeeklyPlan = async ({
     ? config.prompts.weeklyGeneration
     : (config.prompts.weeklyGeneration[goal] || config.prompts.weeklyGeneration.high_protein || Object.values(config.prompts.weeklyGeneration)[0]);
 
-  const systemPrompt = basePromptTemplate
-    .replace('{{AVAILABLE_MEALS}}', JSON.stringify(availableMeals))
-    .replace('{{PREFS_ACCEPTS}}', JSON.stringify(preferences?.accepts || {}))
-    .replace('{{PREFS_EDITS}}', JSON.stringify(preferences?.edits || {}))
-    .replace('{{PREFS_AVOIDS}}', JSON.stringify(preferences?.avoids || {}))
-    .replace('{{RECENT_HISTORY}}', JSON.stringify(slimHistory))
-    .replace('{{TARGET_DATES}}', JSON.stringify(targetDateKeys))
+  // Split prompt: static rules go as systemInstruction (cached by API, billed once)
+  // dynamic data goes as contents (billed per call)
+  const dynamicData = [
+    `AVAILABLE MEAL CATALOG (JSON format):`,
+    JSON.stringify(availableMeals),
+    ``,
+    `USER PREFERENCES:`,
+    `Accepts: ${JSON.stringify(preferences?.accepts || {})}`,
+    `Edits: ${JSON.stringify(preferences?.edits || {})}`,
+    `Avoids: ${JSON.stringify(preferences?.avoids || {})}`,
+    ``,
+    `RECENT HISTORY:`,
+    JSON.stringify(slimHistory),
+    ``,
+    `DATES TO GENERATE: ${JSON.stringify(targetDateKeys)}`,
+    ``,
+    `PROTEIN_TARGET: ${dailyProteinTarget}g`,
+    `PROTEIN_MIN: ${Math.round(Number(dailyProteinTarget) * 0.9)}g`,
+  ].join('\n');
+
+  const systemInstruction = basePromptTemplate
+    .replace('{{AVAILABLE_MEALS}}', '[See user message]')
+    .replace('{{PREFS_ACCEPTS}}', '[See user message]')
+    .replace('{{PREFS_EDITS}}', '[See user message]')
+    .replace('{{PREFS_AVOIDS}}', '[See user message]')
+    .replace('{{RECENT_HISTORY}}', '[See user message]')
+    .replace('{{TARGET_DATES}}', '[See user message]')
     .replace(/{{PROTEIN_TARGET}}/g, String(dailyProteinTarget))
     .replace(/{{PROTEIN_MIN}}/g, String(Math.round(Number(dailyProteinTarget) * 0.9)))
     .replace(/{{PROTEIN_MAX}}/g, String(Math.round(Number(dailyProteinTarget) * 1.1)));
 
+  // 90-second timeout to prevent indefinite spinner
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 90_000) : null;
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3.1-pro-preview',
-      contents: systemPrompt,
+      contents: dynamicData,
       config: {
+        systemInstruction: systemInstruction,
         temperature: 0.7,
         thinkingConfig: { thinkingLevel: 'HIGH' },
         responseMimeType: 'application/json'
       }
     });
 
+    if (timeoutId) clearTimeout(timeoutId);
+
     const outputString = response.text;
     if (!outputString) throw new Error("Empty response from AI");
 
-    const parsed = JSON.parse(outputString);
+    let parsed;
+    try {
+      parsed = JSON.parse(outputString);
+    } catch (parseError) {
+      // Fallback: try extracting JSON from markdown code block wrapper
+      const codeBlockMatch = outputString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        parsed = JSON.parse(codeBlockMatch[1]);
+      } else {
+        console.error("Failed to parse raw weekly output:", outputString);
+        throw new Error("AI returned invalid JSON format");
+      }
+    }
+
     if (!Array.isArray(parsed)) throw new Error("Expected JSON array");
     return parsed;
   } catch (error) {
+    if (timeoutId) clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Meal generation timed out after 90 seconds. Please try again.');
+    }
     console.error("Gemini Weekly Generation Error:", error);
     throw error;
   }
