@@ -637,6 +637,20 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           });
 
           const { generateWeeklyPlan } = await import('./lib/geminiService.js');
+          const { generateFilteredShortlists } = await import('./lib/constraintFilter.js');
+
+          // Phase 1: Pre-filter candidates per slot (free, <5ms)
+          const filterStart = performance.now();
+          const { shortlists, stats } = generateFilteredShortlists({
+            mealDatabase: mergedMealDatabase,
+            goal: onboardingProfile?.goal || 'high_protein',
+            targetDateKeys,
+            historyMap,
+            preferences: adjustedPrefs
+          });
+          console.info(`[Hybrid] Pre-filter completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats);
+
+          // Phase 2: AI selects from shortlists (cheap, fast)
           const generatedDays = await generateWeeklyPlan({
             targetDateKeys,
             mealDatabase: mergedMealDatabase,
@@ -644,7 +658,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             historyMap,
             dailyProteinTarget: adjustedProtein,
             cloudConfig: systemConfig,
-            goal: onboardingProfile?.goal
+            goal: onboardingProfile?.goal,
+            shortlists
           });
 
           const nextPlans = { ...mealPlans };
@@ -1438,6 +1453,20 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       });
 
       const { generateWeeklyPlan } = await import('./lib/geminiService.js');
+      const { generateFilteredShortlists } = await import('./lib/constraintFilter.js');
+
+      // Phase 1: Pre-filter candidates per slot (free, <5ms)
+      const filterStart = performance.now();
+      const { shortlists, stats } = generateFilteredShortlists({
+        mealDatabase: mergedMealDatabase,
+        goal: onboardingProfile?.goal || 'high_protein',
+        targetDateKeys,
+        historyMap,
+        preferences: adjustedPrefs
+      });
+      console.info(`[Hybrid] Pre-filter completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats);
+
+      // Phase 2: AI selects from shortlists (cheap, fast)
       const generatedDays = await generateWeeklyPlan({
         targetDateKeys,
         mealDatabase: mergedMealDatabase,
@@ -1445,7 +1474,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         historyMap,
         dailyProteinTarget: adjustedProtein,
         cloudConfig: systemConfig,
-        goal: onboardingProfile?.goal
+        goal: onboardingProfile?.goal,
+        shortlists
       });
 
       const nextPlans = { ...mealPlans };

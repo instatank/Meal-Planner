@@ -89,80 +89,79 @@ export const generateWeeklyPlan = async ({
   historyMap,
   dailyProteinTarget,
   cloudConfig = null,
-  goal = 'high_protein'
+  goal = 'high_protein',
+  shortlists = null // NEW: pre-filtered shortlists from constraintFilter
 }) => {
   if (!ai) throw new Error("Gemini API key is missing. Add VITE_GEMINI_API_KEY to .env.local");
 
   const config = getActiveConfig(cloudConfig);
 
-  const breakfastSet = new Set((mealDatabase.breakfast || []).map(m => m.canonical_name));
-  const lunchDinnerSet = new Set((mealDatabase.lunchDinner || []).map(m => m.canonical_name));
-
-  const availableMeals = [
-    ...(mealDatabase.breakfast || []),
-    ...(mealDatabase.lunchDinner || []),
-    ...(mealDatabase.snack || [])
-  ].map(m => ({
-    name: m.canonical_name,
-    type: breakfastSet.has(m.canonical_name) ? 'breakfast' : (lunchDinnerSet.has(m.canonical_name) ? 'lunch/dinner' : 'snack'),
-    p: Math.round(m.protein || m.p || 0),
-    c: Math.round(m.c || 0),
-    f: Math.round(m.f || 0),
-    cal: Math.round(m.cal || 0),
-    cuis: m.cuisine || 'general',
-    is_fat_heavy: !!m.is_fat_heavy,
-    has_fibre: !!m.has_fibre,
-    meal_weight: m.meal_weight || 'Medium',
-    pp: m.components?.protein || m.primary_protein || null
-  }));
-
-  // Slim history to just meal names per day — avoids sending full meal objects (~1-2k tokens saved)
-  const slimHistory = Object.fromEntries(
-    Object.entries(historyMap).map(([dateKey, dayData]) => {
-      const slim = {};
-      for (const slot of ['breakfast', 'lunch', 'dinner', 'snack']) {
-        const meal = dayData?.[slot];
-        const name = meal?.name || meal?.canonical_name || (typeof meal === 'string' ? meal : null);
-        if (name) slim[slot] = name;
-      }
-      return [dateKey, slim];
-    })
-  );
-
   const basePromptTemplate = typeof config.prompts.weeklyGeneration === 'string'
     ? config.prompts.weeklyGeneration
     : (config.prompts.weeklyGeneration[goal] || config.prompts.weeklyGeneration.high_protein || Object.values(config.prompts.weeklyGeneration)[0]);
 
-  // Split prompt: static rules go as systemInstruction (cached by API, billed once)
-  // dynamic data goes as contents (billed per call)
-  const dynamicData = [
-    `AVAILABLE MEAL CATALOG (JSON format):`,
-    JSON.stringify(availableMeals),
-    ``,
-    `USER PREFERENCES:`,
-    `Accepts: ${JSON.stringify(preferences?.accepts || {})}`,
-    `Edits: ${JSON.stringify(preferences?.edits || {})}`,
-    `Avoids: ${JSON.stringify(preferences?.avoids || {})}`,
-    ``,
-    `RECENT HISTORY:`,
-    JSON.stringify(slimHistory),
-    ``,
-    `DATES TO GENERATE: ${JSON.stringify(targetDateKeys)}`,
-    ``,
-    `PROTEIN_TARGET: ${dailyProteinTarget}g`,
-    `PROTEIN_MIN: ${Math.round(Number(dailyProteinTarget) * 0.9)}g`,
-  ].join('\n');
+  let dynamicData;
 
+  if (shortlists) {
+    // ── HYBRID MODE: send compact shortlists ──
+    const compactShortlists = {};
+    for (const [dateKey, daySlots] of Object.entries(shortlists)) {
+      compactShortlists[dateKey] = {};
+      for (const [slot, meals] of Object.entries(daySlots)) {
+        compactShortlists[dateKey][slot] = meals.map(m => ({
+          name: m.canonical_name || m.name,
+          p: Math.round(m.protein || m.macros?.p || 0),
+          cal: Math.round(m.cal || 0),
+          cuis: m.cuisine || 'general',
+          has_fibre: !!m.has_fibre,
+          meal_weight: m.meal_weight || 'Medium',
+          pp: m.components?.protein || m.tags?.protein_family || null
+        }));
+      }
+    }
+
+    dynamicData = JSON.stringify(compactShortlists);
+  } else {
+    // ── LEGACY MODE: send full catalog (fallback) ──
+    const breakfastSet = new Set((mealDatabase.breakfast || []).map(m => m.canonical_name));
+    const lunchDinnerSet = new Set((mealDatabase.lunchDinner || []).map(m => m.canonical_name));
+
+    const availableMeals = [
+      ...(mealDatabase.breakfast || []),
+      ...(mealDatabase.lunchDinner || []),
+      ...(mealDatabase.snack || [])
+    ].map(m => ({
+      name: m.canonical_name,
+      type: breakfastSet.has(m.canonical_name) ? 'breakfast' : (lunchDinnerSet.has(m.canonical_name) ? 'lunch/dinner' : 'snack'),
+      p: Math.round(m.protein || m.p || 0),
+      c: Math.round(m.c || 0),
+      f: Math.round(m.f || 0),
+      cal: Math.round(m.cal || 0),
+      cuis: m.cuisine || 'general',
+      is_fat_heavy: !!m.is_fat_heavy,
+      has_fibre: !!m.has_fibre,
+      meal_weight: m.meal_weight || 'Medium',
+      pp: m.components?.protein || m.primary_protein || null
+    }));
+
+    dynamicData = JSON.stringify(availableMeals);
+  }
+
+  // Build system instruction from template
   const systemInstruction = basePromptTemplate
+    .replace('{{SHORTLISTS}}', '[See user message]')
     .replace('{{AVAILABLE_MEALS}}', '[See user message]')
-    .replace('{{PREFS_ACCEPTS}}', '[See user message]')
-    .replace('{{PREFS_EDITS}}', '[See user message]')
-    .replace('{{PREFS_AVOIDS}}', '[See user message]')
+    .replace('{{PREFS_ACCEPTS}}', JSON.stringify(preferences?.accepts || {}))
+    .replace('{{PREFS_EDITS}}', JSON.stringify(preferences?.edits || {}))
+    .replace('{{PREFS_AVOIDS}}', JSON.stringify(preferences?.avoids || {}))
     .replace('{{RECENT_HISTORY}}', '[See user message]')
     .replace('{{TARGET_DATES}}', '[See user message]')
     .replace(/{{PROTEIN_TARGET}}/g, String(dailyProteinTarget))
     .replace(/{{PROTEIN_MIN}}/g, String(Math.round(Number(dailyProteinTarget) * 0.9)))
     .replace(/{{PROTEIN_MAX}}/g, String(Math.round(Number(dailyProteinTarget) * 1.1)));
+
+  // Use MEDIUM thinking for hybrid (constraints pre-checked), HIGH for legacy
+  const thinkingLevel = shortlists ? 'MEDIUM' : 'HIGH';
 
   // 90-second timeout to prevent indefinite spinner
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -175,7 +174,7 @@ export const generateWeeklyPlan = async ({
       config: {
         systemInstruction: systemInstruction,
         temperature: 0.7,
-        thinkingConfig: { thinkingLevel: 'HIGH' },
+        thinkingConfig: { thinkingLevel },
         responseMimeType: 'application/json'
       }
     });
@@ -189,7 +188,6 @@ export const generateWeeklyPlan = async ({
     try {
       parsed = JSON.parse(outputString);
     } catch (parseError) {
-      // Fallback: try extracting JSON from markdown code block wrapper
       const codeBlockMatch = outputString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (codeBlockMatch) {
         parsed = JSON.parse(codeBlockMatch[1]);
