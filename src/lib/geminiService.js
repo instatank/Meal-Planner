@@ -174,8 +174,6 @@ export const generateWeeklyPlan = async ({
       config: {
         systemInstruction: systemInstruction,
         temperature: 0.7,
-        thinkingConfig: { thinkingLevel },
-        responseMimeType: 'application/json'
       }
     });
 
