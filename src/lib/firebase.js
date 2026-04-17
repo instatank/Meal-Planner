@@ -2,14 +2,17 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
+const env = (key, fallback) =>
+  (typeof import.meta !== 'undefined' && import.meta.env?.[key]) || fallback;
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAaj65Q3djx7jc1UZH-rIKYkeDbXsJUILQ",
-  authDomain: "meal-planner-fa6ee.firebaseapp.com",
-  projectId: "meal-planner-fa6ee",
-  storageBucket: "meal-planner-fa6ee.firebasestorage.app",
-  messagingSenderId: "487942784423",
-  appId: "1:487942784423:web:2cef88382e4b41d78fe282",
-  measurementId: "G-CNBSZSHC5E"
+  apiKey: env('VITE_FIREBASE_API_KEY', "AIzaSyAaj65Q3djx7jc1UZH-rIKYkeDbXsJUILQ"),
+  authDomain: env('VITE_FIREBASE_AUTH_DOMAIN', "meal-planner-fa6ee.firebaseapp.com"),
+  projectId: env('VITE_FIREBASE_PROJECT_ID', "meal-planner-fa6ee"),
+  storageBucket: env('VITE_FIREBASE_STORAGE_BUCKET', "meal-planner-fa6ee.firebasestorage.app"),
+  messagingSenderId: env('VITE_FIREBASE_MESSAGING_SENDER_ID', "487942784423"),
+  appId: env('VITE_FIREBASE_APP_ID', "1:487942784423:web:2cef88382e4b41d78fe282"),
+  measurementId: env('VITE_FIREBASE_MEASUREMENT_ID', "G-CNBSZSHC5E")
 };
 
 const app = initializeApp(firebaseConfig);

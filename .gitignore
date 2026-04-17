@@ -14,3 +14,7 @@ meal_database.xlsx
 .env
 .env.*
 .env.local
+
+# Firebase service account keys — NEVER commit these
+*firebase-adminsdk*.json
+service-account*.json

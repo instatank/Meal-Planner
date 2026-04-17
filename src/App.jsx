@@ -584,26 +584,23 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     void saveToStorage('meal-preferences', nextPreferences);
   }, [mealEvents, loading]);
 
-  // Dynamic Autonomous Blank Week Detector
+  // Auto-generation detector — DISABLED (plans are pushed manually via Claude)
+  // Re-enable by removing the `if (false)` wrapper below
   useEffect(() => {
+    if (false) { // eslint-disable-line no-constant-condition
     if (loading || isViewerMode || !mergedMealDatabase) return;
-    if (isRegenerating) return; // Don't trigger overlapping runs
-
+    if (isRegenerating) return;
     const today = getDateKey(new Date());
     const weekKeys = getWeekDateKeys(selectedDateKey).sort();
-
-    // Only auto-gen for current or future weeks
     if (weekKeys[6] < today) return;
-
-    // Check if this week is completely empty (no plans exist)
     const hasAnyPlan = weekKeys.some(k => mealPlans[k] && Object.keys(mealPlans[k]).length > 0);
-    if (!hasAnyPlan) {
-      setPendingAutoGeneration(true);
-    }
+    if (!hasAnyPlan) { setPendingAutoGeneration(true); }
+    } // end disabled block
   }, [loading, isViewerMode, mergedMealDatabase, selectedDateKey, mealPlans, isRegenerating]);
 
+  // Auto-generation runner — DISABLED (plans are pushed manually via Claude)
   useEffect(() => {
-    if (!loading && pendingAutoGeneration && mergedMealDatabase && !isViewerMode) {
+    if (false && !loading && pendingAutoGeneration && mergedMealDatabase && !isViewerMode) { // eslint-disable-line no-constant-condition
       setPendingAutoGeneration(false);
 
       const today = getDateKey(new Date());
