@@ -1672,13 +1672,13 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
 
 
         <div className="bg-white rounded-lg shadow-md px-5 pt-3 pb-3 mb-3">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-2xl font-bold text-gray-800">🍽️ My MealMap</h1>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold shrink-0">
-                Goal: {getOnboardingGoalLabel(onboardingProfile?.goal)}
+          <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
+            <h1 className="text-2xl font-bold text-gray-800 shrink-0">🍽️ My MealMap</h1>
+            <div className="flex items-center gap-2 min-w-0 shrink-0">
+              <span className="text-[11px] px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold whitespace-nowrap">
+                Goal: {getOnboardingGoalLabel(onboardingProfile?.goal)?.split('/')?.[0]?.trim() || getOnboardingGoalLabel(onboardingProfile?.goal)}
               </span>
-              <button onClick={handleSignOut} className="text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-600 hover:bg-red-100 font-semibold border border-red-200 transition-colors">
+              <button onClick={handleSignOut} className="hidden sm:inline-flex text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-600 hover:bg-red-100 font-semibold border border-red-200 transition-colors whitespace-nowrap">
                 Sign Out
               </button>
             </div>
@@ -1701,6 +1701,9 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
                 disabled={isViewerMode}
               >
                 Undo
+              </button>
+              <button onClick={handleSignOut} className="sm:hidden text-[9px] px-1.5 py-1 rounded-full bg-red-50 text-red-600 hover:bg-red-100 font-semibold border border-red-200 transition-colors">
+                Sign Out
               </button>
             </div>
           </div>
