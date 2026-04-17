@@ -198,10 +198,10 @@ const baseMealsList = {
       "parts": [
         { "ingredientId": "chicken_breast", "qty": 150, "unit": "g" },
         { "ingredientId": "rice_noodles", "qty": 120, "unit": "g" },
-        { "ingredientId": "mixed_salad", "qty": 80, "unit": "g" }
+        { "ingredientId": "mixed_salad", "qty": 80, "unit": "g" } // bean sprouts, herbs, greens in pho + small side
       ],
       "components": {
-        "protein": "Chicken breast", "amount": 150, "carb": "Rice noodles", "carbAmount": 120, "veg": "Mixed salad", "vegAmount": 60, "style": "Soup style"
+        "protein": "Chicken breast", "amount": 150, "carb": "Rice noodles", "carbAmount": 120, "veg": "Pho greens + side salad", "vegAmount": 80, "style": "Soup style"
       },
       "cuisine": "asian"
     },
@@ -231,10 +231,11 @@ const baseMealsList = {
       "parts": [
         { "ingredientId": "chicken_breast", "qty": 150, "unit": "g" },
         { "ingredientId": "cooked_rice", "qty": 100, "unit": "g" },
-        { "ingredientId": "curry_base", "qty": 20, "unit": "g" }
+        { "ingredientId": "curry_base", "qty": 20, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 50, "unit": "g" } // small side salad
       ],
       "components": {
-        "protein": "Chicken breast", "amount": 150, "carb": "Cooked rice", "carbAmount": 80, "veg": "Sautéed peppers", "vegAmount": 80, "style": "Pan-fried"
+        "protein": "Chicken breast", "amount": 150, "carb": "Cooked rice", "carbAmount": 80, "veg": "Sautéed peppers + side salad", "vegAmount": 130, "style": "Pan-fried"
       },
       "cuisine": "asian"
     },
@@ -516,6 +517,40 @@ const baseMealsList = {
       "cuisine": "indian"
     },
     {
+      "meal_id": "lunch_dinner_avocado-smoked-salmon-salad",
+      "canonical_name": "Avocado and smoked salmon salad",
+      "display_name": "Avocado & Smoked Salmon Salad",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_02_17",
+      "name": "Avocado and smoked salmon salad",
+      "parts": [
+        { "ingredientId": "smoked_salmon", "qty": 120, "unit": "g" },
+        { "ingredientId": "avocado", "qty": 0.5, "unit": "piece" },
+        { "ingredientId": "mixed_salad", "qty": 130, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Smoked salmon", "amount": 120, "carb": "No carb", "carbAmount": 0, "veg": "Avocado & mixed greens", "vegAmount": 155, "style": "Salad"
+      },
+      "cuisine": "western"
+    },
+    {
+      "meal_id": "lunch_dinner_avocado-smoked-chicken-salad",
+      "canonical_name": "Avocado and smoked chicken salad",
+      "display_name": "Avocado & Smoked Chicken Salad",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_02_17",
+      "name": "Avocado and smoked chicken salad",
+      "parts": [
+        { "ingredientId": "smoked_chicken", "qty": 120, "unit": "g" },
+        { "ingredientId": "avocado", "qty": 0.5, "unit": "piece" },
+        { "ingredientId": "mixed_salad", "qty": 130, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Smoked chicken breast", "amount": 120, "carb": "No carb", "carbAmount": 0, "veg": "Avocado & mixed greens", "vegAmount": 155, "style": "Salad"
+      },
+      "cuisine": "western"
+    },
+    {
       "meal_id": "lunch_dinner_chicken-red-curry-rice",
       "canonical_name": "Chicken red curry + rice",
       "display_name": "Chicken Red Curry + Rice",
@@ -672,9 +707,9 @@ const csvTagsMap = {
   "Grilled salmon fillet + sauteed veg + spaghetti aglio e olio": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
   "Rajma chawal + raita": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
   "Chole + jowar roti + raita": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Vietnamese chicken pho": { cuisine: "Asian", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
+  "Vietnamese chicken pho": { cuisine: "Asian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
   "Grilled steak + mixed greens salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
-  "Thai pad krapow + rice": { cuisine: "Asian", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
+  "Thai pad krapow + rice": { cuisine: "Asian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
   "Mutton keema + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Heavy" },
   "Arhar dal + rice + matar paneer": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
   "Chicken curry + jowar roti + dal": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
@@ -691,7 +726,9 @@ const csvTagsMap = {
   "Kababs + dal + gobi + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
   "Fish curry + rice": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
   "Sweet potato curry + kaala chanaa sabzi + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Chicken red curry + rice": { cuisine: "Asian", is_fat_heavy: true, has_fibre: false, meal_weight: "Medium" },
+  "Avocado and smoked salmon salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
+  "Avocado and smoked chicken salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
+  "Chicken red curry + rice": { cuisine: "Asian", is_fat_heavy: true, has_fibre: true, meal_weight: "Medium" },
   "Greek yogurt + berry bowl": { cuisine: "International", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
   "Carrot halwa (sugar-free) + protein shake": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
   "Nuts, seeds + protein shake": { cuisine: "International", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },

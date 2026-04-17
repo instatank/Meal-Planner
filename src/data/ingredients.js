@@ -56,6 +56,12 @@ export const ingredients = {
     defaultPortion: { qty: 150, unit: "g" },
     source: "USDA #15077"
   },
+  smoked_chicken: {
+    name: "Smoked chicken breast (sliced)",
+    per100g: { kcal: 148, p: 26, c: 0, f: 4.5 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #05182"
+  },
   beef_steak: {
     name: "Beef steak (grilled)",
     per100g: { kcal: 250, p: 26, c: 0, f: 16 },
