@@ -553,18 +553,10 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
 
     for (const key of keysToEnsure) {
       const existing = nextPlans[key];
-      if (!existing) {
-        nextPlans[key] = generatePlanForDate(key, nextPlans, preferences);
-        changed = true;
-        continue;
-      }
-
-      const previousKey = shiftDateKey(key, -1);
-      const previousPlan = nextPlans[previousKey];
-      const isLegacyClone = isSamePlanByName(existing, previousPlan);
-      const isLocked = hasLockedHistoryForDate(key, mealHistory);
-
-      if (isLegacyClone && !isLocked) {
+      // Only generate for truly empty slots — never overwrite existing plans
+      // (this preserves plans pushed externally via Firebase/scripts)
+      const hasAnyMeal = existing && (existing.breakfast || existing.lunch || existing.dinner || existing.snack);
+      if (!hasAnyMeal) {
         nextPlans[key] = generatePlanForDate(key, nextPlans, preferences);
         changed = true;
       }
