@@ -479,9 +479,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         setUserMealCatalog(parsedUserCatalog);
         setOnboardingProfile(parsedOnboarding);
 
+        // Do NOT re-save meal-plans on boot: storageGet already mirrors the
+        // authoritative source into localStorage. Re-saving here would stamp a
+        // fresh `updatedAt` and can eclipse a later CLI push under timestamp
+        // conflict resolution (see CLAUDE.md Priority 1).
         void saveToStorage('meal-history', parsedHistory);
         void saveToStorage('meal-preferences', derivedPreferences);
-        void saveToStorage('meal-plans', parsedPlans);
         void saveToStorage('meal-events', parsedEvents);
         void saveToStorage('meal-user-catalog', parsedUserCatalog);
         if (parsedOnboarding) {
@@ -552,9 +555,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     let changed = false;
 
     for (const key of keysToEnsure) {
+      // Never fabricate fallback plans for today or future dates — those are
+      // source-of-truth pushed via the CLI script (see CLAUDE.md Priority 1).
+      // Even if the Firebase read lags or returns partial data, the local
+      // generator must not overwrite or pre-populate those days.
+      if (key >= todayKey) continue;
       const existing = nextPlans[key];
-      // Only generate for truly empty slots — never overwrite existing plans
-      // (this preserves plans pushed externally via Firebase/scripts)
       const hasAnyMeal = existing && (existing.breakfast || existing.lunch || existing.dinner || existing.snack);
       if (!hasAnyMeal) {
         nextPlans[key] = generatePlanForDate(key, nextPlans, preferences);
