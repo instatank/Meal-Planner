@@ -319,20 +319,17 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
 
 
 
-  // Any timestamp more than this far in the future is treated as corrupt
+  // A timestamp more than this far in the future is treated as corrupt
   // (legacy poison from an old paste helper that stamped __ts one year
-  // ahead). We clamp it back to "now" on read and heal the source so all
-  // devices self-recover without manual cleanup.
+  // ahead). When a source's timestamp is corrupt, its *value* is also
+  // considered untrustworthy (it was written at the time of corruption),
+  // so we discard that source entirely and heal from the other side.
   const FUTURE_TS_SLACK_MS = 6 * 60 * 60 * 1000; // 6 hours
 
-  const clampTimestamp = (ts, nowIso) => {
-    if (!ts) return ts;
+  const isCorruptTs = (ts) => {
+    if (!ts) return false;
     const tsMs = Date.parse(ts);
-    if (!Number.isFinite(tsMs)) return ts;
-    if (tsMs > Date.now() + FUTURE_TS_SLACK_MS) {
-      return nowIso;
-    }
-    return ts;
+    return Number.isFinite(tsMs) && tsMs > Date.now() + FUTURE_TS_SLACK_MS;
   };
 
   const storageGet = async (key) => {
@@ -341,11 +338,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     const nowIso = new Date().toISOString();
     const localValue = safeParseJson(window.localStorage.getItem(key), null);
     const rawLocalTs = window.localStorage.getItem(`${key}__ts`) || null;
-    const localTs = clampTimestamp(rawLocalTs, nowIso);
-    if (rawLocalTs && localTs !== rawLocalTs) {
-      console.warn(`[storageGet] Local ${key} __ts (${rawLocalTs}) is corrupt/future-dated — healing to ${localTs}`);
-      window.localStorage.setItem(`${key}__ts`, localTs);
-    }
+    const localCorrupt = isCorruptTs(rawLocalTs);
 
     if (user) {
       try {
@@ -356,40 +349,77 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           const payload = docSnap.data();
           if (payload?.value != null) {
             const rawFirebaseTs = payload.updatedAt || null;
-            const firebaseTs = clampTimestamp(rawFirebaseTs, nowIso);
-            if (rawFirebaseTs && firebaseTs !== rawFirebaseTs) {
-              console.warn(`[storageGet] Firebase ${key} updatedAt (${rawFirebaseTs}) is corrupt/future-dated — healing to ${firebaseTs}`);
-              // Heal Firestore in the background; don't block the read.
-              setDoc(docRef, { updatedAt: firebaseTs }, { merge: true }).catch((e) =>
-                console.warn('[storageGet] Firestore timestamp heal failed:', e)
+            const firebaseCorrupt = isCorruptTs(rawFirebaseTs);
+
+            // Case A: Firestore timestamp is corrupt. Do NOT trust its value
+            // either — it was written at the time of corruption and predates
+            // any subsequent legitimate write. Prefer local (if any), push it
+            // back with a fresh timestamp to heal Firestore.
+            if (firebaseCorrupt && !localCorrupt) {
+              console.warn(`[storageGet] Firestore ${key} updatedAt is corrupt (${rawFirebaseTs}) — discarding and healing with local`);
+              if (localValue != null) {
+                const safeLocal = JSON.parse(JSON.stringify(localValue));
+                setDoc(docRef, { value: safeLocal, updatedAt: nowIso }, { merge: true }).catch((e) =>
+                  console.warn('[storageGet] heal-with-local push failed:', e)
+                );
+                return localValue;
+              }
+              // No local value; reluctantly use Firestore's value but fix the
+              // timestamp so we don't re-trip this path forever.
+              setDoc(docRef, { updatedAt: nowIso }, { merge: true }).catch((e) =>
+                console.warn('[storageGet] Firestore timestamp-only heal failed:', e)
               );
+              window.localStorage.setItem(key, JSON.stringify(payload.value));
+              window.localStorage.setItem(`${key}__ts`, nowIso);
+              return payload.value;
             }
 
-            // Use whichever version is newer — local timestamp wins in case of tie
-            const localIsNewer = localTs && firebaseTs && localTs >= firebaseTs;
+            // Case B: Local timestamp is corrupt. Trust Firestore.
+            if (localCorrupt && !firebaseCorrupt) {
+              console.warn(`[storageGet] Local ${key} __ts is corrupt (${rawLocalTs}) — accepting Firestore`);
+              window.localStorage.setItem(key, JSON.stringify(payload.value));
+              window.localStorage.setItem(`${key}__ts`, rawFirebaseTs || nowIso);
+              return payload.value;
+            }
+
+            // Case C: Both corrupt. Prefer whatever's in local memory (the
+            // user's last interaction), normalize both sides.
+            if (localCorrupt && firebaseCorrupt) {
+              console.warn(`[storageGet] Both local and Firestore ${key} are corrupt — normalizing`);
+              const canonical = localValue != null ? localValue : payload.value;
+              const safeCanonical = JSON.parse(JSON.stringify(canonical));
+              setDoc(docRef, { value: safeCanonical, updatedAt: nowIso }, { merge: true }).catch((e) =>
+                console.warn('[storageGet] dual-corrupt heal failed:', e)
+              );
+              window.localStorage.setItem(key, JSON.stringify(canonical));
+              window.localStorage.setItem(`${key}__ts`, nowIso);
+              return canonical;
+            }
+
+            // Case D: Both timestamps are sane. Use whichever is newer;
+            // local wins ties because it's what the user just interacted with.
+            const localIsNewer = rawLocalTs && rawFirebaseTs && rawLocalTs >= rawFirebaseTs;
             const localExists = localValue != null;
 
             if (localIsNewer && localExists) {
-              // Local is newer: re-sync this newer version back to Firebase in background
-              console.info(`[storageGet] Local ${key} is newer (${localTs} vs ${firebaseTs}) — using local, syncing to Firebase`);
+              console.info(`[storageGet] Local ${key} is newer (${rawLocalTs} vs ${rawFirebaseTs}) — using local, syncing to Firestore`);
               const safeLocal = JSON.parse(JSON.stringify(localValue));
-              setDoc(docRef, { value: safeLocal, updatedAt: localTs }, { merge: true }).catch(e =>
-                console.warn('[storageGet] Background Firebase re-sync failed:', e)
+              setDoc(docRef, { value: safeLocal, updatedAt: rawLocalTs }, { merge: true }).catch((e) =>
+                console.warn('[storageGet] Background Firestore re-sync failed:', e)
               );
               return localValue;
-            } else {
-              // Firebase is newer or local is absent: use Firebase value and update local
-              window.localStorage.setItem(key, JSON.stringify(payload.value));
-              if (firebaseTs) window.localStorage.setItem(`${key}__ts`, firebaseTs);
-              return payload.value;
             }
+            window.localStorage.setItem(key, JSON.stringify(payload.value));
+            if (rawFirebaseTs) window.localStorage.setItem(`${key}__ts`, rawFirebaseTs);
+            return payload.value;
           }
         } else if (localValue != null) {
           const safeLocalValue = JSON.parse(JSON.stringify(localValue));
           await setDoc(docRef, {
             value: safeLocalValue,
-            updatedAt: localTs || nowIso
+            updatedAt: localCorrupt ? nowIso : (rawLocalTs || nowIso)
           });
+          if (localCorrupt) window.localStorage.setItem(`${key}__ts`, nowIso);
         }
       } catch (error) {
         console.warn('Firebase storage read failed; using local fallback for', key, error);
@@ -1524,7 +1554,10 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       }
 
       setMealPlans(nextPlans);
-      saveToStorage('meal-plans', nextPlans);
+      // Await the Firestore write so we don't tell the user "success" until
+      // the data is actually persisted. Without this, a fast refresh could
+      // race the setDoc and the regen would disappear.
+      await saveToStorage('meal-plans', nextPlans);
       appendMealEvent({
         type: 'regen',
         dateKey: selectedDateKey,
