@@ -81,9 +81,15 @@ export default async function handler(req, res) {
 
     const raw = await anthropicRes.text();
     if (!anthropicRes.ok) {
+      console.error('[api/generate-plan] Anthropic rejected request', {
+        status: anthropicRes.status,
+        model,
+        body: raw.slice(0, 2000)
+      });
       res.status(anthropicRes.status).json({
         error: 'Anthropic API error',
         status: anthropicRes.status,
+        model,
         body: raw.slice(0, 2000)
       });
       return;

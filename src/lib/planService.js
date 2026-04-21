@@ -148,7 +148,10 @@ export const generateWeeklyPlan = async ({
 
     if (!response.ok) {
       const errPayload = await response.json().catch(() => ({}));
-      throw new Error(errPayload?.error || `Proxy error ${response.status}`);
+      console.error('[planService] proxy returned non-OK:', errPayload);
+      const statusNote = errPayload?.status ? ` [Anthropic ${errPayload.status}]` : ` [HTTP ${response.status}]`;
+      const detail = errPayload?.body ? ` — ${String(errPayload.body).slice(0, 500)}` : '';
+      throw new Error(`${errPayload?.error || 'Proxy error'}${statusNote}${detail}`);
     }
 
     const data = await response.json();
