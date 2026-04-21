@@ -6,10 +6,10 @@
 // caching enabled on the system block, and returns `{ text, usage, stopReason }`.
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-// Haiku is ~10x cheaper than Sonnet and reliable for JSON selection from
-// pre-validated shortlists — which is all this endpoint does. Upgrade to
-// Sonnet only if quality regresses noticeably.
-const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+// Sonnet 4.6 — best quality/cost sweet spot for picking appetizing combos
+// from pre-validated shortlists. Haiku was too shallow, Opus overkill.
+// tool_use (not prefill) is used for structured output, which Sonnet supports.
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_TEMPERATURE = 0.7;
 
