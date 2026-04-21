@@ -4,7 +4,7 @@
   const existing = JSON.parse(localStorage.getItem('meal-plans') || '{}');
   const merged = { ...existing, ...plan };
   localStorage.setItem('meal-plans', JSON.stringify(merged));
-  localStorage.setItem('meal-plans__ts', "2027-04-20T08:49:03.284Z");
+  localStorage.setItem('meal-plans__ts', "2026-04-21T10:26:12.740Z");
   console.log('✅ High-Protein plan Apr 21–27 written to localStorage. Reloading…');
   setTimeout(() => location.reload(), 500);
 })();

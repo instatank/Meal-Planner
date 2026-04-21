@@ -57,15 +57,20 @@ if (missing.length) {
   process.exit(1);
 }
 
-// Future timestamp so localStorage wins the sync race and propagates to Firestore.
-const futureTs = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+// Current timestamp. After the Priority 1 sync/overwrite fix the local
+// generator no longer re-stamps meal-plans on boot, so a paste with "now"
+// reliably wins the storageGet conflict-resolution race against whatever
+// is in Firestore AND leaves a clean timestamp that future regens on any
+// device can correctly supersede. Avoid future timestamps — they poison
+// Firestore's updatedAt and freeze other devices out of future updates.
+const pasteTs = new Date().toISOString();
 
 const snippet = `(() => {
   const plan = ${JSON.stringify(plan)};
   const existing = JSON.parse(localStorage.getItem('meal-plans') || '{}');
   const merged = { ...existing, ...plan };
   localStorage.setItem('meal-plans', JSON.stringify(merged));
-  localStorage.setItem('meal-plans__ts', ${JSON.stringify(futureTs)});
+  localStorage.setItem('meal-plans__ts', ${JSON.stringify(pasteTs)});
   console.log('✅ High-Protein plan Apr 21–27 written to localStorage. Reloading…');
   setTimeout(() => location.reload(), 500);
 })();`;
