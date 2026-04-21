@@ -10,32 +10,33 @@ import { FALLBACK_PROMPTS } from '../data/fallbackPrompts.js';
 const PROXY_ENDPOINT = '/api/generate-plan';
 const DEFAULT_TIMEOUT_MS = 90_000;
 
-// Try JSON.parse, fall back to markdown code block, then fall back to
-// extracting the outermost `[...]` substring. Handles cases where the model
-// adds a trailing explanation after the array or wraps it in ```json blocks.
-const robustParseJsonArray = (raw) => {
-  if (typeof raw !== 'string' || !raw) {
-    throw new Error('Empty response from AI');
+// Anthropic tool definition. Forcing tool_choice against this schema is the
+// strictest form of structured output Claude offers — the response is
+// guaranteed to conform to input_schema or the API rejects it before
+// returning. No more fragile prompt-engineering for JSON shape.
+const SUBMIT_PLAN_TOOL = {
+  name: 'submit_weekly_plan',
+  description: 'Submit the finalized weekly meal plan. Provide one entry per target date, using exact meal names from the shortlist.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      days: {
+        type: 'array',
+        description: 'One entry per target date.',
+        items: {
+          type: 'object',
+          properties: {
+            dateKey: { type: 'string', description: 'YYYY-MM-DD' },
+            breakfast: { type: 'string', description: 'Exact meal name chosen for breakfast.' },
+            lunch: { type: 'string', description: 'Exact meal name chosen for lunch.' },
+            dinner: { type: 'string', description: 'Exact meal name chosen for dinner.' }
+          },
+          required: ['dateKey', 'breakfast', 'lunch', 'dinner']
+        }
+      }
+    },
+    required: ['days']
   }
-
-  try {
-    return JSON.parse(raw);
-  } catch { /* fall through */ }
-
-  const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (codeBlockMatch) {
-    try { return JSON.parse(codeBlockMatch[1]); } catch { /* fall through */ }
-  }
-
-  const first = raw.indexOf('[');
-  const last = raw.lastIndexOf(']');
-  if (first !== -1 && last > first) {
-    const slice = raw.slice(first, last + 1);
-    try { return JSON.parse(slice); } catch { /* fall through */ }
-  }
-
-  console.error('[planService] Failed to parse weekly plan output:', raw);
-  throw new Error('AI returned invalid JSON format');
 };
 
 const getActiveConfig = (cloudConfig) => ({
@@ -138,9 +139,7 @@ export const generateWeeklyPlan = async ({
       body: JSON.stringify({
         system: systemInstruction,
         userMessage,
-        // Force Claude to begin its response with "[" so the output is
-        // always a JSON array — no prose preamble, no markdown fencing.
-        assistantPrefill: '[',
+        tool: SUBMIT_PLAN_TOOL,
         temperature: 0.7
       })
     });
@@ -155,12 +154,12 @@ export const generateWeeklyPlan = async ({
     }
 
     const data = await response.json();
-    const outputString = data?.text || '';
-    if (!outputString) throw new Error('Empty response from AI');
-
-    const parsed = robustParseJsonArray(outputString);
-    if (!Array.isArray(parsed)) throw new Error('Expected JSON array');
-    return parsed;
+    const days = data?.toolInput?.days;
+    if (!Array.isArray(days)) {
+      console.error('[planService] Missing days array in toolInput:', data);
+      throw new Error('AI did not return a structured plan');
+    }
+    return days;
   } catch (error) {
     if (timeoutId) clearTimeout(timeoutId);
     if (error?.name === 'AbortError') {

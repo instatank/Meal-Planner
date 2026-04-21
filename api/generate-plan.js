@@ -6,7 +6,10 @@
 // caching enabled on the system block, and returns `{ text, usage, stopReason }`.
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+// Haiku is ~10x cheaper than Sonnet and reliable for JSON selection from
+// pre-validated shortlists — which is all this endpoint does. Upgrade to
+// Sonnet only if quality regresses noticeably.
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_TEMPERATURE = 0.7;
 
@@ -35,7 +38,7 @@ export default async function handler(req, res) {
   const {
     system,
     userMessage,
-    assistantPrefill = null,
+    tool = null,
     model = DEFAULT_MODEL,
     temperature = DEFAULT_TEMPERATURE,
     maxTokens = DEFAULT_MAX_TOKENS
@@ -50,12 +53,25 @@ export default async function handler(req, res) {
     return;
   }
 
-  const messages = [{ role: 'user', content: userMessage }];
-  // Prefill the assistant turn to force the response to start with a specific
-  // token (e.g. "[" for a strict JSON array). Anthropic's API returns the
-  // continuation *without* the prefill, so we re-prepend it before returning.
-  if (typeof assistantPrefill === 'string' && assistantPrefill.length > 0) {
-    messages.push({ role: 'assistant', content: assistantPrefill });
+  const requestBody = {
+    model,
+    max_tokens: maxTokens,
+    temperature,
+    // Ephemeral cache on the system prompt — identical system across
+    // calls (same goal/prefs) gets a 90% input-token discount on hits.
+    system: [
+      { type: 'text', text: system, cache_control: { type: 'ephemeral' } }
+    ],
+    messages: [{ role: 'user', content: userMessage }]
+  };
+
+  // Optional: force Claude to respond via a tool call against a fixed schema.
+  // This is Anthropic's structured-output mechanism — Claude cannot return
+  // free-form text if tool_choice is set to a specific tool. Output arrives
+  // as a tool_use content block whose `input` matches the tool's schema.
+  if (tool && typeof tool === 'object' && tool.name && tool.input_schema) {
+    requestBody.tools = [tool];
+    requestBody.tool_choice = { type: 'tool', name: tool.name };
   }
 
   try {
@@ -66,17 +82,7 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json'
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        temperature,
-        // Ephemeral cache on the system prompt — identical system across
-        // calls (same goal/prefs) gets a 90% input-token discount on hits.
-        system: [
-          { type: 'text', text: system, cache_control: { type: 'ephemeral' } }
-        ],
-        messages
-      })
+      body: JSON.stringify(requestBody)
     });
 
     const raw = await anthropicRes.text();
@@ -96,11 +102,16 @@ export default async function handler(req, res) {
     }
 
     const data = JSON.parse(raw);
-    const continuation = data?.content?.[0]?.text || '';
-    const text = assistantPrefill ? `${assistantPrefill}${continuation}` : continuation;
+    const contentBlocks = Array.isArray(data?.content) ? data.content : [];
+    const toolUseBlock = contentBlocks.find((b) => b?.type === 'tool_use');
+    const textBlock = contentBlocks.find((b) => b?.type === 'text');
+    const text = textBlock?.text || '';
+    const toolInput = toolUseBlock?.input ?? null;
 
     res.status(200).json({
       text,
+      toolInput,
+      toolName: toolUseBlock?.name || null,
       stopReason: data?.stop_reason || null,
       usage: data?.usage || null,
       model: data?.model || model
