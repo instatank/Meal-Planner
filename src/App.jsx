@@ -631,7 +631,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             dailyProteinTarget: 120
           });
 
-          const { generateWeeklyPlan } = await import('./lib/geminiService.js');
+          const { generateWeeklyPlan } = await import('./lib/planService.js');
           const { generateFilteredShortlists } = await import('./lib/constraintFilter.js');
 
           // Phase 1: Pre-filter candidates per slot (free, <5ms)
@@ -1447,7 +1447,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         dailyProteinTarget: 120
       });
 
-      const { generateWeeklyPlan } = await import('./lib/geminiService.js');
+      const { generateWeeklyPlan } = await import('./lib/planService.js');
       const { generateFilteredShortlists } = await import('./lib/constraintFilter.js');
 
       // Phase 1: Pre-filter candidates per slot (free, <5ms)
