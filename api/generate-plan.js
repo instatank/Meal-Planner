@@ -35,6 +35,7 @@ export default async function handler(req, res) {
   const {
     system,
     userMessage,
+    assistantPrefill = null,
     model = DEFAULT_MODEL,
     temperature = DEFAULT_TEMPERATURE,
     maxTokens = DEFAULT_MAX_TOKENS
@@ -47,6 +48,14 @@ export default async function handler(req, res) {
   if (typeof userMessage !== 'string' || !userMessage.trim()) {
     res.status(400).json({ error: 'Missing required field: `userMessage` (string).' });
     return;
+  }
+
+  const messages = [{ role: 'user', content: userMessage }];
+  // Prefill the assistant turn to force the response to start with a specific
+  // token (e.g. "[" for a strict JSON array). Anthropic's API returns the
+  // continuation *without* the prefill, so we re-prepend it before returning.
+  if (typeof assistantPrefill === 'string' && assistantPrefill.length > 0) {
+    messages.push({ role: 'assistant', content: assistantPrefill });
   }
 
   try {
@@ -66,7 +75,7 @@ export default async function handler(req, res) {
         system: [
           { type: 'text', text: system, cache_control: { type: 'ephemeral' } }
         ],
-        messages: [{ role: 'user', content: userMessage }]
+        messages
       })
     });
 
@@ -81,7 +90,8 @@ export default async function handler(req, res) {
     }
 
     const data = JSON.parse(raw);
-    const text = data?.content?.[0]?.text || '';
+    const continuation = data?.content?.[0]?.text || '';
+    const text = assistantPrefill ? `${assistantPrefill}${continuation}` : continuation;
 
     res.status(200).json({
       text,
