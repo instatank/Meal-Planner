@@ -319,11 +319,33 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
 
 
 
+  // Any timestamp more than this far in the future is treated as corrupt
+  // (legacy poison from an old paste helper that stamped __ts one year
+  // ahead). We clamp it back to "now" on read and heal the source so all
+  // devices self-recover without manual cleanup.
+  const FUTURE_TS_SLACK_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+  const clampTimestamp = (ts, nowIso) => {
+    if (!ts) return ts;
+    const tsMs = Date.parse(ts);
+    if (!Number.isFinite(tsMs)) return ts;
+    if (tsMs > Date.now() + FUTURE_TS_SLACK_MS) {
+      return nowIso;
+    }
+    return ts;
+  };
+
   const storageGet = async (key) => {
     if (typeof window === 'undefined') return null;
 
+    const nowIso = new Date().toISOString();
     const localValue = safeParseJson(window.localStorage.getItem(key), null);
-    const localTs = window.localStorage.getItem(`${key}__ts`) || null;
+    const rawLocalTs = window.localStorage.getItem(`${key}__ts`) || null;
+    const localTs = clampTimestamp(rawLocalTs, nowIso);
+    if (rawLocalTs && localTs !== rawLocalTs) {
+      console.warn(`[storageGet] Local ${key} __ts (${rawLocalTs}) is corrupt/future-dated — healing to ${localTs}`);
+      window.localStorage.setItem(`${key}__ts`, localTs);
+    }
 
     if (user) {
       try {
@@ -333,7 +355,15 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         if (docSnap.exists()) {
           const payload = docSnap.data();
           if (payload?.value != null) {
-            const firebaseTs = payload.updatedAt || null;
+            const rawFirebaseTs = payload.updatedAt || null;
+            const firebaseTs = clampTimestamp(rawFirebaseTs, nowIso);
+            if (rawFirebaseTs && firebaseTs !== rawFirebaseTs) {
+              console.warn(`[storageGet] Firebase ${key} updatedAt (${rawFirebaseTs}) is corrupt/future-dated — healing to ${firebaseTs}`);
+              // Heal Firestore in the background; don't block the read.
+              setDoc(docRef, { updatedAt: firebaseTs }, { merge: true }).catch((e) =>
+                console.warn('[storageGet] Firestore timestamp heal failed:', e)
+              );
+            }
 
             // Use whichever version is newer — local timestamp wins in case of tie
             const localIsNewer = localTs && firebaseTs && localTs >= firebaseTs;
@@ -358,7 +388,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           const safeLocalValue = JSON.parse(JSON.stringify(localValue));
           await setDoc(docRef, {
             value: safeLocalValue,
-            updatedAt: localTs || new Date().toISOString()
+            updatedAt: localTs || nowIso
           });
         }
       } catch (error) {
