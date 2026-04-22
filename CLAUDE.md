@@ -151,3 +151,38 @@ tests/                   Node --test suite
 - When in doubt, **develop on a feature branch** (`claude/<description>`), fast-forward `main` only after testing. Vercel auto-deploys `main`.
 - The Anthropic API **bills failed requests** if Claude started generating. Don't iterate blindly — always inspect `console.error('[planService] proxy returned non-OK:', ...)` or Vercel function logs for the real Anthropic error body before trying another call.
 - The `tool_use` path in `planService.js` returns `data.toolInput.days`; the legacy text-based path (not used) returned `data.text`. If you extend the proxy for other features (Omnibox, recipe generation), follow the tool_use pattern — it's strictly safer than prompt-engineered JSON.
+
+---
+
+## End of Session Learning Recap
+
+When the user types the session recap commands, generate a session recap using this exact structure. 
+Keep it brief, plain English, no jargon without explanation. 
+The user is a non-technical founder learning by building — prioritize conceptual understanding over syntax.
+
+**Scope: the current session only.** Recaps cover what happened in this single conversation / working session — not the entire project history, prior sessions, or the full chat backlog. If nothing meaningful happened in this session (e.g. a short Q&A), say so honestly rather than padding with older material.
+
+## Session Recap Commands
+
+### wrap and teach
+Generate a structured session recap **for this session only** (not the whole project, not prior sessions). Plain English only — no jargon without a brief explanation. User is a non-technical founder learning by building.
+
+**SESSION WRAP — [date]**
+
+**What we built**
+- [2–4 bullets: what actually shipped *this session*]
+
+**Key concepts encountered**
+- [concept]: [one plain-English sentence — what it is, why it matters]
+- [repeat for 2–4 concepts max — only what was genuinely touched *this session*]
+
+**One thing worth remembering**
+- [Single most transferable insight from *this session*]
+
+**Friction point** *(only if something broke or took unexpectedly long in this session)*
+- [What it was and why]
+
+---
+
+### summarize learnings
+3–5 bullet points covering **this session only** (not prior sessions, not the whole project). What was built, what was learned. One line each. No headers, no padding.
