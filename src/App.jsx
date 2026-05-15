@@ -2018,7 +2018,29 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
   );
 };
 
+// ─── MAINTENANCE MODE ───────────────────────────────────────────────────────
+// Production is intentionally offline pending security cleanup (most notably
+// the Gemini key bundled into the client for Omnibox intent parsing — see
+// CLAUDE.md Priorities).
+//
+// To re-enable: set MAINTENANCE_MODE to false (or revert the commit that
+// introduced this block). Nothing below this point runs while it's true —
+// no Firebase, no AI calls, no Firestore reads/writes.
+const MAINTENANCE_MODE = true;
+
+const MaintenancePage = () => (
+  <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+    <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+      <h1 className="text-2xl font-bold text-gray-800 mb-3">Meal Planner</h1>
+      <p className="text-gray-600 mb-2">Temporarily offline while we work on the app.</p>
+      <p className="text-gray-400 text-sm">Back soon.</p>
+    </div>
+  </div>
+);
+
 export default function AppRoot() {
+  if (MAINTENANCE_MODE) return <MaintenancePage />;
+
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
