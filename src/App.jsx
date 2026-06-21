@@ -35,7 +35,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from './lib/firebase';
 import AdminTools from './components/AdminTools';
 
-const MealPlannerMain = ({ user, handleSignOut }) => {
+export const MealPlannerMain = ({ user, handleSignOut }) => {
   const IST_TIME_ZONE = 'Asia/Kolkata';
   const ONBOARDING_PROFILE_STORAGE_KEY = 'meal-onboarding-profile';
   const DEFAULT_USER_CATALOG = { breakfast: [], lunchDinner: [], snack: [] };
