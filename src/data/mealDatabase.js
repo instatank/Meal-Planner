@@ -712,6 +712,109 @@ const baseMealsList = {
         "protein": "Chicken breast", "amount": 150, "carb": "Cooked rice", "carbAmount": 80, "veg": "Red curry vegetables", "vegAmount": 100, "style": "Curry style"
       },
       "cuisine": "asian"
+    },
+
+    // ── Phase 2 additions: Asian coverage ────────────────────────────────
+    //
+    // §3.4. Lunch/dinner was 13 Indian / 10 Continental / 3 Asian, while the
+    // weekly prompt asks the model to "mix Indian, Continental and Asian
+    // through the week" and Tier-3 scoring pays a cuisine-variety bonus it
+    // could not actually earn — three dishes cannot fill fourteen slots
+    // without tripping the 2-per-week repeat ceiling.
+    {
+      "meal_id": "lunch_dinner_korean-chicken-bibimbap-bowl",
+      "canonical_name": "Korean chicken bibimbap bowl",
+      "display_name": "Chicken Bibimbap Bowl",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Korean chicken bibimbap bowl",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 150, "unit": "g" },
+        { "ingredientId": "cooked_rice", "qty": 100, "unit": "g" },
+        { "ingredientId": "kimchi", "qty": 60, "unit": "g" },
+        { "ingredientId": "spinach", "qty": 80, "unit": "g" },
+        { "ingredientId": "sesame_stirfry_base", "qty": 20, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 150, "carb": "Cooked rice", "carbAmount": 100, "veg": "Kimchi + spinach", "vegAmount": 140, "style": "Bowl"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_salmon-teriyaki-soba-noodles",
+      "canonical_name": "Salmon teriyaki + soba noodles",
+      "display_name": "Salmon Teriyaki + Soba",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Salmon teriyaki + soba noodles",
+      "parts": [
+        { "ingredientId": "grilled_salmon", "qty": 150, "unit": "g" },
+        { "ingredientId": "soba_noodles", "qty": 150, "unit": "g" },
+        { "ingredientId": "bok_choy", "qty": 120, "unit": "g" },
+        { "ingredientId": "teriyaki_glaze", "qty": 30, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Grilled salmon", "amount": 150, "carb": "Soba noodles", "carbAmount": 150, "veg": "Bok choy", "vegAmount": 120, "style": "Grilled"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_prawn-stir-fry-edamame-rice-noodles",
+      "canonical_name": "Prawn stir-fry + edamame + rice noodles",
+      "display_name": "Prawn Stir-fry + Edamame",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Prawn stir-fry + edamame + rice noodles",
+      "parts": [
+        { "ingredientId": "prawns", "qty": 180, "unit": "g" },
+        { "ingredientId": "rice_noodles", "qty": 120, "unit": "g" },
+        { "ingredientId": "edamame", "qty": 80, "unit": "g" },
+        { "ingredientId": "sesame_stirfry_base", "qty": 25, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Prawns", "amount": 180, "carb": "Rice noodles", "carbAmount": 120, "veg": "Edamame", "vegAmount": 80, "style": "Pan-fried"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_miso-chicken-ramen-egg",
+      "canonical_name": "Miso chicken ramen + egg",
+      "display_name": "Miso Chicken Ramen",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Miso chicken ramen + egg",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 120, "unit": "g" },
+        { "ingredientId": "egg_noodles", "qty": 120, "unit": "g" },
+        { "ingredientId": "egg_whole", "qty": 1, "unit": "piece" },
+        { "ingredientId": "miso_broth", "qty": 200, "unit": "g" },
+        { "ingredientId": "bok_choy", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 120, "carb": "Egg noodles", "carbAmount": 120, "veg": "Bok choy", "vegAmount": 100, "style": "Soup style"
+      },
+      "cuisine": "asian"
+    },
+    {
+      // The vegetarian Asian entry. Also lowers the cost of a `vegetarian`
+      // ruleset later — that goal currently throws by design.
+      "meal_id": "lunch_dinner_tofu-edamame-ramen",
+      "canonical_name": "Tofu & edamame ramen",
+      "display_name": "Tofu & Edamame Ramen",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Tofu & edamame ramen",
+      "parts": [
+        { "ingredientId": "tofu_firm", "qty": 180, "unit": "g" },
+        { "ingredientId": "egg_noodles", "qty": 100, "unit": "g" },
+        { "ingredientId": "miso_broth", "qty": 200, "unit": "g" },
+        { "ingredientId": "bok_choy", "qty": 120, "unit": "g" },
+        { "ingredientId": "edamame", "qty": 60, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Firm tofu", "amount": 180, "carb": "Egg noodles", "carbAmount": 100, "veg": "Bok choy + edamame", "vegAmount": 180, "style": "Soup style"
+      },
+      "cuisine": "asian"
     }
   ],
   "snack": [
@@ -897,6 +1000,11 @@ const handAuthoredTags = {
   "Avocado and smoked salmon salad": { cuisine: "Continental" },
   "Avocado and smoked chicken salad": { cuisine: "Continental" },
   "Chicken red curry + rice": { cuisine: "Asian" },
+  "Korean chicken bibimbap bowl": { cuisine: "Asian" },
+  "Salmon teriyaki + soba noodles": { cuisine: "Asian" },
+  "Prawn stir-fry + edamame + rice noodles": { cuisine: "Asian" },
+  "Miso chicken ramen + egg": { cuisine: "Asian" },
+  "Tofu & edamame ramen": { cuisine: "Asian" },
   "Greek yogurt + berry bowl": { cuisine: "International" },
   "Carrot halwa (sugar-free) + protein shake": { cuisine: "Indian" },
   "Nuts, seeds + protein shake": { cuisine: "International" },

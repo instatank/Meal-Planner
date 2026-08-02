@@ -67,6 +67,35 @@ test('at least 3 breakfasts carry more than 35g of protein', () => {
   );
 });
 
+test('lunch/dinner carries at least 6 Asian dishes', () => {
+  // The weekly prompt asks the model to mix Indian, Continental and Asian
+  // through the week and Tier-3 pays a cuisine-variety bonus. With 3 Asian
+  // dishes and a 2-per-week repeat ceiling, Asian could fill at most 6 of 14
+  // lunch/dinner slots and the bonus was partly unearnable.
+  const asian = mealDatabase.lunchDinner.filter((meal) => String(meal.cuisine).toLowerCase() === 'asian');
+
+  assert.ok(
+    asian.length >= 6,
+    `only ${asian.length} Asian lunch/dinner dishes: ${asian.map((m) => m.canonical_name).join(', ')}`
+  );
+});
+
+test('no single cuisine dominates lunch/dinner outright', () => {
+  const counts = new Map();
+  for (const meal of mealDatabase.lunchDinner) {
+    const cuisine = String(meal.cuisine).toLowerCase();
+    counts.set(cuisine, (counts.get(cuisine) || 0) + 1);
+  }
+
+  const total = mealDatabase.lunchDinner.length;
+  for (const [cuisine, count] of counts) {
+    assert.ok(
+      count / total <= 0.6,
+      `${cuisine} is ${count} of ${total} lunch/dinner dishes — the week cannot vary cuisine it does not have`
+    );
+  }
+});
+
 test('breakfasts exist inside the measured protein/calorie/carb envelope', () => {
   // docs/PHASE2_HANDOVER.md §2: the catalog needs breakfasts that clear
   // protein AND calories AND carbs at once. Optimising any one axis alone

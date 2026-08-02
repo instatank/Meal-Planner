@@ -179,6 +179,18 @@ export const ingredients = {
     defaultPortion: { qty: 150, unit: "g" },
     source: "USDA #16427"
   },
+  prawns: {
+    name: "Prawns (cooked)",
+    per100g: { kcal: 99, p: 24, c: 0.2, f: 0.3, fibre: 0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #15152"
+  },
+  edamame: {
+    name: "Edamame (shelled, cooked)",
+    per100g: { kcal: 122, p: 11.9, c: 8.9, f: 5.2, fibre: 5.2 },
+    defaultPortion: { qty: 80, unit: "g" },
+    source: "USDA #11212"
+  },
   milk_toned: {
     name: "Toned milk",
     per100g: { kcal: 58, p: 3.1, c: 4.4, f: 3.0, fibre: 0 },
@@ -265,6 +277,18 @@ export const ingredients = {
     defaultPortion: { qty: 50, unit: "g" },
     source: "USDA #20038"
   },
+  soba_noodles: {
+    name: "Soba noodles (cooked)",
+    per100g: { kcal: 99, p: 5.1, c: 21.4, f: 0.1, fibre: 1.0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #20135"
+  },
+  egg_noodles: {
+    name: "Egg noodles (cooked)",
+    per100g: { kcal: 138, p: 4.5, c: 25, f: 2.1, fibre: 1.2 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #20409"
+  },
 
   // --- Vegetables / Sides / Flavorings ---
   mixed_salad: {
@@ -315,6 +339,18 @@ export const ingredients = {
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA"
   },
+  bok_choy: {
+    name: "Bok choy (steamed)",
+    per100g: { kcal: 12, p: 1.6, c: 1.8, f: 0.2, fibre: 1.0 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #11117"
+  },
+  kimchi: {
+    name: "Kimchi",
+    per100g: { kcal: 15, p: 1.1, c: 2.4, f: 0.5, fibre: 1.6 },
+    defaultPortion: { qty: 60, unit: "g" },
+    source: "USDA #11957"
+  },
 
   // --- Basics & Fats ---
   curry_base: {
@@ -322,6 +358,24 @@ export const ingredients = {
     per100g: { kcal: 250, p: 2, c: 15, f: 20, fibre: 1.5 },
     defaultPortion: { qty: 50, unit: "g" },
     source: "Inferred base"
+  },
+  sesame_stirfry_base: {
+    name: "Stir-fry base (sesame oil, garlic, ginger, soy)",
+    per100g: { kcal: 260, p: 1.5, c: 6, f: 26, fibre: 0.8 },
+    defaultPortion: { qty: 25, unit: "g" },
+    source: "Inferred base"
+  },
+  miso_broth: {
+    name: "Miso broth",
+    per100g: { kcal: 40, p: 2.5, c: 4, f: 1.5, fibre: 0.8 },
+    defaultPortion: { qty: 200, unit: "g" },
+    source: "USDA #16112 (derived)"
+  },
+  teriyaki_glaze: {
+    name: "Teriyaki glaze",
+    per100g: { kcal: 89, p: 1.5, c: 15.5, f: 0, fibre: 0.1 },
+    defaultPortion: { qty: 30, unit: "g" },
+    source: "USDA #06970"
   },
   avocado: {
     name: "Avocado",
