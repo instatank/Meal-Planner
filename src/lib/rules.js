@@ -197,7 +197,28 @@ const GOAL_DEFINITIONS = {
 export const CARB_HEAVY_THRESHOLD = 55;
 export const FAT_HEAVY_THRESHOLD = 25;
 export const HEAVY_MEAL_CALORIES = 600;
+export const MEDIUM_MEAL_CALORIES = 350;
 export const PROTEIN_BALANCE_MAX_GAP = 40;
+
+/**
+ * Grams of dietary fibre at which a meal counts as a fibre meal.
+ *
+ * 3g is the EU/FSSAI "source of fibre" claim threshold — a real regulatory
+ * definition for a per-serving bar, and a meal is at least a serving. The
+ * "high in fibre" bar of 6g was the obvious alternative and was rejected on a
+ * measurement: at 6g only 15 of 41 catalog meals qualify and *no* breakfast
+ * that clears the 20g protein floor does, which would make the prompt's
+ * "prefer 2 of 3 daily meals with fibre" unsatisfiable at breakfast by
+ * construction.
+ *
+ * At 3g, 30 of 41 meals qualify and the ones excluded are the ones a human
+ * would exclude by eye: poha (0.9g), chicken red curry + rice (1.1g), fish
+ * curry + rice (1.2g), pad krapow (1.6g), chicken soup + salmon salad (1.8g),
+ * scrambled eggs + toast (1.9g).
+ *
+ * This is a new constant, not a changed one. No Tier-1/2/3 threshold moved.
+ */
+export const FIBRE_MEAL_THRESHOLD = 3;
 
 // ─── Derivation helpers ─────────────────────────────────────────────────────
 

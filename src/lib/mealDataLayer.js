@@ -2,6 +2,12 @@ const GOAL_NAMES = ['high_protein', 'low_carb', 'two_meals'];
 const METADATA_SIMILARITY_FIELDS = ['format', 'protein_family', 'carb_level', 'cuisine'];
 
 import { ingredients } from '../data/ingredients.js';
+import {
+  FAT_HEAVY_THRESHOLD,
+  FIBRE_MEAL_THRESHOLD,
+  HEAVY_MEAL_CALORIES,
+  MEDIUM_MEAL_CALORIES
+} from './rules.js';
 
 const ALLOWED_MEAL_TYPE_TAGS = new Set(['breakfast', 'lunch_dinner', 'snack']);
 const ALLOWED_PROTEIN_FAMILIES = new Set(['chicken', 'fish', 'red_meat', 'vegetarian', 'mixed']);
@@ -96,10 +102,47 @@ export const inferProteinFamily = (meal = {}) => {
 export const inferMealWeightClass = (meal = {}) => {
   const calories = asNumber(meal.cal);
   if (!Number.isFinite(calories)) return 'medium';
-  if (calories > 600) return 'heavy';
-  if (calories >= 350) return 'medium';
+  if (calories > HEAVY_MEAL_CALORIES) return 'heavy';
+  if (calories >= MEDIUM_MEAL_CALORIES) return 'medium';
   return 'light';
 };
+
+// ─── Derived meal tags ──────────────────────────────────────────────────────
+//
+// These three fields used to be hand-typed in `csvTagsMap` alongside computed
+// macros, and they disagreed with the macros they sat next to: 12 of 41 meals
+// on `is_fat_heavy`, 3 of 41 on `meal_weight`, and `has_fibre` by a margin
+// that depended entirely on which heuristic you asked. A hand-typed field
+// beside a computed one always drifts, so all three are now derived from the
+// ingredient list and the hand-authored map keeps only subjective fields.
+//
+// Each rule is stated once, here, and reads its threshold from `rules.js`.
+
+/** Fat-heavy: more than FAT_HEAVY_THRESHOLD (25g) of fat in the meal. */
+export const deriveIsFatHeavy = (meal = {}) => asNumber(meal.macros?.f) > FAT_HEAVY_THRESHOLD;
+
+/**
+ * Fibre meal: at least FIBRE_MEAL_THRESHOLD (3g) of rolled-up dietary fibre.
+ * See the constant's comment in `rules.js` for why 3g and not 6g.
+ */
+export const deriveHasFibre = (meal = {}) => asNumber(meal.macros?.fibre) >= FIBRE_MEAL_THRESHOLD;
+
+/**
+ * Display weight label, by calories: >600 Heavy, >=350 Medium, else Light.
+ * Display and reporting only — Phase 1 made dinner tapering calorie-based, so
+ * nothing in the engine reads this label any more.
+ */
+export const deriveMealWeight = (meal = {}) => {
+  const cls = inferMealWeightClass(meal);
+  return cls.charAt(0).toUpperCase() + cls.slice(1);
+};
+
+/** All three derived tags for a meal that already has computed macros. */
+export const deriveMealTags = (meal = {}) => ({
+  is_fat_heavy: deriveIsFatHeavy(meal),
+  has_fibre: deriveHasFibre(meal),
+  meal_weight: deriveMealWeight(meal)
+});
 
 export const inferCarbLevel = (meal = {}) => {
   const carbs = asNumber(meal.macros?.c);

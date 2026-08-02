@@ -1,4 +1,4 @@
-import { computeMacros, enrichMealForDataLayer } from '../lib/mealDataLayer.js';
+import { computeMacros, deriveMealTags, enrichMealForDataLayer } from '../lib/mealDataLayer.js';
 
 // Base meals converted to the new Ingredient Architecture
 const baseMealsList = {
@@ -695,53 +695,88 @@ const baseMealsList = {
   ]
 };
 
-const csvTagsMap = {
-  "Scrambled eggs + toast": { cuisine: "Continental", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
-  "Boiled eggs + ham sandwich": { cuisine: "Continental", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
-  "Smoked salmon + avocado on toast": { cuisine: "Continental", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
-  "Poha + kabab/protein shake": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
-  "Egg white omelette + avocado": { cuisine: "Continental", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
-  "Aloo paratha + curd": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Heavy" },
-  "Idli, Mysore masala dosa + sambar + chutney": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Chicken curry + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Heavy" },
-  "Grilled salmon fillet + sauteed veg + spaghetti aglio e olio": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Rajma chawal + raita": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
-  "Chole + jowar roti + raita": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Vietnamese chicken pho": { cuisine: "Asian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
-  "Grilled steak + mixed greens salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
-  "Thai pad krapow + rice": { cuisine: "Asian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
-  "Mutton keema + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Heavy" },
-  "Arhar dal + rice + matar paneer": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Chicken curry + jowar roti + dal": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Grilled fish + pumpkin salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
-  "Grilled salmon + sauteed veg + garlic rice": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
-  "Chicken soup + smoked salmon salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
-  "Paneer sabzi + dal + raita": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Pork chop + pumpkin salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Pork chop + mixed greens salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
-  "Tandoori chicken + smoked chicken + avocado salad": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
-  "Broccoli soup + grilled fish + spaghetti aglio e olio": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" },
-  "Saag meat + jowar roti + dal": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Kofta + dal + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Kababs + dal + gobi + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Fish curry + rice": { cuisine: "Indian", is_fat_heavy: false, has_fibre: false, meal_weight: "Medium" },
-  "Sweet potato curry + kaala chanaa sabzi + jowar roti": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Heavy" },
-  "Avocado and smoked salmon salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
-  "Avocado and smoked chicken salad": { cuisine: "Continental", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
-  "Chicken red curry + rice": { cuisine: "Asian", is_fat_heavy: true, has_fibre: true, meal_weight: "Medium" },
-  "Greek yogurt + berry bowl": { cuisine: "International", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
-  "Carrot halwa (sugar-free) + protein shake": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
-  "Nuts, seeds + protein shake": { cuisine: "International", is_fat_heavy: false, has_fibre: false, meal_weight: "Light" },
-  "Sweet potato chaat": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
-  "Kaala chana chaat": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
-  "Avocado/cheese toast": { cuisine: "Continental", is_fat_heavy: true, has_fibre: false, meal_weight: "Light" },
-  "Fruit + Almonds + Plant Shake": { cuisine: "General", is_fat_heavy: false, has_fibre: true, meal_weight: "Light" },
-  "Chaat + Bhel + Protein Shake": { cuisine: "Indian", is_fat_heavy: false, has_fibre: true, meal_weight: "Medium" }
+/**
+ * Hand-authored tags — subjective fields only.
+ *
+ * This used to be `csvTagsMap` and also carried `is_fat_heavy`, `has_fibre`
+ * and `meal_weight` typed by hand next to macros computed from `parts[]`. They
+ * drifted, as hand-typed data next to computed data always does: 12 of 41
+ * meals disagreed on `is_fat_heavy` (mutton keema at 34g fat was tagged
+ * `false`, chicken red curry at 14g was tagged `true`) and 3 of 41 on
+ * `meal_weight`. All three are now derived in `deriveMealTags` and must not
+ * be typed here — a test asserts this map carries nothing but `cuisine`.
+ *
+ * `cuisine` stays hand-authored because it is a genuine judgement call that no
+ * ingredient list can settle: pad krapow and chicken red curry share almost
+ * every ingredient with an Indian curry.
+ */
+const handAuthoredTags = {
+  "Scrambled eggs + toast": { cuisine: "Continental" },
+  "Boiled eggs + ham sandwich": { cuisine: "Continental" },
+  "Smoked salmon + avocado on toast": { cuisine: "Continental" },
+  "Poha + kabab/protein shake": { cuisine: "Indian" },
+  "Egg white omelette + avocado": { cuisine: "Continental" },
+  "Aloo paratha + curd": { cuisine: "Indian" },
+  "Idli, Mysore masala dosa + sambar + chutney": { cuisine: "Indian" },
+  "Chicken curry + jowar roti": { cuisine: "Indian" },
+  "Grilled salmon fillet + sauteed veg + spaghetti aglio e olio": { cuisine: "Continental" },
+  "Rajma chawal + raita": { cuisine: "Indian" },
+  "Chole + jowar roti + raita": { cuisine: "Indian" },
+  "Vietnamese chicken pho": { cuisine: "Asian" },
+  "Grilled steak + mixed greens salad": { cuisine: "Continental" },
+  "Thai pad krapow + rice": { cuisine: "Asian" },
+  "Mutton keema + jowar roti": { cuisine: "Indian" },
+  "Arhar dal + rice + matar paneer": { cuisine: "Indian" },
+  "Chicken curry + jowar roti + dal": { cuisine: "Indian" },
+  "Grilled fish + pumpkin salad": { cuisine: "Continental" },
+  "Grilled salmon + sauteed veg + garlic rice": { cuisine: "Continental" },
+  "Chicken soup + smoked salmon salad": { cuisine: "Continental" },
+  "Paneer sabzi + dal + raita": { cuisine: "Indian" },
+  "Pork chop + pumpkin salad": { cuisine: "Continental" },
+  "Pork chop + mixed greens salad": { cuisine: "Continental" },
+  "Tandoori chicken + smoked chicken + avocado salad": { cuisine: "Indian" },
+  "Broccoli soup + grilled fish + spaghetti aglio e olio": { cuisine: "Continental" },
+  "Saag meat + jowar roti + dal": { cuisine: "Indian" },
+  "Kofta + dal + jowar roti": { cuisine: "Indian" },
+  "Kababs + dal + gobi + jowar roti": { cuisine: "Indian" },
+  "Fish curry + rice": { cuisine: "Indian" },
+  "Sweet potato curry + kaala chanaa sabzi + jowar roti": { cuisine: "Indian" },
+  "Avocado and smoked salmon salad": { cuisine: "Continental" },
+  "Avocado and smoked chicken salad": { cuisine: "Continental" },
+  "Chicken red curry + rice": { cuisine: "Asian" },
+  "Greek yogurt + berry bowl": { cuisine: "International" },
+  "Carrot halwa (sugar-free) + protein shake": { cuisine: "Indian" },
+  "Nuts, seeds + protein shake": { cuisine: "International" },
+  "Sweet potato chaat": { cuisine: "Indian" },
+  "Kaala chana chaat": { cuisine: "Indian" },
+  "Avocado/cheese toast": { cuisine: "Continental" },
+  "Fruit + Almonds + Plant Shake": { cuisine: "General" },
+  "Chaat + Bhel + Protein Shake": { cuisine: "Indian" }
 };
 
-// Auto-inject computed macros to maintain strict backward compatibility
+/** Exported so tests can assert no derived field creeps back in. */
+export const handAuthoredTagFields = Object.freeze(['cuisine']);
+export { handAuthoredTags };
+
+/**
+ * Compute macros from `parts[]`, derive the three computed tags from those
+ * macros, then layer the subjective hand-authored tags on top. Order matters:
+ * macros first, because the derivations read them.
+ */
+const buildMeal = (meal, mealType) => {
+  const withMacros = { ...meal, ...computeMacros(meal.parts) };
+  return enrichMealForDataLayer(
+    {
+      ...withMacros,
+      ...deriveMealTags(withMacros),
+      ...(handAuthoredTags[meal.canonical_name] || {})
+    },
+    mealType
+  );
+};
+
 export const mealDatabase = {
-  breakfast: baseMealsList.breakfast.map(meal => enrichMealForDataLayer({ ...meal, ...(csvTagsMap[meal.canonical_name] || {}), ...computeMacros(meal.parts) }, 'breakfast')),
-  lunchDinner: baseMealsList.lunchDinner.map(meal => enrichMealForDataLayer({ ...meal, ...(csvTagsMap[meal.canonical_name] || {}), ...computeMacros(meal.parts) }, 'lunch_dinner')),
-  snack: baseMealsList.snack.map(meal => enrichMealForDataLayer({ ...meal, ...(csvTagsMap[meal.canonical_name] || {}), ...computeMacros(meal.parts) }, 'snack'))
+  breakfast: baseMealsList.breakfast.map(meal => buildMeal(meal, 'breakfast')),
+  lunchDinner: baseMealsList.lunchDinner.map(meal => buildMeal(meal, 'lunch_dinner')),
+  snack: baseMealsList.snack.map(meal => buildMeal(meal, 'snack'))
 };

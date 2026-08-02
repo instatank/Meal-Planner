@@ -20,16 +20,16 @@
  */
 
 import {
+  CARB_HEAVY_THRESHOLD,
+  FAT_HEAVY_THRESHOLD,
+  FIBRE_MEAL_THRESHOLD,
+  HEAVY_MEAL_CALORIES,
   PROTEIN_BALANCE_MAX_GAP,
   requiredCompliantDays,
   weeklyProteinFloor
 } from './rules.js';
 
 export const CORE_SLOTS = ['breakfast', 'lunch', 'dinner'];
-
-const HEAVY_MEAL_CALORIES = 600;
-const CARB_HEAVY_THRESHOLD = 55;
-const FAT_HEAVY_THRESHOLD = 25;
 
 // ─── Meal accessors ─────────────────────────────────────────────────────────
 
@@ -83,7 +83,18 @@ const getFibreScore = (meal) => {
   return score;
 };
 
-export const hasFibre = (meal) => Boolean(meal?.has_fibre) || getFibreScore(meal) > 0;
+/**
+ * Catalog meals now carry rolled-up fibre in grams, so measure them. The name
+ * heuristic below is the fallback for meals that carry no figure — test
+ * fixtures and, until they compute real macros, user-added meals — and it
+ * must not override a real measurement: "scrambled eggs + toast" matches the
+ * wholegrain pattern on the word "whole" while carrying 1.9g of fibre.
+ */
+export const hasFibre = (meal) => {
+  const grams = Number(meal?.macros?.fibre);
+  if (Number.isFinite(grams)) return grams >= FIBRE_MEAL_THRESHOLD;
+  return Boolean(meal?.has_fibre) || getFibreScore(meal) > 0;
+};
 
 const hasRepeatedFamilyInsideMeal = (meal) => {
   const name = getMealName(meal).toLowerCase();
