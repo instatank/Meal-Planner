@@ -132,13 +132,23 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 
 ## Next Priorities (updated)
 
-0. **Phase 2 — repair and expand the database.** Phase 1 made the rules real; the catalog is now the binding constraint. In priority order: high-protein breakfasts (5 legal options for 7 days), derive `is_fat_heavy` / `has_fibre` / `meal_weight` from ingredients instead of the hand-typed `csvTagsMap` (12, 11 and 3 disagreements respectively), fibre in grams, then expansion toward ~120 meals. See `docs/EVAL_AND_ROADMAP.md` §4.
+0. **Phase 2 — repair and expand the database. → `docs/PHASE2_HANDOVER.md`** Phase 1 made the rules real; the catalog is now the binding constraint. Only 0.9% of legal day combinations satisfy all three Tier-2 budgets at once, and the generated week passes calories at exactly the 5-of-7 minimum. The measured spec for new breakfasts is **35–45g protein, 500–600 kcal, ≤55g carbs** — optimising protein alone moves one budget and breaks another. Also: derive `is_fat_heavy` / `has_fibre` / `meal_weight` from ingredients instead of the hand-typed `csvTagsMap` (12, 10 and 3 disagreements), fibre in grams, Asian coverage (3 dishes), then expansion toward ~120 meals.
 1. **Migrate Omnibox to Claude.** Currently the only remaining Gemini dependency. Use Haiku 4.5 via the same proxy (latency < 2s, cost ~1/10th of Sonnet). Removes the exposed `VITE_GEMINI_API_KEY` from the browser bundle.
 2. **Switch timestamps to Firestore `serverTimestamp()`.** The current heal-on-read logic is defensive but brittle. Using server-assigned timestamps makes client-clock poisoning impossible and lets us delete the `isCorruptTs` / heal branches.
 3. **IF (Intermittent Fasting) mode.** `two_meals` is declared in onboarding and reconciled in `rules.js`, but has no ruleset — `getRules` throws for it by design. Give it real Tier-1/2/3 definitions and surface it so users can opt into 16/8 or 18/6 without overriding meals manually.
 4. **Tag AI-generated plans** (`_aiGenerated: true`) so future dedup/cleanup logic can tell pushed/AI/manual plans apart.
 5. **Raise the weekly protein floor above 85%** once the catalog grows. A generated week currently clears the 785g floor by ~100g (885g, 95.8% of nominal), but that is with almost no slack on the calorie budget — the headroom is real, the margin is not.
 6. **Bundle size.** 980KB gzipped 240KB. Code-split Firebase + `@google/genai` (largest offenders).
+
+---
+
+## Docs
+
+| Doc | What it is |
+| --- | --- |
+| `docs/PHASE2_HANDOVER.md` | **The current work.** Self-contained brief for the database repair + expansion, with the measured spec for new meals and the open questions for the founder. |
+| `docs/PHASE1_HANDOVER.md` | Shipped 2026-08-02. §9 records what the generation-engine rebuild measured — read it before changing any threshold. |
+| `docs/EVAL_AND_ROADMAP.md` | The original audit. §3 is now historical (that code is deleted); §4 onward is still live. |
 
 ---
 

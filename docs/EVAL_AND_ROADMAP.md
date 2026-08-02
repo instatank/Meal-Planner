@@ -1,7 +1,16 @@
 # Meal Planner — Evaluation & Roadmap
 
 **Date:** 2026-08-02
-**Scope:** Full evaluation of the meal generation engine, meal database design, and rule/prompt system. Plus a design for user-added meals. Planning only — nothing in this document has been built.
+**Scope:** Full evaluation of the meal generation engine, meal database design, and rule/prompt system. Plus a design for user-added meals.
+
+> **Status update (2026-08-02): Phase 1 is shipped.** Everything in §3 (the
+> generation engine) has been fixed and is measured in
+> `docs/PHASE1_HANDOVER.md` §9. **§3 is now a historical record of what was
+> broken, not a description of the current code** — the filter it describes has
+> been deleted. §4 (the database) is still accurate and is the live work; see
+> `docs/PHASE2_HANDOVER.md`. §5–§7 are unchanged and still pending.
+>
+> Re-measure any figure in this document with `npm run audit:generation`.
 
 ---
 
@@ -42,7 +51,12 @@ That's the core problem. Everything else below is downstream of it.
 
 ---
 
-## 3. What's broken — the generation engine
+## 3. What's broken — the generation engine *(FIXED in Phase 1 — historical)*
+
+> Every defect in this section has been fixed. `constraintFilter.js` is deleted;
+> `src/lib/rules.js`, `planOptimizer.js` and `planValidator.js` replace it. Kept
+> for the record because the measurements explain *why* the current architecture
+> looks the way it does.
 
 ### 3.1 The constraint filter filters almost nothing
 
@@ -123,7 +137,7 @@ Also worth noting the **Vercel Hobby 10-second cap**, already flagged in `CLAUDE
 
 ---
 
-## 4. What's broken — the database design
+## 4. What's broken — the database design *(LIVE — this is Phase 2)*
 
 ### 4.1 It's too small to satisfy its own rules
 
@@ -237,9 +251,16 @@ Nothing here suggests you need a commercial nutrition API subscription. USDA (fr
 
 Ordered by leverage. Phase 1 is the one that matters; the rest builds on it.
 
-### Phase 1 — Make the rules real *(highest leverage)*
+### Phase 1 — Make the rules real *(SHIPPED 2026-08-02)*
 
 Goal: a generated day either satisfies its constraints or the app knows it didn't.
+
+**Done.** All seven items below shipped, plus a three-tier rule model
+(hard / budgeted / scored) that the original write-up did not anticipate — the
+founder's "aim daily, judge weekly" call made a flat filter the wrong shape.
+Measured results in `docs/PHASE1_HANDOVER.md` §9. Headline: a generated week hits
+7 of 7 days in the protein band and 885g weekly protein (95.8% of nominal), with
+the calorie budget — not protein — as the binding constraint.
 
 1. **Fix the sequential filter.** Make the filter actually commit a slot before filtering the next, so daily accumulators are non-zero. Two viable approaches: (a) beam search over B/L/D combinations scoring against daily targets, or (b) have the filter emit *feasible combinations* rather than three independent lists. (a) is more flexible; (b) is simpler and makes the tool-schema enum trivial.
 2. **Add a post-generation validator.** Check the returned week against daily protein band, carb cap, calorie floor/ceiling, weekly repetition, and red-meat cap. On violation, repair deterministically or retry once with the violations fed back.
@@ -249,14 +270,18 @@ Goal: a generated day either satisfies its constraints or the app knows it didn'
 6. **Fix the high-protein/taper conflict.** Calorie-based dinner tapering, as a score not a hard cut.
 7. **Upgrade the model — and remove `temperature` in the same commit** (Sonnet 5 rejects it with a 400).
 
-*Done when:* a 7-day generated plan passes the validator on every day, and the 4 failing regression tests pass against the unified rules.
+*Done when:* a 7-day generated plan passes the validator on every day, and the 4 failing regression tests pass against the unified rules. — **Met.** The suite is 102/102; one of the four "failures" turned out to be a time-bomb fixture rather than a rules problem (see the handover).
 
-### Phase 2 — Repair the database
+### Phase 2 — Repair the database *(NEXT — see `docs/PHASE2_HANDOVER.md`)*
 
 1. **Derive tags instead of typing them.** Compute `is_fat_heavy`, `has_fibre`, `meal_weight` from ingredients; keep hand-tags only for cuisine/effort. Retire `csvTagsMap`.
 2. **Add fibre in grams** to the ingredient table (IFCT has it), then to meals. Optionally sodium.
 3. **Add prep time and effort** — needed for "I'm exhausted" swaps, which the Omnibox already has an intent for.
-4. **Reconcile the goal enums** across onboarding, filter, and data layer. Either implement `low_carb` / `vegetarian` / `two_meals` properly or remove them from the UI — right now they silently become `high_protein`.
+4. ~~**Reconcile the goal enums**~~ — *partially done in Phase 1.* `rules.js`
+   normalises the spelling (`two_meals_day` → `two_meals`) and `getRules` now
+   throws `UnsupportedGoalError` instead of silently falling back to
+   `high_protein`. The three unimplemented goals still need either a real
+   ruleset or removal from the UI.
 5. **Expand the catalog** toward ~120 meals, weighted to the current gaps: high-protein breakfasts, lighter dinners, Asian dishes.
 
 ### Phase 3 — User-added meals *(your feature request)*
@@ -281,9 +306,9 @@ Goal: a generated day either satisfies its constraints or the app knows it didn'
 
 ## 9. If you only do three things
 
-1. **Make the constraint filter actually accumulate the day, and add a validator after generation.** Everything else is cosmetic while two-thirds of days miss the protein target.
-2. **Grow the database, and make user-added meals the way it grows** — with real nutrition resolution, not hardcoded placeholder macros.
-3. **Delete the sentence in the prompt that tells Claude the constraints are already handled** — until it's true.
+1. ~~**Make the constraint filter actually accumulate the day, and add a validator after generation.**~~ **Done** — the filter is deleted and replaced by an enumerating optimizer plus a post-generation validator with deterministic repair.
+2. **Grow the database, and make user-added meals the way it grows** — with real nutrition resolution, not hardcoded placeholder macros. **Still the highest-leverage item, and now the binding one:** the rules are real, so the catalog is what limits output quality. Only 0.9% of legal day combinations satisfy all three daily budgets at once.
+3. ~~**Delete the sentence in the prompt that tells Claude the constraints are already handled.**~~ **Done** — the prompt now separates what the pipeline guarantees from what it doesn't, and states every target as a hard number.
 
 ---
 
