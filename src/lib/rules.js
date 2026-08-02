@@ -104,7 +104,14 @@ const GOAL_DEFINITIONS = {
       redMeatMealsPerWeek: 3,
       // A meal is excluded outright once the user's avoid score passes this.
       avoidScoreExclusiveMax: 3,
-      weeklyProteinFloorRatio: 0.85
+      weeklyProteinFloorRatio: 0.85,
+      // Carried over verbatim from constraintFilter.js so the optimizer swap
+      // changes the engine and not the rules. This excludes every `Heavy` meal
+      // from dinner, which removes the three highest-protein dishes in the
+      // catalog — see docs/EVAL_AND_ROADMAP.md 3.5. Replaced by the scored,
+      // calorie-based taper in a later commit.
+      requireDinnerTaper: true,
+      dinnerWeightAllowed: ['Light', 'Medium']
     },
     budgeted: {
       proteinBandRatio: 0.10,
@@ -117,6 +124,10 @@ const GOAL_DEFINITIONS = {
       // Protein proximity dominates: this is what "aim daily" means.
       proteinProximity: 1.0,
       outOfBandPenalty: 12,
+      // Applied when a candidate day misses a Tier-2 budget, scaled up as the
+      // remaining days run out of room to make it back. Without this the beam
+      // fills with high-variety branches that are already doomed.
+      budgetPressurePenalty: 45,
       carbOverCapPenalty: 0.35,
       calorieOutOfBoundsPenalty: 0.02,
       // Dinner tapering is a preference, not an exclusion. Expressed as the
@@ -147,7 +158,9 @@ const GOAL_DEFINITIONS = {
       maxLunchDinnerRepeatsPerWeek: 2,
       redMeatMealsPerWeek: 4,
       avoidScoreExclusiveMax: 3,
-      weeklyProteinFloorRatio: 0.85
+      weeklyProteinFloorRatio: 0.85,
+      requireDinnerTaper: false,
+      dinnerWeightAllowed: null
     },
     budgeted: {
       proteinBandRatio: 0.10,
@@ -160,6 +173,7 @@ const GOAL_DEFINITIONS = {
     scored: {
       proteinProximity: 0.6,
       outOfBandPenalty: 8,
+      budgetPressurePenalty: 45,
       carbOverCapPenalty: 0,
       calorieOutOfBoundsPenalty: 0.02,
       dinnerCalorieShareTarget: 0.40,

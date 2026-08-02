@@ -692,18 +692,23 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           });
 
           const { generateWeeklyPlan } = await import('./lib/planService.js');
-          const { generateFilteredShortlists } = await import('./lib/constraintFilter.js');
+          const { buildWeekPlan } = await import('./lib/planOptimizer.js');
+          const { getRulesForProfile } = await import('./lib/rules.js');
 
-          // Phase 1: Pre-filter candidates per slot (free, <5ms)
+          // Phase 1: deterministic optimizer — enumerate legal days, beam-search
+          // a week that respects the Tier-2 budgets, and derive the shortlists
+          // the AI picks from.
+          const rules = getRulesForProfile(onboardingProfile?.goal, { dailyProteinTarget: adjustedProtein });
           const filterStart = performance.now();
-          const { shortlists, stats } = generateFilteredShortlists({
+          const reference = buildWeekPlan({
             mealDatabase: mergedMealDatabase,
-            goal: onboardingProfile?.goal || 'high_protein',
+            rules,
             targetDateKeys,
             historyMap,
             preferences: adjustedPrefs
           });
-          console.info(`[Hybrid] Pre-filter completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats);
+          const { shortlists, stats } = reference;
+          console.info(`[Hybrid] Optimizer completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats, reference.summary);
 
           // Phase 2: AI selects from shortlists (cheap, fast)
           const generatedDays = await generateWeeklyPlan({
@@ -1508,18 +1513,24 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       });
 
       const { generateWeeklyPlan } = await import('./lib/planService.js');
-      const { generateFilteredShortlists } = await import('./lib/constraintFilter.js');
+      const { buildWeekPlan } = await import('./lib/planOptimizer.js');
+      const { getRulesForProfile } = await import('./lib/rules.js');
 
-      // Phase 1: Pre-filter candidates per slot (free, <5ms)
+      // Phase 1: deterministic optimizer — enumerate legal days, beam-search a
+      // week that respects the Tier-2 budgets, and derive the shortlists the AI
+      // picks from. The reference week is also the repair target if the AI's
+      // selection fails validation.
+      const rules = getRulesForProfile(onboardingProfile?.goal, { dailyProteinTarget: adjustedProtein });
       const filterStart = performance.now();
-      const { shortlists, stats } = generateFilteredShortlists({
+      const reference = buildWeekPlan({
         mealDatabase: mergedMealDatabase,
-        goal: onboardingProfile?.goal || 'high_protein',
+        rules,
         targetDateKeys,
         historyMap,
         preferences: adjustedPrefs
       });
-      console.info(`[Hybrid] Pre-filter completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats);
+      const { shortlists, stats } = reference;
+      console.info(`[Hybrid] Optimizer completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats, reference.summary);
 
       // Phase 2: AI selects from shortlists (cheap, fast)
       const generatedDays = await generateWeeklyPlan({
