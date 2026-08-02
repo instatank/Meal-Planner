@@ -27,11 +27,23 @@ Measured, for the `high_protein` goal (132g/day target):
 
 These came from reviewing the audit. They are settled.
 
-### 2.1 The rules are guidelines, not a straitjacket
+### 2.1 Aim daily, judge weekly — this is the core mental model
 
-Perfection per-day is explicitly **not** the goal. The founder's words: *"we need not be militant about every single day meeting the criteria."*
+Perfection per-day is explicitly **not** the goal. The founder's words:
 
-- **Protein — needs tightening.** 2-in-3 days missing is too much. Acceptable is **up to 20–25% of days off-target, i.e. a maximum of 2 miss days in a 7-day week.** Those are treated as deliberate "cheat/treat" days, not failures.
+> *"we DO want to aim for the daily protein targets, but we don't HAVE TO MEET EVERY SINGLE DAY. As long as the week is working fine, a couple of exception days are acceptable. So it's sort of a two-step filtering process."*
+
+Read that literally — it defines the architecture:
+
+- **Step 1 — aim daily.** Every day is *targeted* at the daily protein goal. The optimizer always tries to hit the band.
+- **Step 2 — judge weekly.** A week is accepted or rejected on **weekly** performance, not on every day passing. Up to **2 of 7 days may fall out of band**, and those days are allowed to be **genuinely flexible — low floors, not near-misses.**
+
+The unit of success is the week. A day that misses is not a failure; a week that misses is.
+
+Specifics:
+
+- **Protein — needs tightening.** 2-in-3 days missing is too much. Acceptable is **up to 20–25% of days off-target, i.e. a maximum of 2 miss days in a 7-day week.** Those are deliberate "cheat/treat" days.
+- **Flex days are properly flexible.** The founder explicitly asked for **low floors** on those 1–2 days. Do not impose a tight per-day minimum on them (an earlier draft proposed 105g — **that has been rejected**). See §3 Tier 1 for what replaces it.
 - **Carbs — current miss rate is acceptable.** ~1 in 5 days over the cap is fine. Do **not** tighten this; do not let it crowd out protein adherence.
 
 ### 2.2 Scope is Phase 1 only
@@ -57,9 +69,10 @@ Replace the current flat "filter" concept with three explicit tiers. This is the
 - Weekly repetition ceilings (breakfast ≤4, lunch/dinner ≤2) — **counted against the week being generated**, which today it is not
 - Weekly red-meat cap (3 for `high_protein`, 4 for `standard`)
 - User avoids with score > 3
-- An absolute daily protein floor that applies **even on off-days**
+- **Weekly protein total ≥ 85% of nominal** (nominal = 7 × daily target; for `high_protein` that is 7 × 132 = 924g, so the floor is **≈785g**)
+- A sanity-only per-day protein floor of **50g** — this exists to catch a pathological day, not to constrain treat days
 
-> **Assumption to confirm with the founder — flag it, don't silently adopt:** a "treat day" should still be a reasonable day. Proposal: no day may fall below **105g** protein even when it's one of the 2 permitted off-band days. 105g is not arbitrary — it is already `DAILY_PROTEIN_MIN` in `plannerGenerator.js`, so this reuses an existing, deliberate number. Without a floor like this, "2 off days allowed" permits a 64g day, which is what the audit found at the bottom of the range.
+**There is deliberately no meaningful per-day floor on flex days.** The weekly total is what guarantees the week is sound. This is the direct implementation of "as long as the week is working fine": two genuinely low days are fine *provided the other five compensate*, and the weekly floor is what forces that compensation. A per-day floor and a weekly floor would double-constrain the same thing, and the per-day one is what the founder rejected.
 
 ### Tier 2 — Budgeted (violations allowed, but counted and capped per week)
 
@@ -70,6 +83,36 @@ Replace the current flat "filter" concept with three explicit tiers. This is the
 | Daily calorie bounds (1600–2200 for `high_protein`) | ≥5 of 7 days within |
 
 A week that blows a budget is invalid and must be repaired or retried.
+
+### Where the 85% weekly floor comes from — and why it isn't higher
+
+Measured against the current catalog (enumeration of all 1,820 legal `high_protein` day-combinations):
+
+| Achievable daily protein | Value |
+|---|---|
+| Minimum | 64g |
+| 25th percentile | 101g |
+| Median | 112g |
+| 90th percentile | 131g |
+| Maximum | 155g |
+| Mean of in-band combos | 127.6g |
+
+Note the maximum is misleading: the 150g+ combinations reach that only by serving the same dish twice in one day, which Tier 1 forbids. **A realistic strong day is ~128–132g, not 140g.**
+
+Weekly totals that follow:
+
+| Scenario | Weekly total | % of nominal (924g) |
+|---|---|---|
+| 5 days @ 128g + 2 days @ 60g | 758g | 82% |
+| 5 days @ 132g + 2 days @ 70g | 800g | 87% |
+| 5 days @ 132g + 2 days @ 90g | 840g | 91% |
+| 5 days @ 132g + 2 days @ 105g | 870g | 94% |
+
+**This is the trade-off, stated plainly:** genuinely low flex days and a 90%+ weekly total are mutually exclusive on a 41-meal catalog. The founder chose low flex days, so the weekly floor is set at **85%** to match. Anything higher silently re-imposes the per-day floor that was rejected.
+
+The binding constraint is **breakfast** — only 5 of 7 breakfasts survive the 20g per-meal floor, and the best is 37g. That caps every day. Raising the weekly floor above 85% is a **Phase 2 outcome** (more high-protein breakfasts), not something to force in Phase 1.
+
+> If a generated week comfortably clears 85%, report the actual figure — that is the evidence for where to set the floor once the catalog grows.
 
 ### Tier 3 — Scored (never reject; rank by these)
 
@@ -147,14 +190,15 @@ Sonnet 5 uses a new tokenizer (~30% more tokens for the same text) — re-baseli
 Phase 1 is done when all of these hold:
 
 1. A generated 7-day `high_protein` week has **≥5 of 7 days** with total protein in 119–145g.
-2. **No day** falls below the absolute protein floor (105g, pending founder confirmation per §3 Tier 1).
-3. **≥5 of 7 days** under the 130g carb cap and within 1600–2200 kcal.
-4. No Tier-1 violation appears in any generated week.
-5. Weekly repetition and red-meat caps are counted **against the generated week**, not just history.
-6. The validator runs on every generation and surfaces violations rather than writing silently.
-7. `plannerGenerator.js`, the optimizer, and the validator all read thresholds from one module.
-8. **`npm run test:logic` is fully green** — the 4 known failures in `tests/planner.regression.test.js` (tests 12, 25, 26, 27, "total protein out of range: 147") should resolve once the rule engines are unified. If a test encodes an assumption the new model contradicts, update the test deliberately and say so.
-9. New tests cover: budget accounting, the off-day floor, weekly repetition against the generated week, and validator repair/retry.
+2. The **weekly protein total is ≥785g** (85% of nominal). This is the constraint that makes flex days safe — verify it explicitly, not by inference from the daily numbers.
+3. No day falls below the 50g sanity floor. Flex days are otherwise unconstrained — **a 70g day is a pass, not a bug.**
+4. **≥5 of 7 days** under the 130g carb cap and within 1600–2200 kcal.
+5. No Tier-1 violation appears in any generated week.
+6. Weekly repetition and red-meat caps are counted **against the generated week**, not just history.
+7. The validator runs on every generation and surfaces violations rather than writing silently.
+8. `plannerGenerator.js`, the optimizer, and the validator all read thresholds from one module.
+9. **`npm run test:logic` is fully green** — the 4 known failures in `tests/planner.regression.test.js` (tests 12, 25, 26, 27, "total protein out of range: 147") should resolve once the rule engines are unified. Note that the *weekly* model may legitimately invalidate a test that asserts a hard per-day protein range; if so, update the test deliberately and say which assumption changed and why.
+10. New tests cover: weekly-total accounting, budget accounting, flex days passing at low protein, weekly repetition against the generated week, and validator repair/retry.
 
 ---
 
@@ -186,5 +230,8 @@ Phase 1 is done when all of these hold:
 
 On completion, state plainly:
 - Measured adherence of a generated week against each acceptance criterion (re-run the audit method — enumerate combinations, don't estimate)
-- Any rule that the current 41-meal catalog **cannot** satisfy — this is the evidence base for prioritising Phase 2
+- **The actual weekly protein total achieved**, as a percentage of nominal. If it clears 85% comfortably, say by how much — that is the evidence for raising the floor after Phase 2.
+- Any rule that the current 41-meal catalog **cannot** satisfy — the evidence base for prioritising Phase 2
 - Any test whose assumptions were changed, and why
+
+**No open questions remain.** All rule thresholds in §3 are settled; build against them. If the build surfaces a genuine conflict between two settled rules, report it rather than picking a winner.
