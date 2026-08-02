@@ -729,12 +729,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           // Phase 2: AI selects from shortlists (cheap, fast)
           const generatedDays = await generateWeeklyPlan({
             targetDateKeys,
-            mealDatabase: mergedMealDatabase,
             preferences: adjustedPrefs,
             historyMap,
             dailyProteinTarget: adjustedProtein,
             cloudConfig: systemConfig,
             goal: onboardingProfile?.goal,
+            rules,
             shortlists
           });
 
@@ -1551,12 +1551,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       // Phase 2: AI selects from shortlists (cheap, fast)
       const generatedDays = await generateWeeklyPlan({
         targetDateKeys,
-        mealDatabase: mergedMealDatabase,
         preferences: adjustedPrefs,
         historyMap,
         dailyProteinTarget: adjustedProtein,
         cloudConfig: systemConfig,
         goal: onboardingProfile?.goal,
+        rules,
         shortlists
       });
 
