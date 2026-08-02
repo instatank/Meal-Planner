@@ -2026,7 +2026,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
 // To re-enable: set MAINTENANCE_MODE to false (or revert the commit that
 // introduced this block). Nothing below this point runs while it's true —
 // no Firebase, no AI calls, no Firestore reads/writes.
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 
 const MaintenancePage = () => (
   <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
