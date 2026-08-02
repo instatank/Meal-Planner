@@ -96,7 +96,7 @@ Re-measure any of this with `npm run audit:generation` — it enumerates rather 
 npm install
 npm run dev              # local dev (no serverless functions — use `vercel dev` for those)
 npm run build            # production build
-npm run test:logic       # all tests (94, all green)
+npm run test:logic       # all tests (102, all green)
 npm run test:planner     # planner regression only
 npm run audit:generation # enumerate combinations + score a week against the acceptance criteria
 npm run db:pack          # regenerate database packs under database/ + exports/
@@ -138,7 +138,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 3. **IF (Intermittent Fasting) mode.** `two_meals` is declared in onboarding and reconciled in `rules.js`, but has no ruleset — `getRules` throws for it by design. Give it real Tier-1/2/3 definitions and surface it so users can opt into 16/8 or 18/6 without overriding meals manually.
 4. **Tag AI-generated plans** (`_aiGenerated: true`) so future dedup/cleanup logic can tell pushed/AI/manual plans apart.
 5. **Raise the weekly protein floor above 85%** once the catalog grows. A generated week currently clears the 785g floor by ~100g (885g, 95.8% of nominal), but that is with almost no slack on the calorie budget — the headroom is real, the margin is not.
-6. **Bundle size.** 980KB gzipped 240KB. Code-split Firebase + `@google/genai` (largest offenders).
+6. **Bundle size.** 994KB, 245KB gzipped. Code-split Firebase + `@google/genai` (largest offenders).
 
 ---
 
