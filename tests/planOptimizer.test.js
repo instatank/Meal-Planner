@@ -49,12 +49,12 @@ const roomyCatalog = () => ({
   snack: []
 });
 
-const rulesNoTaper = (overrides = {}) => {
+const rulesFor = (overrides = {}) => {
   const base = getRules('high_protein', { dailyProteinTarget: 132 });
   return {
     ...base,
     ...overrides,
-    hard: { ...base.hard, requireDinnerTaper: false, ...(overrides.hard || {}) },
+    hard: { ...base.hard, ...(overrides.hard || {}) },
     budgeted: { ...base.budgeted, ...(overrides.budgeted || {}) },
     scored: { ...base.scored, ...(overrides.scored || {}) }
   };
@@ -63,7 +63,7 @@ const rulesNoTaper = (overrides = {}) => {
 // ─── Tier 1 — hard constraints ──────────────────────────────────────────────
 
 test('enumeration rejects every meal under the per-meal protein floor', () => {
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const database = roomyCatalog();
   database.lunchDinner.push(meal({ name: 'TooLean', p: 8, c: 10, cal: 200 }));
 
@@ -74,7 +74,7 @@ test('enumeration rejects every meal under the per-meal protein floor', () => {
 });
 
 test('enumeration never places the same meal twice in one day', () => {
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const days = enumerateFeasibleDays({ mealDatabase: roomyCatalog(), rules, preferences: {} });
 
   for (const day of days) {
@@ -83,7 +83,7 @@ test('enumeration never places the same meal twice in one day', () => {
 });
 
 test('enumeration excludes meals whose avoid score passes the exclusion threshold', () => {
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const preferences = { avoids: { L1: 3.5, L2: 3 } };
   const days = enumerateFeasibleDays({ mealDatabase: roomyCatalog(), rules, preferences });
 
@@ -92,7 +92,7 @@ test('enumeration excludes meals whose avoid score passes the exclusion threshol
 });
 
 test('enumeration enforces the 50g per-day sanity floor', () => {
-  const rules = rulesNoTaper({ hard: { minMealProtein: 10 } });
+  const rules = rulesFor({ hard: { minMealProtein: 10 } });
   const database = {
     breakfast: [meal({ name: 'Tiny B', p: 12, c: 5, cal: 120 })],
     lunchDinner: [
@@ -113,7 +113,7 @@ test('enumeration enforces the 50g per-day sanity floor', () => {
 // ─── Weekly Tier 1, counted against the week being generated ────────────────
 
 test('weekly repetition ceilings are counted against the generated week', () => {
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const { days } = selectWeek({
     mealDatabase: roomyCatalog(),
     rules,
@@ -144,7 +144,7 @@ test('weekly repetition ceilings are counted against the generated week', () => 
 test('a locked day in the same week counts against the repetition ceilings', () => {
   // Only two lunch/dinner meals exist and the cap is 2 uses each, so the four
   // slots the locked days already occupy leave exactly two free.
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const database = {
     breakfast: [meal({ name: 'B1', p: 40, c: 30, cal: 520 })],
     lunchDinner: [
@@ -182,7 +182,7 @@ test('a locked day in the same week counts against the repetition ceilings', () 
 });
 
 test('the red-meat cap is counted across the generated week, not just history', () => {
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const database = {
     breakfast: [
       meal({ name: 'B1', p: 40, c: 30, cal: 520 }),
@@ -277,7 +277,7 @@ test('a week one gram under the floor, or one day short of the budget, fails', (
 test('the optimizer spends its 2 allowed miss days rather than forcing every day in band', () => {
   // Two very low-protein-but-legal days exist alongside plenty of strong ones.
   // The week must stay within budget, which means at most 2 misses.
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const database = roomyCatalog();
   database.lunchDinner.push(meal({ name: 'Light1', p: 21, c: 8, cal: 260 }));
   database.lunchDinner.push(meal({ name: 'Light2', p: 20, c: 8, cal: 250 }));
@@ -343,7 +343,7 @@ test('a genuinely low flex day is accepted when the rest of the week compensates
 // ─── Determinism and shortlists ─────────────────────────────────────────────
 
 test('week selection is deterministic for fixed input', () => {
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const run = () =>
     selectWeek({ mealDatabase: roomyCatalog(), rules, targetDateKeys: DATES, preferences: {} })
       .days.map((day) => day.mealNames.join('|'));
@@ -353,7 +353,7 @@ test('week selection is deterministic for fixed input', () => {
 });
 
 test('shortlists lead with the deterministic pick and stay inside the legal set', () => {
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const database = roomyCatalog();
   const result = buildWeekPlan({
     mealDatabase: database,
@@ -383,7 +383,7 @@ test('shortlists lead with the deterministic pick and stay inside the legal set'
 });
 
 test('history pushes the optimizer away from meals it just served', () => {
-  const rules = rulesNoTaper();
+  const rules = rulesFor();
   const database = roomyCatalog();
   const historyMap = {
     '2026-08-01': { breakfast: database.breakfast[0], lunch: database.lunchDinner[0], dinner: database.lunchDinner[1] },

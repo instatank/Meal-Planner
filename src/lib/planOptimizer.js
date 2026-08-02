@@ -39,7 +39,6 @@ export const getMealCarbs = (meal) => Number(meal?.macros?.c || 0);
 export const getMealFat = (meal) => Number(meal?.macros?.f || 0);
 export const getMealCalories = (meal) => Number(meal?.cal || 0);
 export const getMealCuisine = (meal) => String(meal?.cuisine || '').toLowerCase();
-export const getMealWeight = (meal) => String(meal?.meal_weight || 'Medium');
 
 const FAMILY_PATTERNS = {
   fish: /\b(fish|salmon|tuna|cod|prawn|shrimp)\b/i,
@@ -114,15 +113,18 @@ export const hashString = (input) => {
 
 // ─── Tier 1 — hard constraints ──────────────────────────────────────────────
 
-/** Is this meal admissible in this slot at all? Tier 1 only. */
-export const isMealAdmissible = (meal, { rules, preferences = {}, slot = null }) => {
+/**
+ * Is this meal admissible in this slot at all? Tier 1 only.
+ *
+ * Note what is deliberately absent: there is no dinner exclusion. The old
+ * filter barred every `Heavy` meal from dinner on a hand-typed weight label,
+ * which removed the three highest-protein dishes in the catalog from the goal
+ * that needs them most. Tapering is scored, by calories, in `scoreDayStandalone`.
+ */
+export const isMealAdmissible = (meal, { rules, preferences = {} }) => {
   if (!meal) return false;
   if (getMealProtein(meal) < rules.hard.minMealProtein) return false;
   if (Number(preferences?.avoids?.[getMealName(meal)] || 0) > rules.hard.avoidScoreExclusiveMax) return false;
-  if (slot === 'dinner' && rules.hard.requireDinnerTaper) {
-    const allowed = rules.hard.dinnerWeightAllowed;
-    if (Array.isArray(allowed) && !allowed.includes(getMealWeight(meal))) return false;
-  }
   return true;
 };
 
@@ -143,9 +145,7 @@ export const summariseDay = (day) => {
 export const satisfiesDayHardConstraints = (day, { rules, preferences = {} }) => {
   const meals = CORE_SLOTS.map((slot) => day?.[slot]);
   if (meals.some((meal) => !meal)) return false;
-  for (let i = 0; i < CORE_SLOTS.length; i += 1) {
-    if (!isMealAdmissible(meals[i], { rules, preferences, slot: CORE_SLOTS[i] })) return false;
-  }
+  if (meals.some((mealForSlot) => !isMealAdmissible(mealForSlot, { rules, preferences }))) return false;
 
   const names = meals.map(getMealName);
   const counts = {};
@@ -168,16 +168,14 @@ export const satisfiesDayHardConstraints = (day, { rules, preferences = {} }) =>
  */
 export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {} }) => {
   const breakfasts = getMealsForSlot(mealDatabase, 'breakfast')
-    .filter((meal) => isMealAdmissible(meal, { rules, preferences, slot: 'breakfast' }));
-  const lunches = getMealsForSlot(mealDatabase, 'lunch')
-    .filter((meal) => isMealAdmissible(meal, { rules, preferences, slot: 'lunch' }));
-  const dinners = getMealsForSlot(mealDatabase, 'dinner')
-    .filter((meal) => isMealAdmissible(meal, { rules, preferences, slot: 'dinner' }));
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
+  const lunchDinners = getMealsForSlot(mealDatabase, 'lunch')
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
 
   const days = [];
   for (const breakfast of breakfasts) {
-    for (const lunch of lunches) {
-      for (const dinner of dinners) {
+    for (const lunch of lunchDinners) {
+      for (const dinner of lunchDinners) {
         const day = { breakfast, lunch, dinner };
         if (!satisfiesDayHardConstraints(day, { rules, preferences })) continue;
         days.push(annotateDay(day, rules));

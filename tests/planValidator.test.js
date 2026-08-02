@@ -46,10 +46,7 @@ const catalog = () => ({
   snack: []
 });
 
-const rules = () => {
-  const base = getRules('high_protein', { dailyProteinTarget: 132 });
-  return { ...base, hard: { ...base.hard, requireDinnerTaper: false } };
-};
+const rules = () => getRules('high_protein', { dailyProteinTarget: 132 });
 
 const validWeek = (database, ruleset) =>
   selectWeek({ mealDatabase: database, rules: ruleset, targetDateKeys: DATES, preferences: {} }).days;

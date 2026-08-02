@@ -104,14 +104,12 @@ const GOAL_DEFINITIONS = {
       redMeatMealsPerWeek: 3,
       // A meal is excluded outright once the user's avoid score passes this.
       avoidScoreExclusiveMax: 3,
-      weeklyProteinFloorRatio: 0.85,
-      // Carried over verbatim from constraintFilter.js so the optimizer swap
-      // changes the engine and not the rules. This excludes every `Heavy` meal
-      // from dinner, which removes the three highest-protein dishes in the
-      // catalog — see docs/EVAL_AND_ROADMAP.md 3.5. Replaced by the scored,
-      // calorie-based taper in a later commit.
-      requireDinnerTaper: true,
-      dinnerWeightAllowed: ['Light', 'Medium']
+      weeklyProteinFloorRatio: 0.85
+      // No hard dinner taper. The old `dinnerWeightAllowed: ['Light','Medium']`
+      // excluded every `Heavy` meal from dinner, which removed the three
+      // highest-protein dishes in the catalog (61g, 56g, 46g) — the goal was
+      // fighting its own rules. Tapering is now Tier 3, by calories, via
+      // `scored.dinnerCalorieShareTarget`.
     },
     budgeted: {
       proteinBandRatio: 0.10,
@@ -158,9 +156,7 @@ const GOAL_DEFINITIONS = {
       maxLunchDinnerRepeatsPerWeek: 2,
       redMeatMealsPerWeek: 4,
       avoidScoreExclusiveMax: 3,
-      weeklyProteinFloorRatio: 0.85,
-      requireDinnerTaper: false,
-      dinnerWeightAllowed: null
+      weeklyProteinFloorRatio: 0.85
     },
     budgeted: {
       proteinBandRatio: 0.10,
