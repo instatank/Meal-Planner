@@ -7,6 +7,7 @@ import {
   DAILY_CARB_HARD_CAP,
   DAILY_PROTEIN_MAX,
   DAILY_PROTEIN_MIN,
+  DAILY_PROTEIN_SANITY_FLOOR,
   FAT_HEAVY_THRESHOLD,
   generatePlanForDate,
   getMealsForType,
@@ -103,21 +104,46 @@ const hasMeatFibreHint = (meal) => {
   return LEGUME_FIBRE_PATTERN.test(text) || VEG_FIBRE_PATTERN.test(text) || WHOLEGRAIN_FIBRE_PATTERN.test(text);
 };
 
+const isIndian = (meal) => String(meal?.cuisine || '').toLowerCase() === 'indian';
+
+/**
+ * Tier 1 — the rules a plan may never break. Under the "aim daily, judge
+ * weekly" model this list is deliberately short: the daily protein band, the
+ * carb cap and the calorie bounds moved to Tier 2 (budgeted across the week),
+ * so a single day is only required to clear the 50g sanity floor.
+ */
 const assertSatisfiesHardConstraints = (plan) => {
+  const meals = [plan.breakfast, plan.lunch, plan.dinner];
+  const totalProtein = meals.reduce((sum, meal) => sum + Number(meal?.protein || 0), 0);
+  const names = meals.map((meal) => String(meal?.name || ''));
+
+  assert.ok(totalProtein >= DAILY_PROTEIN_SANITY_FLOOR, `day falls below the sanity floor: ${totalProtein}g`);
+  assert.ok(meals.every((meal) => Number(meal?.protein || 0) >= MIN_MEAL_PROTEIN), 'each meal must be at least 20g protein');
+  assert.equal(new Set(names).size, names.length, `no meal may appear twice in one day: ${names.join(' | ')}`);
+};
+
+/**
+ * Tier 2 + Tier 3 — what the generator *aims* for. A single generated day is
+ * expected to hit these; a week is only required to hit them on 5 of 7 days,
+ * which is asserted in tests/planOptimizer.test.js instead.
+ */
+const assertDayHitsItsTargets = (plan) => {
   const meals = [plan.breakfast, plan.lunch, plan.dinner];
   const totalProtein = meals.reduce((sum, meal) => sum + Number(meal?.protein || 0), 0);
   const totalCarbs = meals.reduce((sum, meal) => sum + getMacro(meal, 'c'), 0);
   const proteinValues = meals.map((meal) => Number(meal?.protein || 0));
 
-  assert.ok(totalProtein >= DAILY_PROTEIN_MIN && totalProtein <= DAILY_PROTEIN_MAX, `total protein out of range: ${totalProtein}`);
+  assert.ok(
+    totalProtein >= DAILY_PROTEIN_MIN && totalProtein <= DAILY_PROTEIN_MAX,
+    `total protein out of band: ${totalProtein}`
+  );
   assert.ok(totalCarbs <= DAILY_CARB_HARD_CAP, `total carbs exceed cap: ${totalCarbs}`);
-  assert.ok(meals.every((meal) => Number(meal?.protein || 0) >= MIN_MEAL_PROTEIN), 'each meal must be at least 20g protein');
   assert.ok(meals.filter(isHeavyMeal).length <= 1, 'max 1 heavy meal/day');
   assert.ok(meals.filter(isCarbHeavyMeal).length <= 1, 'max 1 carb-heavy meal/day');
   assert.ok(meals.filter(isFatHeavyMeal).length <= 1, 'max 1 fat-heavy meal/day');
   assert.ok(meals.every((meal) => !hasRepeatedPrimaryFamilyInsideMeal(meal)), 'no repeated primary family inside one meal');
   assert.ok(meals.every((meal) => hasMeatFibreHint(meal)), 'meat meals must include fibre hints');
-  assert.ok((plan.lunch?.cuisine === 'indian') !== (plan.dinner?.cuisine === 'indian'), 'lunch+dinner must split indian/non-indian');
+  assert.ok(!(isIndian(plan.lunch) && isIndian(plan.dinner)), 'lunch+dinner should not both be Indian');
 
   const lunchFamily = getPrimaryFamily(plan.lunch);
   const dinnerFamily = getPrimaryFamily(plan.dinner);
@@ -154,17 +180,22 @@ test('planner regression snapshot for fixed fixture', () => {
 
   assert.deepEqual(snapshot, {
     breakfast: 'Boiled eggs + ham sandwich',
-    lunch: 'Chicken curry + jowar roti + dal',
-    dinner: 'Grilled fish + pumpkin salad'
+    lunch: 'Chicken curry + jowar roti',
+    dinner: 'Grilled salmon + sauteed veg + garlic rice'
   });
 });
 
-test('generated fixture plan satisfies V1 hard constraints', () => {
+test('generated fixture plan satisfies Tier-1 hard constraints', () => {
   const generated = runFixture();
   assertSatisfiesHardConstraints(generated);
 });
 
-test('hard constraints hold across a date sample', () => {
+test('generated fixture plan hits its daily targets', () => {
+  const generated = runFixture();
+  assertDayHitsItsTargets(generated);
+});
+
+test('hard constraints and daily targets hold across a date sample', () => {
   const dateKeys = ['2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23'];
 
   for (const dateKey of dateKeys) {
@@ -175,7 +206,23 @@ test('hard constraints hold across a date sample', () => {
       mealDatabase
     });
     assertSatisfiesHardConstraints(generated);
+    assertDayHitsItsTargets(generated);
   }
+});
+
+test('a low-protein flex day passes Tier 1 but is flagged as off-target', () => {
+  // The direct implementation of "a 70g day is a pass, not a bug": the same
+  // day clears every hard rule while missing the band.
+  const flexDay = {
+    breakfast: mealDatabase.breakfast.find((m) => m.name === 'Egg white omelette + avocado'),
+    lunch: mealDatabase.lunchDinner.find((m) => m.name === 'Avocado and smoked salmon salad'),
+    dinner: mealDatabase.lunchDinner.find((m) => m.name === 'Avocado and smoked chicken salad')
+  };
+  const totalProtein = [flexDay.breakfast, flexDay.lunch, flexDay.dinner]
+    .reduce((sum, meal) => sum + Number(meal.protein || 0), 0);
+
+  assert.ok(totalProtein < DAILY_PROTEIN_MIN, `expected an off-band day, got ${totalProtein}g`);
+  assert.doesNotThrow(() => assertSatisfiesHardConstraints(flexDay));
 });
 
 test('lunch and dinner both draw from shared lunchDinner pool', () => {

@@ -1,12 +1,47 @@
+/**
+ * plannerGenerator.js — the deterministic single-day generator.
+ *
+ * Runs on goal change, onboarding, and when backfilling a past day that has no
+ * plan. It used to carry its own copy of every threshold, which disagreed with
+ * the copy in the constraint filter — the same app produced plans under two
+ * rulebooks depending on which button you pressed. Every limit now comes from
+ * `rules.js`.
+ *
+ * Under the "aim daily, judge weekly" model this generator *aims* at the daily
+ * protein band but does not treat it as a hard constraint: the only per-day
+ * hard rules are Tier 1 (per-meal protein floor, no meal twice in a day, the
+ * 50g sanity floor, and heavily-avoided meals). Everything else — band
+ * proximity, the carb cap, calorie bounds, variety, cuisine and fibre — is
+ * Tier 3 scoring. A week's soundness is enforced by the week optimizer and the
+ * validator, not by rejecting individual days here.
+ */
+
+import {
+  CARB_HEAVY_THRESHOLD,
+  FAT_HEAVY_THRESHOLD,
+  HEAVY_MEAL_CALORIES,
+  PROTEIN_BALANCE_MAX_GAP,
+  getRules,
+  getRulesForProfile
+} from './rules.js';
+
 export const CORE_MEAL_TYPES = ['breakfast', 'lunch', 'dinner'];
-export const DAILY_PROTEIN_MIN = 105;
-export const DAILY_PROTEIN_MAX = 140;
-export const DEFAULT_DAILY_PROTEIN_TARGET = 120;
-export const DAILY_CARB_HARD_CAP = 130;
-export const MIN_MEAL_PROTEIN = 20;
-export const CARB_HEAVY_THRESHOLD = 55;
-export const FAT_HEAVY_THRESHOLD = 25;
-export const PROTEIN_BALANCE_MAX_GAP = 40;
+
+export { CARB_HEAVY_THRESHOLD, FAT_HEAVY_THRESHOLD, HEAVY_MEAL_CALORIES, PROTEIN_BALANCE_MAX_GAP };
+
+// Back-compat numeric exports. These are the *default* high-protein figures;
+// anything that cares about a specific goal or protein target should call
+// `getRules` rather than reading these.
+const DEFAULT_RULES = getRules('high_protein', { dailyProteinTarget: 120 });
+
+export const DEFAULT_DAILY_PROTEIN_TARGET = DEFAULT_RULES.dailyProteinTarget;
+export const DAILY_PROTEIN_MIN = DEFAULT_RULES.budgeted.dailyProteinMin;
+export const DAILY_PROTEIN_MAX = DEFAULT_RULES.budgeted.dailyProteinMax;
+export const DAILY_PROTEIN_SANITY_FLOOR = DEFAULT_RULES.hard.dailyProteinSanityFloor;
+export const DAILY_CARB_HARD_CAP = DEFAULT_RULES.budgeted.dailyCarbCap;
+export const MIN_MEAL_PROTEIN = DEFAULT_RULES.hard.minMealProtein;
+
+// ─── Meal accessors ─────────────────────────────────────────────────────────
 
 const PRIMARY_PROTEIN_FAMILIES = new Set(['fish', 'chicken', 'red-meat']);
 
@@ -44,6 +79,48 @@ export const createDefaultPlan = (mealDatabase) => ({
   dinner: getMealsForType(mealDatabase, 'dinner')[0]
 });
 
+const getMealName = (meal) => String(meal?.name || meal?.canonical_name || '');
+const getMealProtein = (meal) => Number(meal?.protein ?? meal?.macros?.p ?? 0);
+const getMealMacro = (meal, macroKey) => Number(meal?.macros?.[macroKey] || 0);
+const getMealCalories = (meal) => Number(meal?.cal || 0);
+
+const getMealFamilyText = (meal) => `${meal?.components?.protein || ''} ${meal?.name || ''}`.toLowerCase();
+
+const getPrimaryProteinFamily = (meal) => {
+  const text = getMealFamilyText(meal);
+  if (FAMILY_TEST_PATTERNS.fish.test(text)) return 'fish';
+  if (FAMILY_TEST_PATTERNS.chicken.test(text)) return 'chicken';
+  if (FAMILY_TEST_PATTERNS['red-meat'].test(text)) return 'red-meat';
+  return null;
+};
+
+const hasRepeatedPrimaryFamilyInsideMeal = (meal) => {
+  const mealName = String(meal?.name || '').toLowerCase();
+  return Object.values(FAMILY_COUNT_PATTERNS).some((pattern) => {
+    const matches = mealName.match(pattern);
+    return (matches?.length || 0) >= 2;
+  });
+};
+
+const getMealFibreScore = (meal) => {
+  const text = `${meal?.name || ''} ${meal?.components?.carb || ''} ${meal?.components?.veg || ''}`.toLowerCase();
+  let score = 0;
+  if (LEGUME_FIBRE_PATTERN.test(text)) score += 2;
+  if (VEG_FIBRE_PATTERN.test(text)) score += 1;
+  if (WHOLEGRAIN_FIBRE_PATTERN.test(text)) score += 1;
+  return score;
+};
+
+const isMeatMeal = (meal) => PRIMARY_PROTEIN_FAMILIES.has(getPrimaryProteinFamily(meal));
+const isHeavyMeal = (meal) =>
+  getMealCalories(meal) > HEAVY_MEAL_CALORIES ||
+  (getMealMacro(meal, 'f') > FAT_HEAVY_THRESHOLD && getMealMacro(meal, 'c') > 35);
+const isCarbHeavyMeal = (meal) => getMealMacro(meal, 'c') >= CARB_HEAVY_THRESHOLD;
+const isFatHeavyMeal = (meal) => getMealMacro(meal, 'f') > FAT_HEAVY_THRESHOLD;
+const hasFibre = (meal) => Boolean(meal?.has_fibre) || getMealFibreScore(meal) > 0;
+
+// ─── Date helpers ───────────────────────────────────────────────────────────
+
 const formatDateKeyFromUtcDate = (date) => {
   const year = String(date.getUTCFullYear());
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -58,7 +135,6 @@ const parseDateKey = (dateKey) => {
     if (!Number.isNaN(parsed.getTime())) return parsed;
     return new Date(Number.NaN);
   }
-
   const [, year, month, day] = matches;
   return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
 };
@@ -70,398 +146,251 @@ const shiftDateKey = (dateKey, offsetDays) => {
   return formatDateKeyFromUtcDate(date);
 };
 
-const hashString = (input) => {
+export const hashString = (input) => {
   let hash = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    hash = (hash << 5) - hash + input.charCodeAt(i);
+  for (let i = 0; i < String(input).length; i += 1) {
+    hash = (hash << 5) - hash + String(input).charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash);
 };
 
 const getRecentMealCounts = (plans, dateKey, lookbackDays = 10) => {
-  const counts = {
-    breakfast: {},
-    lunch: {},
-    dinner: {}
-  };
-
+  const counts = {};
   for (let i = 1; i <= lookbackDays; i += 1) {
     const key = shiftDateKey(dateKey, -i);
-    const dayPlan = plans[key];
+    const dayPlan = plans?.[key];
     if (!dayPlan) continue;
-
     for (const mealType of CORE_MEAL_TYPES) {
-      const name = dayPlan[mealType]?.name;
+      const name = getMealName(dayPlan[mealType]);
       if (!name) continue;
-      counts[mealType][name] = (counts[mealType][name] || 0) + 1;
+      // Recency-weighted: yesterday's repeat stings more than last week's.
+      counts[name] = (counts[name] || 0) + Math.max(0.2, 1 - (i - 1) / lookbackDays);
     }
   }
-
   return counts;
 };
 
-const getDayTheme = (dateKey) => {
-  const seed = hashString(dateKey);
-  return {
-    preferIndian: seed % 3 === 0,
-    preferLowCarb: seed % 4 === 0,
-    preferHighProtein: seed % 5 === 0
-  };
+// ─── Tier 1 — hard constraints, per day ─────────────────────────────────────
+
+/**
+ * Is this meal admissible in this slot at all? Tier 1 only.
+ */
+export const isMealAdmissible = (meal, { rules, preferences }) => {
+  if (!meal) return false;
+  if (getMealProtein(meal) < rules.hard.minMealProtein) return false;
+  const avoidScore = Number(preferences?.avoids?.[getMealName(meal)] || 0);
+  if (avoidScore > rules.hard.avoidScoreExclusiveMax) return false;
+  return true;
 };
 
-const isCompletePlan = (plan) => CORE_MEAL_TYPES.every((mealType) => Boolean(plan[mealType]));
+/**
+ * Tier-1 check for a complete day. Deliberately short: the daily protein band,
+ * the carb cap and the calorie bounds are Tier 2 (budgeted across the week),
+ * not grounds to reject a single day.
+ */
+export const satisfiesDayHardConstraints = (day, { rules, preferences }) => {
+  const meals = CORE_MEAL_TYPES.map((slot) => day?.[slot]);
+  if (meals.some((meal) => !meal)) return false;
+  if (meals.some((meal) => !isMealAdmissible(meal, { rules, preferences }))) return false;
 
-const getPlanMeals = (plan) => CORE_MEAL_TYPES.map((mealType) => plan[mealType]).filter(Boolean);
+  const names = meals.map(getMealName);
+  const uniqueNames = new Set(names);
+  if (uniqueNames.size < names.length) {
+    // maxSameMealPerDay of 1 means every slot must hold a distinct meal.
+    const maxPerDay = rules.hard.maxSameMealPerDay;
+    for (const name of uniqueNames) {
+      if (names.filter((n) => n === name).length > maxPerDay) return false;
+    }
+  }
 
-const getMealMacro = (meal, macroKey) => Number(meal?.macros?.[macroKey] || 0);
-
-const getMealFamilyText = (meal) => `${meal?.components?.protein || ''} ${meal?.name || ''}`.toLowerCase();
-
-const getMealNameText = (meal) => String(meal?.name || '').toLowerCase();
-
-const getPrimaryProteinFamily = (meal) => {
-  const text = getMealFamilyText(meal);
-  if (FAMILY_TEST_PATTERNS.fish.test(text)) return 'fish';
-  if (FAMILY_TEST_PATTERNS.chicken.test(text)) return 'chicken';
-  if (FAMILY_TEST_PATTERNS['red-meat'].test(text)) return 'red-meat';
-  return null;
-};
-
-const hasRepeatedPrimaryFamilyInsideMeal = (meal) => {
-  const mealName = getMealNameText(meal);
-  return Object.values(FAMILY_COUNT_PATTERNS).some((pattern) => {
-    const matches = mealName.match(pattern);
-    return (matches?.length || 0) >= 2;
-  });
-};
-
-const getMealFibreScore = (meal) => {
-  const text = `${meal?.name || ''} ${meal?.components?.carb || ''} ${meal?.components?.veg || ''}`.toLowerCase();
-  let score = 0;
-
-  if (LEGUME_FIBRE_PATTERN.test(text)) score += 2;
-  if (VEG_FIBRE_PATTERN.test(text)) score += 1;
-  if (WHOLEGRAIN_FIBRE_PATTERN.test(text)) score += 1;
-
-  return score;
-};
-
-const isMeatMeal = (meal) => PRIMARY_PROTEIN_FAMILIES.has(getPrimaryProteinFamily(meal));
-
-const isHeavyMeal = (meal) => {
-  const carbs = getMealMacro(meal, 'c');
-  const fat = getMealMacro(meal, 'f');
-  return (meal?.cal || 0) > 600 || (fat > 25 && carbs > 35);
-};
-
-const isCarbHeavyMeal = (meal) => getMealMacro(meal, 'c') >= CARB_HEAVY_THRESHOLD;
-
-const isFatHeavyMeal = (meal) => getMealMacro(meal, 'f') > FAT_HEAVY_THRESHOLD;
-
-const hasValidLunchDinnerCuisinePairing = (plan) => {
-  const { lunch, dinner } = plan;
-  if (!lunch || !dinner) return true;
-  return (lunch.cuisine === 'indian') !== (dinner.cuisine === 'indian');
-};
-
-const hasValidLunchDinnerProteinPairing = (plan) => {
-  const { lunch, dinner } = plan;
-  if (!lunch || !dinner) return true;
-
-  const lunchFamily = getPrimaryProteinFamily(lunch);
-  const dinnerFamily = getPrimaryProteinFamily(dinner);
-
-  if (!PRIMARY_PROTEIN_FAMILIES.has(lunchFamily) || !PRIMARY_PROTEIN_FAMILIES.has(dinnerFamily)) return true;
-  return lunchFamily !== dinnerFamily;
-};
-
-const hasBalancedProteinDistribution = (plan) => {
-  if (!isCompletePlan(plan)) return true;
-
-  const proteinByMeal = CORE_MEAL_TYPES.map((mealType) => Number(plan[mealType]?.protein || 0));
-  const minProtein = Math.min(...proteinByMeal);
-  const maxProtein = Math.max(...proteinByMeal);
-
-  return maxProtein - minProtein <= PROTEIN_BALANCE_MAX_GAP;
-};
-
-const satisfiesHardConstraints = (plan) => {
-  const meals = getPlanMeals(plan);
-  const totalProtein = meals.reduce((sum, meal) => sum + Number(meal?.protein || 0), 0);
-  const totalCarbs = meals.reduce((sum, meal) => sum + getMealMacro(meal, 'c'), 0);
-
-  if (meals.some((meal) => Number(meal?.protein || 0) < MIN_MEAL_PROTEIN)) return false;
-  if (meals.some(hasRepeatedPrimaryFamilyInsideMeal)) return false;
-  if (meals.some((meal) => isMeatMeal(meal) && getMealFibreScore(meal) < 1)) return false;
-
-  if (!hasValidLunchDinnerCuisinePairing(plan)) return false;
-  if (!hasValidLunchDinnerProteinPairing(plan)) return false;
-
-  if (meals.filter(isHeavyMeal).length > 1) return false;
-  if (meals.filter(isCarbHeavyMeal).length > 1) return false;
-  if (meals.filter(isFatHeavyMeal).length > 1) return false;
-
-  if (totalCarbs > DAILY_CARB_HARD_CAP) return false;
-  if (totalProtein > DAILY_PROTEIN_MAX) return false;
-
-  if (!isCompletePlan(plan)) return true;
-
-  if (totalProtein < DAILY_PROTEIN_MIN) return false;
-  if (!hasBalancedProteinDistribution(plan)) return false;
+  const totalProtein = meals.reduce((sum, meal) => sum + getMealProtein(meal), 0);
+  if (totalProtein < rules.hard.dailyProteinSanityFloor) return false;
 
   return true;
 };
 
-const serializePlanKey = (plan) => CORE_MEAL_TYPES.map((mealType) => plan[mealType]?.name || '_').join('|');
+export const summariseDay = (day) => {
+  const meals = CORE_MEAL_TYPES.map((slot) => day?.[slot]).filter(Boolean);
+  return {
+    protein: meals.reduce((sum, meal) => sum + getMealProtein(meal), 0),
+    carbs: meals.reduce((sum, meal) => sum + getMealMacro(meal, 'c'), 0),
+    fat: meals.reduce((sum, meal) => sum + getMealMacro(meal, 'f'), 0),
+    calories: meals.reduce((sum, meal) => sum + getMealCalories(meal), 0)
+  };
+};
 
-const canCompletePlanWithHardConstraints = ({ plan, mealDatabase, cache }) => {
-  const cacheKey = serializePlanKey(plan);
-  if (cache.has(cacheKey)) return cache.get(cacheKey);
+// ─── Tier 3 — scoring ───────────────────────────────────────────────────────
 
-  if (!satisfiesHardConstraints(plan)) {
-    cache.set(cacheKey, false);
-    return false;
+/**
+ * Rank a complete, Tier-1-legal day. Higher is better. Never rejects.
+ */
+export const scoreDay = (day, { rules, preferences = {}, recentCounts = {}, dateKey = '' }) => {
+  const weights = rules.scored;
+  const meals = CORE_MEAL_TYPES.map((slot) => day[slot]);
+  const totals = summariseDay(day);
+  let score = 0;
+
+  // Aim daily: proximity to the protein target, with a cliff outside the band.
+  const { dailyProteinMin, dailyProteinMax, dailyCarbCap, dailyCalorieMin, dailyCalorieMax } = rules.budgeted;
+  if (totals.protein < dailyProteinMin) {
+    score -= weights.outOfBandPenalty + (dailyProteinMin - totals.protein) * weights.proteinProximity;
+  } else if (totals.protein > dailyProteinMax) {
+    score -= weights.outOfBandPenalty + (totals.protein - dailyProteinMax) * weights.proteinProximity;
+  } else {
+    score -= Math.abs(totals.protein - rules.dailyProteinTarget) * weights.proteinProximity * 0.25;
   }
 
-  const nextMealType = CORE_MEAL_TYPES.find((mealType) => !plan[mealType]);
-  if (!nextMealType) {
-    cache.set(cacheKey, true);
-    return true;
+  if (Number.isFinite(dailyCarbCap) && totals.carbs > dailyCarbCap) {
+    score -= (totals.carbs - dailyCarbCap) * weights.carbOverCapPenalty;
+  }
+  if (totals.calories < dailyCalorieMin) {
+    score -= (dailyCalorieMin - totals.calories) * weights.calorieOutOfBoundsPenalty;
+  } else if (totals.calories > dailyCalorieMax) {
+    score -= (totals.calories - dailyCalorieMax) * weights.calorieOutOfBoundsPenalty;
   }
 
-  const nextCandidates = getMealsForType(mealDatabase, nextMealType);
-  for (const candidate of nextCandidates) {
-    const candidatePlan = {
-      ...plan,
-      [nextMealType]: candidate
-    };
-    if (canCompletePlanWithHardConstraints({ plan: candidatePlan, mealDatabase, cache })) {
-      cache.set(cacheKey, true);
-      return true;
+  // Dinner tapering — calorie-based and scored, never a hard exclusion.
+  if (totals.calories > 0) {
+    const dinnerShare = getMealCalories(day.dinner) / totals.calories;
+    if (dinnerShare > weights.dinnerCalorieShareTarget) {
+      score -= (dinnerShare - weights.dinnerCalorieShareTarget) * weights.dinnerTaperPenalty * 10;
     }
   }
 
-  cache.set(cacheKey, false);
-  return false;
-};
-
-const scoreMealCandidate = ({
-  meal,
-  mealType,
-  dateKey,
-  preferences,
-  partialPlan,
-  remainingProteinTarget,
-  recentCounts,
-  dayTheme,
-  yesterdayPlan
-}) => {
-  const accepts = preferences?.accepts || {};
-  const avoids = preferences?.avoids || {};
-  const edits = preferences?.edits || {};
-  const mealName = meal.name;
-
-  let score = 0;
-
-  score += Math.min((accepts[mealName] || 0) * 0.8, 5);
-  score += Math.min((edits[mealName] || 0) * 0.35, 2);
-  score -= Math.min((avoids[mealName] || 0) * 0.95, 5);
-
-  const proteinNeed = Math.max(remainingProteinTarget, 0);
-  if (proteinNeed > 0) score += Math.min(meal.protein, proteinNeed) * 0.24;
-  score += meal.protein * 0.03;
-
-  if (mealType !== 'breakfast') {
-    score -= (meal.cal || 0) / 650;
+  // Protein-family diversity within the day.
+  const families = meals.map(getPrimaryProteinFamily).filter(Boolean);
+  const familyCounts = {};
+  for (const family of families) familyCounts[family] = (familyCounts[family] || 0) + 1;
+  for (const count of Object.values(familyCounts)) {
+    if (count > 1) score -= (count - 1) * weights.sameProteinFamilyTwiceInDayPenalty;
   }
 
-  const isLowCarb = meal.components?.carb === 'No carb';
-  if (dayTheme.preferLowCarb) score += isLowCarb ? 2.2 : -0.6;
-  if (dayTheme.preferIndian && meal.cuisine === 'indian') score += 1.8;
-  if (dayTheme.preferHighProtein && meal.protein >= 40) score += 1.4;
-
-  if (mealType === 'dinner' && partialPlan.lunch?.cuisine) {
-    if (meal.cuisine === partialPlan.lunch.cuisine) score -= 1.5;
-    else score += 0.8;
+  // Lunch and dinner should not read as the same meal twice.
+  if (day.lunch?.cuisine && day.dinner?.cuisine && day.lunch.cuisine === day.dinner.cuisine) {
+    score -= weights.lunchDinnerCuisineClashPenalty;
   }
 
-  const tieKey = `${dateKey}-${mealType}-${mealName}`;
-  const tieBreaker = (hashString(tieKey) % 100) / 1000;
-  score += tieBreaker;
+  // Fibre presence, and the old "meat meals should carry fibre" preference.
+  score += meals.filter(hasFibre).length * weights.fibreBonus;
+  score -= meals.filter((meal) => isMeatMeal(meal) && getMealFibreScore(meal) < 1).length * weights.fibreBonus;
+
+  // Meal-shape balance: these were hard rules in the old generator and are now
+  // preferences, so a legitimate treat day is possible.
+  score -= Math.max(0, meals.filter(isHeavyMeal).length - 1) * weights.fibreBonus * 2;
+  score -= Math.max(0, meals.filter(isCarbHeavyMeal).length - 1) * weights.fibreBonus * 2;
+  score -= Math.max(0, meals.filter(isFatHeavyMeal).length - 1) * weights.fibreBonus * 2;
+  score -= meals.filter(hasRepeatedPrimaryFamilyInsideMeal).length * weights.sameProteinFamilyTwiceInDayPenalty;
+
+  const proteinValues = meals.map(getMealProtein);
+  const proteinGap = Math.max(...proteinValues) - Math.min(...proteinValues);
+  if (proteinGap > PROTEIN_BALANCE_MAX_GAP) {
+    score -= (proteinGap - PROTEIN_BALANCE_MAX_GAP) * 0.15;
+  }
+
+  // User preference signal.
+  const accepts = preferences.accepts || {};
+  const edits = preferences.edits || {};
+  const avoids = preferences.avoids || {};
+  for (const meal of meals) {
+    const name = getMealName(meal);
+    score += Math.min(Number(accepts[name] || 0), 4) * weights.preferenceAcceptWeight;
+    score += Math.min(Number(edits[name] || 0), 3) * weights.preferenceEditWeight;
+    score -= Math.min(Number(avoids[name] || 0), 4) * weights.preferenceAvoidWeight;
+  }
+
+  // Anti-greedy: prefer meals the recent history has not just served.
+  for (const meal of meals) {
+    score -= Number(recentCounts[getMealName(meal)] || 0) * weights.historyRepeatPenalty;
+  }
+
+  // Deterministic tie-break so identical scores resolve the same way forever.
+  const tieKey = `${dateKey}|${meals.map(getMealName).join('|')}`;
+  score += (hashString(tieKey) % 1000) / 100000;
 
   return score;
 };
 
-const pickMealForType = ({
-  mealType,
-  dateKey,
-  preferences,
-  partialPlan,
-  remainingProteinTarget,
-  recentCounts,
-  dayTheme,
-  yesterdayPlan,
-  mealDatabase,
-  hardConstraintCache
-}) => {
-  const candidates = getMealsForType(mealDatabase, mealType);
-  const constrainedCandidates = candidates.filter((meal) => {
-    const candidatePlan = {
-      ...partialPlan,
-      [mealType]: meal
-    };
-    return canCompletePlanWithHardConstraints({
-      plan: candidatePlan,
-      mealDatabase,
-      cache: hardConstraintCache
-    });
-  });
+// ─── Day enumeration ────────────────────────────────────────────────────────
 
-  const scoringCandidates = constrainedCandidates.length > 0 ? constrainedCandidates : candidates;
+/**
+ * Every Tier-1-legal breakfast/lunch/dinner combination for one date.
+ *
+ * The catalog is small (5 legal breakfasts x 26 lunch/dinner meals gives a few
+ * thousand combinations), so exhaustive enumeration is both viable and far
+ * simpler to reason about than the old slot-by-slot filter — which never
+ * committed a slot and so left five of its ten rules as dead code.
+ */
+export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {} }) => {
+  const breakfasts = getMealsForType(mealDatabase, 'breakfast')
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
+  const lunchDinners = getMealsForType(mealDatabase, 'lunch')
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
 
-  let bestMeal = scoringCandidates[0];
-  let bestScore = Number.NEGATIVE_INFINITY;
-
-  for (const meal of scoringCandidates) {
-    const score = scoreMealCandidate({
-      meal,
-      mealType,
-      dateKey,
-      preferences,
-      partialPlan,
-      remainingProteinTarget,
-      recentCounts,
-      dayTheme,
-      yesterdayPlan
-    });
-    if (score > bestScore) {
-      bestScore = score;
-      bestMeal = meal;
+  const days = [];
+  for (const breakfast of breakfasts) {
+    for (const lunch of lunchDinners) {
+      for (const dinner of lunchDinners) {
+        const day = { breakfast, lunch, dinner };
+        if (!satisfiesDayHardConstraints(day, { rules, preferences })) continue;
+        days.push({ ...day, totals: summariseDay(day) });
+      }
     }
   }
-
-  return bestMeal;
+  return days;
 };
 
+// ─── Public API ─────────────────────────────────────────────────────────────
+
+/**
+ * Build one day's plan deterministically.
+ *
+ * @param {Object} params
+ * @param {string} params.dateKey        YYYY-MM-DD
+ * @param {Object} params.plans          existing plans by date, for anti-repeat
+ * @param {Object} params.preferences    { accepts, avoids, edits, skips }
+ * @param {Object} params.mealDatabase   { breakfast, lunchDinner, snack }
+ * @param {string} [params.goal]         defaults to high_protein
+ * @param {number} [params.dailyProteinTarget]
+ */
 export const generatePlanForDate = ({
   dateKey,
   plans = {},
   preferences = {},
   mealDatabase,
+  goal,
   dailyProteinTarget = DEFAULT_DAILY_PROTEIN_TARGET
 }) => {
+  const rules = getRulesForProfile(goal, { dailyProteinTarget });
   const normalizedPreferences = normalizePreferences(preferences);
-  const dayTheme = getDayTheme(dateKey);
   const recentCounts = getRecentMealCounts(plans, dateKey, 10);
-  const yesterdayPlan = plans[shiftDateKey(dateKey, -1)] || null;
-  const hardConstraintCache = new Map();
 
-  const parsedProteinTarget = Number(dailyProteinTarget);
-  const clampedProteinTarget = Number.isFinite(parsedProteinTarget)
-    ? Math.min(DAILY_PROTEIN_MAX, Math.max(DAILY_PROTEIN_MIN, parsedProteinTarget))
-    : DEFAULT_DAILY_PROTEIN_TARGET;
+  const candidates = enumerateFeasibleDays({ mealDatabase, rules, preferences: normalizedPreferences });
 
-  let remainingProtein = clampedProteinTarget;
-  const generated = {};
+  if (candidates.length === 0) {
+    // Nothing satisfies Tier 1 — hand back the least-bad complete plan we can
+    // assemble rather than nothing at all. The validator will flag it.
+    return createDefaultPlan(mealDatabase);
+  }
 
-  generated.breakfast = pickMealForType({
-    mealType: 'breakfast',
-    dateKey,
-    preferences: normalizedPreferences,
-    partialPlan: generated,
-    remainingProteinTarget: Math.min(remainingProtein, 35),
-    recentCounts,
-    dayTheme,
-    yesterdayPlan,
-    mealDatabase,
-    hardConstraintCache
-  });
-
-  remainingProtein -= generated.breakfast?.protein || 0;
-
-  generated.lunch = pickMealForType({
-    mealType: 'lunch',
-    dateKey,
-    preferences: normalizedPreferences,
-    partialPlan: generated,
-    remainingProteinTarget: Math.max(remainingProtein, 35),
-    recentCounts,
-    dayTheme,
-    yesterdayPlan,
-    mealDatabase,
-    hardConstraintCache
-  });
-
-  remainingProtein -= generated.lunch?.protein || 0;
-
-  generated.dinner = pickMealForType({
-    mealType: 'dinner',
-    dateKey,
-    preferences: normalizedPreferences,
-    partialPlan: generated,
-    remainingProteinTarget: Math.max(remainingProtein, 25),
-    recentCounts,
-    dayTheme,
-    yesterdayPlan,
-    mealDatabase,
-    hardConstraintCache
-  });
-
-  if (
-    yesterdayPlan &&
-    CORE_MEAL_TYPES.every((mealType) => generated[mealType]?.name && generated[mealType]?.name === yesterdayPlan[mealType]?.name)
-  ) {
-    const lunchOptions = getMealsForType(mealDatabase, 'lunch');
-    const alternateLunches = lunchOptions.filter((meal) => {
-      if (meal.name === generated.lunch?.name) return false;
-      return satisfiesHardConstraints({
-        ...generated,
-        lunch: meal
-      });
+  let best = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  for (const candidate of candidates) {
+    const score = scoreDay(candidate, {
+      rules,
+      preferences: normalizedPreferences,
+      recentCounts,
+      dateKey
     });
-    if (alternateLunches.length > 0) {
-      const altIdx = hashString(dateKey) % alternateLunches.length;
-      generated.lunch = alternateLunches[altIdx];
+    if (score > bestScore) {
+      bestScore = score;
+      best = candidate;
     }
   }
 
-  const finalPlan = {
-    breakfast: generated.breakfast || getMealsForType(mealDatabase, 'breakfast')[0],
-    lunch: generated.lunch || getMealsForType(mealDatabase, 'lunch')[0],
-    dinner: generated.dinner || getMealsForType(mealDatabase, 'dinner')[0]
+  return {
+    breakfast: best.breakfast,
+    lunch: best.lunch,
+    dinner: best.dinner
   };
-
-  if (satisfiesHardConstraints(finalPlan)) return finalPlan;
-
-  if (
-    canCompletePlanWithHardConstraints({
-      plan: {},
-      mealDatabase,
-      cache: hardConstraintCache
-    })
-  ) {
-    let recovery = {};
-    for (const mealType of CORE_MEAL_TYPES) {
-      const options = getMealsForType(mealDatabase, mealType);
-      const next = options.find((meal) =>
-        canCompletePlanWithHardConstraints({
-          plan: {
-            ...recovery,
-            [mealType]: meal
-          },
-          mealDatabase,
-          cache: hardConstraintCache
-        })
-      );
-      if (!next) break;
-      recovery = {
-        ...recovery,
-        [mealType]: next
-      };
-    }
-    if (isCompletePlan(recovery) && satisfiesHardConstraints(recovery)) return recovery;
-  }
-
-  return finalPlan;
 };
