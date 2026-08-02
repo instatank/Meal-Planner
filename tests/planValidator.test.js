@@ -1,0 +1,358 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  TIER,
+  formatViolations,
+  repairWeek,
+  resolveWeek,
+  validateAndRepairWeek,
+  validateWeek
+} from '../src/lib/planValidator.js';
+import { selectWeek } from '../src/lib/planOptimizer.js';
+import { getRules } from '../src/lib/rules.js';
+
+const DATES = ['2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09'];
+
+const meal = ({ name, p, c = 20, f = 10, cal, cuisine = 'continental', weight = 'Medium', family = 'vegetarian', fibre = true }) => ({
+  name,
+  canonical_name: name,
+  protein: p,
+  cal,
+  macros: { p, c, f },
+  cuisine,
+  meal_weight: weight,
+  has_fibre: fibre,
+  tags: { protein_family: family }
+});
+
+const catalog = () => ({
+  breakfast: [
+    meal({ name: 'B1', p: 40, c: 30, cal: 520 }),
+    meal({ name: 'B2', p: 38, c: 30, cal: 510, cuisine: 'indian' }),
+    meal({ name: 'B3', p: 36, c: 28, cal: 500, cuisine: 'asian' }),
+    meal({ name: 'B4', p: 34, c: 28, cal: 495 })
+  ],
+  lunchDinner: [
+    meal({ name: 'L1', p: 48, c: 35, cal: 600, family: 'chicken' }),
+    meal({ name: 'L2', p: 47, c: 35, cal: 590, cuisine: 'indian', family: 'fish' }),
+    meal({ name: 'L3', p: 46, c: 34, cal: 585, cuisine: 'asian' }),
+    meal({ name: 'L4', p: 45, c: 34, cal: 580, family: 'chicken' }),
+    meal({ name: 'L5', p: 44, c: 33, cal: 575, cuisine: 'indian' }),
+    meal({ name: 'L6', p: 43, c: 33, cal: 570, cuisine: 'asian', family: 'fish' }),
+    meal({ name: 'L7', p: 42, c: 32, cal: 565 }),
+    meal({ name: 'L8', p: 41, c: 32, cal: 560, cuisine: 'indian' })
+  ],
+  snack: []
+});
+
+const rules = () => {
+  const base = getRules('high_protein', { dailyProteinTarget: 132 });
+  return { ...base, hard: { ...base.hard, requireDinnerTaper: false } };
+};
+
+const validWeek = (database, ruleset) =>
+  selectWeek({ mealDatabase: database, rules: ruleset, targetDateKeys: DATES, preferences: {} }).days;
+
+const codes = (result) => result.violations.map((v) => v.code).sort();
+
+// ─── Validation ─────────────────────────────────────────────────────────────
+
+test('a week produced by the optimizer validates clean', () => {
+  const ruleset = rules();
+  const result = validateWeek({ days: validWeek(catalog(), ruleset), rules: ruleset });
+
+  assert.equal(result.valid, true, formatViolations(result.violations));
+  assert.deepEqual(result.violations, []);
+  assert.equal(result.summary.dayCount, 7);
+});
+
+test('a meal below the per-meal protein floor is a Tier-1 violation', () => {
+  const ruleset = rules();
+  const database = catalog();
+  const days = validWeek(database, ruleset);
+  days[2] = { ...days[2], lunch: meal({ name: 'Lean', p: 8, c: 10, cal: 200 }), totals: undefined };
+
+  const result = validateWeek({ days, rules: ruleset });
+
+  assert.equal(result.valid, false);
+  const found = result.violations.find((v) => v.code === 'meal_below_protein_floor');
+  assert.ok(found);
+  assert.equal(found.tier, TIER.HARD);
+  assert.equal(found.slot, 'lunch');
+  assert.equal(found.actual, 8);
+  assert.equal(found.limit, 20);
+});
+
+test('the same meal twice in one day is a Tier-1 violation', () => {
+  const ruleset = rules();
+  const database = catalog();
+  const days = validWeek(database, ruleset);
+  days[0] = { ...days[0], lunch: database.lunchDinner[0], dinner: database.lunchDinner[0], totals: undefined };
+
+  const result = validateWeek({ days, rules: ruleset });
+  assert.ok(result.violations.some((v) => v.code === 'duplicate_meal_in_day'));
+});
+
+test('a day under the 50g sanity floor is a Tier-1 violation, but a 70g day is not', () => {
+  const ruleset = rules();
+  const database = catalog();
+  const days = validWeek(database, ruleset);
+
+  const tiny = { name: 'Tiny', canonical_name: 'Tiny', protein: 10, cal: 120, macros: { p: 10, c: 5, f: 3 }, cuisine: 'x', tags: { protein_family: 'vegetarian' } };
+  const belowFloor = [...days];
+  belowFloor[0] = { dateKey: days[0].dateKey, breakfast: tiny, lunch: tiny, dinner: tiny };
+  assert.ok(
+    validateWeek({ days: belowFloor, rules: ruleset }).violations.some((v) => v.code === 'day_below_sanity_floor')
+  );
+
+  // 70g: off-band but comfortably over the sanity floor. A pass, not a bug.
+  const flex = { name: 'Flex', canonical_name: 'Flex', protein: 24, cal: 300, macros: { p: 24, c: 10, f: 8 }, cuisine: 'x', tags: { protein_family: 'vegetarian' } };
+  const flexDay = [...days];
+  flexDay[0] = {
+    dateKey: days[0].dateKey,
+    breakfast: { ...flex, name: 'Flex B', canonical_name: 'Flex B', protein: 22 },
+    lunch: { ...flex, name: 'Flex L', canonical_name: 'Flex L' },
+    dinner: { ...flex, name: 'Flex D', canonical_name: 'Flex D' }
+  };
+  const result = validateWeek({ days: flexDay, rules: ruleset });
+  assert.ok(!result.violations.some((v) => v.code === 'day_below_sanity_floor'));
+  assert.ok(!result.hardViolations.some((v) => v.dateKey === days[0].dateKey));
+});
+
+test('weekly repetition ceilings are validated against the generated week plus locked days', () => {
+  const ruleset = rules();
+  const database = catalog();
+  const days = validWeek(database, ruleset);
+
+  // Force L1 into three lunch slots — one over the ceiling of 2.
+  for (const index of [0, 1, 2]) {
+    days[index] = { ...days[index], lunch: database.lunchDinner[0], totals: undefined };
+  }
+  const result = validateWeek({ days, rules: ruleset });
+  const found = result.violations.find((v) => v.code === 'lunch_dinner_repeat_exceeded');
+  assert.ok(found, formatViolations(result.violations));
+  assert.equal(found.limit, 2);
+
+  // A locked day pushes an otherwise-legal week over the same ceiling.
+  const clean = validWeek(database, ruleset);
+  const usedTwice = clean.map((day) => day.mealNames[1]).find(
+    (name, _i, all) => all.filter((n) => n === name).length === 2
+  );
+  if (usedTwice) {
+    const locked = { '2026-08-02': { breakfast: database.breakfast[0], lunch: database.lunchDinner.find((m) => m.name === usedTwice), dinner: database.lunchDinner[7] } };
+    const lockedResult = validateWeek({ days: clean, rules: ruleset, lockedDays: locked });
+    assert.ok(lockedResult.violations.some((v) => v.code === 'lunch_dinner_repeat_exceeded'));
+  }
+});
+
+test('the red-meat cap and the weekly protein floor are validated', () => {
+  const ruleset = rules();
+  const steak = meal({ name: 'Steak', p: 50, c: 30, cal: 600, family: 'red_meat' });
+  const days = DATES.map((dateKey) => ({
+    dateKey,
+    breakfast: meal({ name: 'B1', p: 40, c: 30, cal: 520 }),
+    lunch: steak,
+    dinner: meal({ name: 'L1', p: 48, c: 35, cal: 600, family: 'chicken' })
+  }));
+
+  const result = validateWeek({ days, rules: ruleset });
+  const redMeat = result.violations.find((v) => v.code === 'red_meat_cap_exceeded');
+  assert.ok(redMeat);
+  assert.equal(redMeat.actual, 7);
+  assert.equal(redMeat.limit, 3);
+
+  const lean = meal({ name: 'Lean', p: 20, c: 10, cal: 250 });
+  const thinWeek = DATES.map((dateKey) => ({
+    dateKey,
+    breakfast: meal({ name: 'B1', p: 20, c: 10, cal: 200 }),
+    lunch: lean,
+    dinner: meal({ name: 'Lean2', p: 20, c: 10, cal: 250 })
+  }));
+  const floorResult = validateWeek({ days: thinWeek, rules: ruleset });
+  const floorViolation = floorResult.violations.find((v) => v.code === 'weekly_protein_below_floor');
+  assert.ok(floorViolation);
+  assert.equal(floorViolation.actual, 420);
+  assert.equal(floorViolation.limit, 785);
+});
+
+test('Tier-2 budgets only fire once more than 2 of 7 days miss', () => {
+  const ruleset = getRules('high_protein', { dailyProteinTarget: 132 });
+  const strong = (dateKey) => ({
+    dateKey,
+    breakfast: meal({ name: 'B1', p: 37, c: 30, cal: 600 }),
+    lunch: meal({ name: 'L1', p: 48, c: 35, cal: 620, family: 'chicken' }),
+    dinner: meal({ name: 'L2', p: 47, c: 35, cal: 620, family: 'fish', cuisine: 'indian' })
+  });
+  const flex = (dateKey) => ({
+    dateKey,
+    breakfast: meal({ name: 'B4', p: 22, c: 10, cal: 200 }),
+    lunch: meal({ name: 'L7', p: 24, c: 10, cal: 260 }),
+    dinner: meal({ name: 'L8', p: 24, c: 10, cal: 260, cuisine: 'indian' })
+  });
+
+  // 5 strong + 2 flex — exactly at budget, and the weekly floor still holds.
+  const atBudget = [...DATES.slice(0, 5).map(strong), ...DATES.slice(5).map(flex)];
+  const okResult = validateWeek({ days: atBudget, rules: ruleset });
+  assert.ok(!okResult.violations.some((v) => v.tier === TIER.BUDGETED), formatViolations(okResult.violations));
+  assert.equal(okResult.summary.daysProteinInBand, 5);
+
+  // 4 strong + 3 flex — one miss too many.
+  const overBudget = [...DATES.slice(0, 4).map(strong), ...DATES.slice(4).map(flex)];
+  const badResult = validateWeek({ days: overBudget, rules: ruleset });
+  const budgetViolation = badResult.violations.find((v) => v.code === 'protein_band_budget_exceeded');
+  assert.ok(budgetViolation);
+  assert.equal(budgetViolation.tier, TIER.BUDGETED);
+  assert.equal(budgetViolation.actual, 4);
+  assert.equal(budgetViolation.limit, 5);
+});
+
+// ─── Resolution of model output ─────────────────────────────────────────────
+
+test('meal names resolve by canonical name, and a near-miss is reported not swallowed', () => {
+  const ruleset = rules();
+  const database = catalog();
+  const { days, violations } = resolveWeek({
+    days: [
+      { dateKey: '2026-08-03', breakfast: 'B1', lunch: 'L1', dinner: 'L2' },
+      { dateKey: '2026-08-04', breakfast: 'B2', lunch: 'Chicken Curry (invented)', dinner: 'L3' }
+    ],
+    mealDatabase: database,
+    rules: ruleset
+  });
+
+  assert.equal(days[0].breakfast.name, 'B1');
+  assert.equal(days[0].lunch.name, 'L1');
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0].code, 'unresolved_meal');
+  assert.equal(violations[0].slot, 'lunch');
+  assert.equal(violations[0].dateKey, '2026-08-04');
+});
+
+// ─── Repair ─────────────────────────────────────────────────────────────────
+
+test('repair leaves an already-valid week untouched', () => {
+  const ruleset = rules();
+  const days = validWeek(catalog(), ruleset);
+  const before = days.map((day) => day.mealNames.join('|'));
+
+  const result = repairWeek({ days, mealDatabase: catalog(), rules: ruleset });
+
+  assert.equal(result.repaired, false);
+  assert.equal(result.strategy, 'none');
+  assert.deepEqual(result.days.map((day) => day.mealNames.join('|')), before);
+});
+
+test('repair replaces only the days carrying a hard violation', () => {
+  const ruleset = rules();
+  const database = catalog();
+  const days = validWeek(database, ruleset);
+  const untouchedBefore = days.slice(1).map((day) => day.mealNames.join('|'));
+
+  days[0] = {
+    dateKey: days[0].dateKey,
+    breakfast: meal({ name: 'Lean B', p: 5, c: 5, cal: 80 }),
+    lunch: days[0].lunch,
+    dinner: days[0].dinner
+  };
+
+  const result = repairWeek({ days, mealDatabase: database, rules: ruleset });
+
+  assert.equal(result.repaired, true);
+  assert.equal(result.strategy, 'replaced_invalid_days');
+  assert.equal(result.validation.valid, true, formatViolations(result.validation.violations));
+  assert.deepEqual(
+    result.days.slice(1).map((day) => day.mealNames.join('|')),
+    untouchedBefore,
+    'days that were fine are preserved'
+  );
+});
+
+test('repair rebuilds the whole week when only weekly budgets are blown', () => {
+  const ruleset = rules();
+  const database = catalog();
+
+  // Every day legal on its own, but far too lean for the weekly floor.
+  const lean = meal({ name: 'Lean', p: 21, c: 8, cal: 240 });
+  database.lunchDinner.push(lean);
+  const days = DATES.map((dateKey) => ({
+    dateKey,
+    breakfast: database.breakfast[3],
+    lunch: lean,
+    dinner: lean
+  }));
+
+  const before = validateWeek({ days, rules: ruleset });
+  assert.equal(before.valid, false);
+
+  const result = repairWeek({ days, mealDatabase: database, rules: ruleset });
+  assert.equal(result.strategy, 'regenerated_week');
+  assert.equal(result.validation.valid, true, formatViolations(result.validation.violations));
+  assert.ok(result.validation.summary.totalProtein >= result.validation.summary.proteinFloor);
+});
+
+test('repair reports catalog infeasibility rather than writing a bad week quietly', () => {
+  const ruleset = rules();
+  // A catalog that physically cannot reach the weekly protein floor.
+  const thin = {
+    breakfast: [meal({ name: 'B', p: 20, c: 10, cal: 200 })],
+    lunchDinner: [
+      meal({ name: 'L1', p: 20, c: 10, cal: 240 }),
+      meal({ name: 'L2', p: 20, c: 10, cal: 240 }),
+      meal({ name: 'L3', p: 20, c: 10, cal: 240 }),
+      meal({ name: 'L4', p: 20, c: 10, cal: 240 }),
+      meal({ name: 'L5', p: 20, c: 10, cal: 240 }),
+      meal({ name: 'L6', p: 20, c: 10, cal: 240 }),
+      meal({ name: 'L7', p: 20, c: 10, cal: 240 })
+    ],
+    snack: []
+  };
+  const days = DATES.map((dateKey) => ({
+    dateKey,
+    breakfast: thin.breakfast[0],
+    lunch: thin.lunchDinner[0],
+    dinner: thin.lunchDinner[1]
+  }));
+
+  const result = repairWeek({ days, mealDatabase: thin, rules: ruleset });
+
+  assert.equal(result.validation.valid, false);
+  assert.equal(result.catalogInfeasible, true);
+  assert.ok(result.validation.violations.some((v) => v.code === 'weekly_protein_below_floor'));
+});
+
+test('validateAndRepairWeek regenerates a day whose meal name did not resolve', () => {
+  const ruleset = rules();
+  const database = catalog();
+  const reference = validWeek(database, ruleset);
+  const asNames = reference.map((day) => ({
+    dateKey: day.dateKey,
+    breakfast: day.breakfast.name,
+    lunch: day.lunch.name,
+    dinner: day.dinner.name
+  }));
+  asNames[3].dinner = 'Hallucinated Dinner Special';
+
+  const result = validateAndRepairWeek({ days: asNames, mealDatabase: database, rules: ruleset });
+
+  assert.equal(result.resolutionViolations.length, 1);
+  assert.equal(result.resolutionViolations[0].code, 'unresolved_meal');
+  assert.equal(result.repaired, true);
+  assert.equal(result.validation.valid, true, formatViolations(result.validation.violations));
+  assert.equal(result.days.length, 7);
+  assert.ok(result.days.every((day) => day.breakfast && day.lunch && day.dinner));
+  assert.deepEqual(result.days.map((day) => day.dateKey), DATES, 'no date is dropped');
+});
+
+test('formatViolations renders one readable line per violation', () => {
+  const text = formatViolations([
+    { tier: 1, code: 'day_below_sanity_floor', message: '2026-08-03 totals 30g protein' },
+    { tier: 2, code: 'protein_band_budget_exceeded', message: 'Only 4 of 7 days are in the protein band' }
+  ]);
+
+  assert.equal(
+    text,
+    '- [tier 1] day_below_sanity_floor: 2026-08-03 totals 30g protein\n'
+    + '- [tier 2] protein_band_budget_exceeded: Only 4 of 7 days are in the protein band'
+  );
+});

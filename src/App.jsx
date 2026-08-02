@@ -256,6 +256,22 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     return CORE_MEAL_TYPES.some((mealType) => day[mealType]?.confirmed || day[mealType]?.skipped);
   };
 
+  /**
+   * Days in the currently selected week that are NOT being regenerated. The
+   * weekly repetition ceilings and the red-meat cap are counted against the
+   * whole week, so a locked day still consumes its share of both.
+   */
+  const buildLockedWeekDays = (targetDateKeys) => {
+    const targets = new Set(targetDateKeys);
+    const locked = {};
+    for (const key of getWeekDateKeys(selectedDateKey)) {
+      if (targets.has(key)) continue;
+      const plan = mealPlans[key];
+      if (plan?.breakfast || plan?.lunch || plan?.dinner) locked[key] = plan;
+    }
+    return locked;
+  };
+
   const isSamePlanByName = (a, b) => {
     if (!a || !b) return false;
     return CORE_MEAL_TYPES.every((mealType) => a[mealType]?.name && b[mealType]?.name && a[mealType].name === b[mealType].name);
@@ -1544,23 +1560,34 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         shortlists
       });
 
+      // Phase 3: validate what came back, and repair it deterministically if
+      // it breaks the rules. Nothing invalid is written silently.
+      const { validateAndRepairWeek, formatViolations } = await import('./lib/planValidator.js');
+      const checked = validateAndRepairWeek({
+        days: generatedDays,
+        mealDatabase: mergedMealDatabase,
+        rules,
+        preferences: adjustedPrefs,
+        historyMap,
+        lockedDays: buildLockedWeekDays(targetDateKeys)
+      });
+
+      if (checked.resolutionViolations.length > 0) {
+        console.warn('[Hybrid] AI returned meal names outside the shortlist:', checked.resolutionViolations);
+      }
+      if (checked.repaired) {
+        console.warn(`[Hybrid] Repaired the generated week (${checked.strategy}):\n${formatViolations(checked.validation.violations)}`);
+      }
+      console.info('[Hybrid] Week summary:', checked.validation.summary);
+
       const nextPlans = { ...mealPlans };
-
-      // Re-hydrate the canonical string names from the AI back into full meal objects
-      const catalog = [
-        ...(mergedMealDatabase.breakfast || []),
-        ...(mergedMealDatabase.lunchDinner || []),
-        ...(mergedMealDatabase.snack || [])
-      ];
-      const findMeal = (name) => { const n = String(name || '').trim().toLowerCase(); return catalog.find(m => m.canonical_name.toLowerCase() === n || m.name?.toLowerCase() === n) || null; };
-
-      for (const day of generatedDays) {
+      for (const day of checked.days) {
         if (!day.dateKey) continue;
         nextPlans[day.dateKey] = {
           ...nextPlans[day.dateKey],
-          breakfast: findMeal(day.breakfast) || nextPlans[day.dateKey]?.breakfast,
-          lunch: findMeal(day.lunch) || nextPlans[day.dateKey]?.lunch,
-          dinner: findMeal(day.dinner) || nextPlans[day.dateKey]?.dinner
+          breakfast: day.breakfast || nextPlans[day.dateKey]?.breakfast,
+          lunch: day.lunch || nextPlans[day.dateKey]?.lunch,
+          dinner: day.dinner || nextPlans[day.dateKey]?.dinner
         };
       }
 
@@ -1573,12 +1600,25 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         type: 'regen',
         dateKey: selectedDateKey,
         mealType: 'week',
-        regeneratedDays: generatedDays.length,
+        regeneratedDays: checked.days.length,
         keptLockedDays,
+        repaired: checked.repaired,
+        violationCodes: checked.validation.violations.map((v) => v.code),
         contextMeals: Array.from(new Set(chosenMealNames))
       });
 
-      showNotification(`✓ AI Regenerated ${generatedDays.length} day(s)${keptLockedDays > 0 ? `, kept ${keptLockedDays} locked` : ''}`);
+      const weekSummary = checked.validation.summary;
+      if (!checked.validation.valid) {
+        // Surfaced, not swallowed: the catalog could not satisfy the rules.
+        console.error('[Hybrid] Week still violates the rules after repair:', checked.validation.violations);
+        showNotification(`\u26a0\ufe0f Regenerated ${checked.days.length} day(s) \u2014 ${checked.validation.violations.length} rule issue(s) remain, see console`);
+      } else {
+        showNotification(
+          `\u2713 Regenerated ${checked.days.length} day(s) \u2014 ${weekSummary.totalProtein}g protein `
+          + `(${weekSummary.proteinPctOfNominal}% of target), ${weekSummary.daysProteinInBand}/${weekSummary.dayCount} days in band`
+          + `${keptLockedDays > 0 ? `, kept ${keptLockedDays} locked` : ''}`
+        );
+      }
     } catch (err) {
       console.error(err);
       showNotification('❌ AI Generation failed. Please try again.');
