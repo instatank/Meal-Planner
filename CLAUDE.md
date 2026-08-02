@@ -10,7 +10,7 @@ Last updated to reflect the current state after the sync-overwrite hardening and
 - **Backend**: Firebase (Firestore + Auth). Optional Upstash Redis behind `api/storage/[key].js`.
 - **AI**:
   - Weekly plan generation → **Claude Sonnet 4.6** via a Vercel serverless proxy (`api/generate-plan.js`). Uses `tool_use` for strict JSON output and ephemeral prompt caching on the system block.
-  - Omnibox natural-language intent parsing → **still Gemini** (`@google/genai`) via `src/lib/geminiService.js`. Migration to Claude is a pending priority.
+  - Omnibox natural-language intent parsing → **also Claude Sonnet**, same proxy, via `src/lib/omniboxService.js` (`submit_meal_intent` tool). Gemini (`@google/genai`, `geminiService.js`) has been fully removed — no more client-exposed AI key.
 - **Deployment**: Vercel (production + preview branches). Production URL: `meal-planner-rho-eight.vercel.app`.
 
 ---
@@ -20,8 +20,7 @@ Last updated to reflect the current state after the sync-overwrite hardening and
 ### Vercel (Production, Preview, Development)
 | Var | Where it's used | Purpose |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | `api/generate-plan.js` (server-only) | Auth to Anthropic Messages API. **Never exposed to the browser.** |
-| `VITE_GEMINI_API_KEY` | Omnibox intent parsing (browser) | Auth to Gemini for NL input. Exposed; rotate if leaked. |
+| `ANTHROPIC_API_KEY` | `api/generate-plan.js` (server-only) | Auth to Anthropic Messages API. **Never exposed to the browser.** Now used by both weekly generation and Omnibox. |
 | `VITE_FIREBASE_*` | `src/lib/firebase.js` | Firebase config. Has in-code fallbacks for local dev, but Vercel should set them explicitly. |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` (optional) | `api/storage/[key].js` | Only needed if Redis fallback is used. Currently dormant. |
 
@@ -64,7 +63,7 @@ LocalStorage-first with Firestore as the shared source of truth. Each key has a 
 | **High-protein filter is strict** | Eliminates some viable Asian dishes lacking `has_fibre`. Partial fixes merged in `1b2141c` but not complete. | Audit `src/lib/constraintFilter.js` + meal metadata when adding new goals. |
 | **Date keys + IST** | `getDateKey` uses `Asia/Kolkata`. Week boundaries are Monday-start. Don't mix with raw `toISOString()` slicing. | See `getWeekDateKeys` / `parseDateKey` in `App.jsx`. |
 | **Pre-existing planner test failures** | 4 of 29 tests fail with `total protein out of range: 147` and a custom-meal-count assertion. These existed before the recent work. | Track as technical debt; tests 12, 25, 26, 27 in `tests/planner.regression.test.js`. |
-| **Omnibox still on Gemini** | Uses `VITE_GEMINI_API_KEY` exposed in the browser. Small surface area but a real key leak. | Follow-up: migrate to Claude Haiku 4.5 via the same proxy. |
+| **Old Gemini key still live at Google** | Removing `VITE_GEMINI_API_KEY` from Vercel only stops *future* builds from bundling it — every already-deployed URL (Vercel keeps old deployments reachable) still ships the old key in its JS bundle. The key itself must be deleted/rotated in Google AI Studio / Cloud Console, not just unset in Vercel. | Founder-owned follow-up outside this repo. |
 
 ---
 
@@ -102,18 +101,18 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 - **Priority 1 (sync/overwrite) — shipped.** `keysToEnsure` now skips `dateKey >= todayKey`; boot no longer re-saves meal-plans; regen awaits Firestore write; `storageGet` detects and heals corrupt future-dated timestamps on both local and Firestore. Paste helper uses current time.
 - **Priority 2 (Vercel proxy) — shipped.** Weekly generation runs through `api/generate-plan.js` against Claude Sonnet 4.6. `tool_use` replaces the old JSON-prompting hack. Prompt caching active. API key server-only.
 - **Auto-generation useEffect hooks — disabled** (still present but wrapped in `if (false)`). Keep them off unless you're redesigning the "plan pushed externally vs plan auto-generated" contract.
+- **Priority 3 (Omnibox → Claude) — shipped.** `src/lib/omniboxService.js` replaces `geminiService.js` for intent parsing, using the same `api/generate-plan.js` proxy with a new `submit_meal_intent` tool. `@google/genai` dependency removed. `VITE_GEMINI_API_KEY` is no longer read anywhere in the app — the old key still needs deleting/rotating at the Google end (see Known Gotchas).
 
 ---
 
 ## Next Priorities (updated)
 
-1. **Migrate Omnibox to Claude.** Currently the only remaining Gemini dependency. Use Haiku 4.5 via the same proxy (latency < 2s, cost ~1/10th of Sonnet). Removes the exposed `VITE_GEMINI_API_KEY` from the browser bundle.
-2. **Switch timestamps to Firestore `serverTimestamp()`.** The current heal-on-read logic is defensive but brittle. Using server-assigned timestamps makes client-clock poisoning impossible and lets us delete the `isCorruptTs` / heal branches.
-3. **IF (Intermittent Fasting) mode.** A `two_meals` goal filter already exists in `constraintFilter.js`. Surface it in onboarding so users can opt into 16/8 or 18/6 without overriding meals manually.
-4. **Tag AI-generated plans** (`_aiGenerated: true`) so future dedup/cleanup logic can tell pushed/AI/manual plans apart.
-5. **Fix the 4 failing planner regression tests.** "Total protein out of range: 147" suggests the planner's protein clamp isn't being enforced in some fixtures. Pre-existing.
-6. **Database expansion.** More high-fibre, high-protein options — especially lighter breakfast alternatives compatible with IF's noon-eating start.
-7. **Bundle size.** 980KB gzipped 240KB. Code-split Firebase + `@google/genai` (largest offenders).
+1. **Switch timestamps to Firestore `serverTimestamp()`.** The current heal-on-read logic is defensive but brittle. Using server-assigned timestamps makes client-clock poisoning impossible and lets us delete the `isCorruptTs` / heal branches.
+2. **IF (Intermittent Fasting) mode.** A `two_meals` goal filter already exists in `constraintFilter.js`. Surface it in onboarding so users can opt into 16/8 or 18/6 without overriding meals manually.
+3. **Tag AI-generated plans** (`_aiGenerated: true`) so future dedup/cleanup logic can tell pushed/AI/manual plans apart.
+4. **Fix the 4 failing planner regression tests.** "Total protein out of range: 147" suggests the planner's protein clamp isn't being enforced in some fixtures. Pre-existing.
+5. **Database expansion.** More high-fibre, high-protein options — especially lighter breakfast alternatives compatible with IF's noon-eating start.
+6. **Bundle size.** 980KB gzipped 240KB. Code-split Firebase (now the largest offender since `@google/genai` is gone).
 
 ---
 
@@ -130,8 +129,8 @@ src/
     AdminTools.jsx       Admin panel
     OnboardingFlow.jsx   First-run setup
   lib/
-    planService.js       Client wrapper for /api/generate-plan (Claude)
-    geminiService.js     Legacy weekly-gen + active Omnibox parser
+    planService.js       Client wrapper for /api/generate-plan — weekly gen (Claude)
+    omniboxService.js    Client wrapper for /api/generate-plan — Omnibox intent parsing (Claude)
     constraintFilter.js  Phase-1 deterministic filter
     plannerGenerator.js  Deterministic fallback plan builder
     mealEvents.js        Event log → preference derivation
