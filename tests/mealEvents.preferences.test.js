@@ -67,14 +67,39 @@ test('undo target lookup includes active slot events only', () => {
   assert.deepEqual(targets, ['c1']);
 });
 
+// `getCustomMealOccurrenceCount` measures its lookback window from `Date.now()`,
+// so fixtures must be anchored to the current clock. Hard-coded 2026-02 dates
+// passed when they were written and then silently aged out of every window.
+const daysAgo = (days) => {
+  const date = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return { iso: date.toISOString(), dateKey: date.toISOString().slice(0, 10) };
+};
+
 test('custom meal occurrence count tracks last 45 days and ignores undone customs', () => {
+  const d30 = daysAgo(30);
+  const d20 = daysAgo(20);
+  const d10 = daysAgo(10);
+
   const events = [
-    createMealEvent({ id: 'x1', type: 'custom', dateKey: '2026-02-01', mealType: 'dinner', customMealText: 'Sushi bowl', timestamp: at('2026-02-01T08:00:00Z') }),
-    createMealEvent({ id: 'x2', type: 'custom', dateKey: '2026-02-03', mealType: 'dinner', customMealText: 'Sushi bowl', timestamp: at('2026-02-03T08:00:00Z') }),
-    createMealEvent({ id: 'u1', type: 'undo', dateKey: '2026-02-03', mealType: 'day', undoTargets: ['x2'], timestamp: at('2026-02-03T09:00:00Z') }),
-    createMealEvent({ id: 'x3', type: 'custom', dateKey: '2026-02-05', mealType: 'dinner', customMealText: 'SUSHI   bowl!!', timestamp: at('2026-02-05T08:00:00Z') })
+    createMealEvent({ id: 'x1', type: 'custom', dateKey: d30.dateKey, mealType: 'dinner', customMealText: 'Sushi bowl', timestamp: d30.iso }),
+    createMealEvent({ id: 'x2', type: 'custom', dateKey: d20.dateKey, mealType: 'dinner', customMealText: 'Sushi bowl', timestamp: d20.iso }),
+    createMealEvent({ id: 'u1', type: 'undo', dateKey: d20.dateKey, mealType: 'day', undoTargets: ['x2'], timestamp: d20.iso }),
+    createMealEvent({ id: 'x3', type: 'custom', dateKey: d10.dateKey, mealType: 'dinner', customMealText: 'SUSHI   bowl!!', timestamp: d10.iso })
   ];
 
   const count = getCustomMealOccurrenceCount(events, 'sushi bowl', 45);
   assert.equal(count, 2);
+});
+
+test('custom meals older than the lookback window are excluded', () => {
+  const d100 = daysAgo(100);
+  const d5 = daysAgo(5);
+
+  const events = [
+    createMealEvent({ id: 'old', type: 'custom', dateKey: d100.dateKey, mealType: 'dinner', customMealText: 'Sushi bowl', timestamp: d100.iso }),
+    createMealEvent({ id: 'new', type: 'custom', dateKey: d5.dateKey, mealType: 'dinner', customMealText: 'Sushi bowl', timestamp: d5.iso })
+  ];
+
+  assert.equal(getCustomMealOccurrenceCount(events, 'sushi bowl', 45), 1);
+  assert.equal(getCustomMealOccurrenceCount(events, 'sushi bowl', 365), 2);
 });
