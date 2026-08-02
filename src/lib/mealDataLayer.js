@@ -10,6 +10,7 @@ const ALLOWED_FORMATS = new Set(['curry', 'soup', 'salad', 'toast', 'sandwich', 
 const ALLOWED_EFFORT = new Set(['low', 'medium', 'high']);
 
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+const round1 = (value) => Number(Number(value).toFixed(1));
 const round2 = (value) => Number(Number(value).toFixed(2));
 
 const asNumber = (value) => {
@@ -27,7 +28,7 @@ const normalizedText = (...parts) =>
 const has = (text, pattern) => pattern.test(text);
 
 export const computeMacros = (parts = []) => {
-  const totals = { cal: 0, p: 0, c: 0, f: 0 };
+  const totals = { cal: 0, p: 0, c: 0, f: 0, fibre: 0 };
 
   for (const part of parts) {
     const ing = ingredients[part.ingredientId];
@@ -46,6 +47,7 @@ export const computeMacros = (parts = []) => {
     totals.p += (ing.per100g.p || 0) * ratio;
     totals.c += (ing.per100g.c || 0) * ratio;
     totals.f += (ing.per100g.f || 0) * ratio;
+    totals.fibre += (ing.per100g.fibre || 0) * ratio;
   }
 
   return {
@@ -54,7 +56,10 @@ export const computeMacros = (parts = []) => {
     macros: {
       p: Math.round(totals.p),
       c: Math.round(totals.c),
-      f: Math.round(totals.f)
+      f: Math.round(totals.f),
+      // Fibre keeps one decimal: whole grams would round a 0.4g garnish to
+      // zero and a 2.5g side to 3, and the has_fibre threshold sits at 5.
+      fibre: round1(totals.fibre)
     }
   };
 };
