@@ -9,6 +9,7 @@
 // but it should never see an unresolvable name from this path.)
 
 import { FALLBACK_PROMPTS } from '../data/fallbackPrompts.js';
+import { requiredCompliantDays } from './rules.js';
 
 const PROXY_ENDPOINT = '/api/generate-plan';
 const DEFAULT_TIMEOUT_MS = 90_000;
@@ -134,6 +135,14 @@ export const generateWeeklyPlan = async ({
   const proteinMin = rules?.budgeted?.dailyProteinMin ?? Math.round(target * 0.9);
   const proteinMax = rules?.budgeted?.dailyProteinMax ?? Math.round(target * 1.1);
 
+  // Budgets pro-rate with the number of days actually being generated, so a
+  // 4-day remainder is not told it may spend a full week's worth of flex days.
+  const dayCount = targetDateKeys.length;
+  const minCompliantDays = rules ? requiredCompliantDays(dayCount, rules) : dayCount;
+  const weeklyFloor = rules
+    ? Math.round(dayCount * rules.dailyProteinTarget * rules.hard.weeklyProteinFloorRatio)
+    : '';
+
   const systemInstruction = basePromptTemplate
     .replace('{{SHORTLISTS}}', '[See user message]')
     .replace('{{AVAILABLE_MEALS}}', '[See user message]')
@@ -148,12 +157,11 @@ export const generateWeeklyPlan = async ({
     .replace(/{{CARB_CAP}}/g, String(rules?.budgeted?.dailyCarbCap ?? ''))
     .replace(/{{CALORIE_MIN}}/g, String(rules?.budgeted?.dailyCalorieMin ?? ''))
     .replace(/{{CALORIE_MAX}}/g, String(rules?.budgeted?.dailyCalorieMax ?? ''))
-    .replace(/{{DAY_COUNT}}/g, String(targetDateKeys.length))
-    .replace(/{{MIN_COMPLIANT_DAYS}}/g, String(rules?.week?.minDaysProteinInBand ?? ''))
-    .replace(/{{MAX_FLEX_DAYS}}/g, String(
-      Math.max(0, targetDateKeys.length - (rules?.week?.minDaysProteinInBand ?? targetDateKeys.length))
-    ))
-    .replace(/{{WEEKLY_PROTEIN_FLOOR}}/g, String(rules?.week?.proteinFloor ?? ''));
+    .replace(/{{MIN_MEAL_PROTEIN}}/g, String(rules?.hard?.minMealProtein ?? ''))
+    .replace(/{{DAY_COUNT}}/g, String(dayCount))
+    .replace(/{{MIN_COMPLIANT_DAYS}}/g, String(minCompliantDays))
+    .replace(/{{MAX_FLEX_DAYS}}/g, String(Math.max(0, dayCount - minCompliantDays)))
+    .replace(/{{WEEKLY_PROTEIN_FLOOR}}/g, String(weeklyFloor));
 
   // Bundle everything the model needs into a single user message so the
   // proxy stays dumb (no prompt logic server-side).
