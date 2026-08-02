@@ -9,7 +9,7 @@ Last updated to reflect the current state after the sync-overwrite hardening and
 - **Frontend**: React 18 + Vite + Tailwind
 - **Backend**: Firebase (Firestore + Auth). Optional Upstash Redis behind `api/storage/[key].js`.
 - **AI**:
-  - Weekly plan generation → **Claude Sonnet 4.6** via a Vercel serverless proxy (`api/generate-plan.js`). Uses `tool_use` for strict JSON output and ephemeral prompt caching on the system block.
+  - Weekly plan generation → **Claude Sonnet 5** via a Vercel serverless proxy (`api/generate-plan.js`). Uses `tool_use` with per-slot `enum`s for strict output, `output_config.effort` as the quality/cost dial, and ephemeral prompt caching on the system block. **No sampling parameters** — Sonnet 5 rejects `temperature`/`top_p`/`top_k` with a 400.
   - Omnibox natural-language intent parsing → **still Gemini** (`@google/genai`) via `src/lib/geminiService.js`. Migration to Claude is a pending priority.
 - **Deployment**: Vercel (production + preview branches). Production URL: `meal-planner-rho-eight.vercel.app`.
 
@@ -79,9 +79,12 @@ Re-measure any of this with `npm run audit:generation` — it enumerates rather 
 | Area | Gotcha | Workaround / Reference |
 | --- | --- | --- |
 | **Claude structured output** | Prefill (`"[":`) is not a reliable way to force JSON. Use `tool_use` with `tool_choice: {type: 'tool', name}`. | See `buildSubmitPlanTool` in `src/lib/planService.js` and `tool` handling in `api/generate-plan.js`. |
-| **Vercel timeouts** | `api/generate-plan.js` declares `maxDuration: 60`. Hobby plan caps at 10s regardless — upgrade to Pro or the regen will 504. | Switch model to Haiku 4.5 for Hobby-grade responses under 10s. |
+| **Vercel timeouts** | `api/generate-plan.js` declares `maxDuration: 60`. Hobby plan caps at 10s regardless — upgrade to Pro or the regen will 504. | The proxy runs at `effort: 'low'` to stay inside the cap. Lower it further before reaching for a smaller model. |
 | **The calorie floor is the binding budget** | Only 19.6% of legal day combinations reach 1600 kcal, and just 0.9% satisfy all three Tier-2 budgets at once. The week still validates, but there is very little slack. | Phase 2 catalog expansion. Measure with `npm run audit:generation`. |
 | **Only 5 legal breakfasts for 7 days** | The 20g per-meal floor leaves 5 of 7 breakfasts, best 37g. This caps every day and is why the weekly floor sits at 85% rather than higher. | Phase 2: high-protein breakfasts are the single highest-leverage addition. |
+| **Sampling parameters** | Sonnet 5 returns a 400 for any non-default `temperature`/`top_p`/`top_k`. A model swap without removing them breaks the endpoint outright. | `buildAnthropicRequest` in `api/generate-plan.js` strips them defensively, so a stale cached client bundle degrades instead of breaking. |
+| **Thinking shares `max_tokens`** | Adaptive thinking is on by default on Sonnet 5 and counts against `max_tokens`. A budget sized for the response alone truncates mid-answer. | `DEFAULT_MAX_TOKENS` is 8192 for a response that is only a few enum picks. |
+| **Sonnet 5 tokenizer** | ~30% more tokens for the same text than Sonnet 4.6, so cost baselines shift even though per-token pricing did not. | Re-baseline before reacting to the numbers. Also note prompt caching needs a 1024-token prefix; a short system prompt silently will not cache. |
 | **Date keys + IST** | `getDateKey` uses `Asia/Kolkata`. Week boundaries are Monday-start. Don't mix with raw `toISOString()` slicing. | See `getWeekDateKeys` / `parseDateKey` in `App.jsx`. |
 | **Omnibox still on Gemini** | Uses `VITE_GEMINI_API_KEY` exposed in the browser. Small surface area but a real key leak. | Follow-up: migrate to Claude Haiku 4.5 via the same proxy. |
 

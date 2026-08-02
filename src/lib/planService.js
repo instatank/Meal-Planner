@@ -184,8 +184,7 @@ export const generateWeeklyPlan = async ({
       body: JSON.stringify({
         system: systemInstruction,
         userMessage,
-        tool,
-        temperature: 0.7
+        tool
       })
     });
     if (timeoutId) clearTimeout(timeoutId);
