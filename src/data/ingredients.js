@@ -161,6 +161,30 @@ export const ingredients = {
     defaultPortion: { qty: 100, unit: "g" },
     source: "IFCT Reference"
   },
+  chicken_keema: {
+    name: "Chicken keema (minced, cooked)",
+    per100g: { kcal: 195, p: 27, c: 0, f: 9.5, fibre: 0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #05664"
+  },
+  chicken_sausage: {
+    name: "Chicken sausage (grilled)",
+    per100g: { kcal: 172, p: 17, c: 3, f: 10, fibre: 0 },
+    defaultPortion: { qty: 100, unit: "g" },
+    source: "USDA #07940"
+  },
+  tofu_firm: {
+    name: "Tofu (firm)",
+    per100g: { kcal: 144, p: 15.8, c: 4.3, f: 8.7, fibre: 2.3 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #16427"
+  },
+  milk_toned: {
+    name: "Toned milk",
+    per100g: { kcal: 58, p: 3.1, c: 4.4, f: 3.0, fibre: 0 },
+    defaultPortion: { qty: 200, unit: "g" },
+    source: "IFCT Reference"
+  },
 
   // --- Carbs ---
   cooked_rice: {
@@ -222,6 +246,24 @@ export const ingredients = {
     per100g: { kcal: 260, p: 6.5, c: 38, f: 9, fibre: 3.5 },
     defaultPortion: { qty: 2, unit: "piece", pieceWeightG: 120 },
     source: "IFCT Reference"
+  },
+  plain_paratha: {
+    name: "Plain whole wheat paratha",
+    per100g: { kcal: 320, p: 8, c: 45, f: 12, fibre: 5.0 },
+    defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 100 },
+    source: "IFCT Reference"
+  },
+  moong_dal_chilla: {
+    name: "Moong dal chilla (savoury pancake)",
+    per100g: { kcal: 168, p: 10.5, c: 21, f: 4.5, fibre: 5.2 },
+    defaultPortion: { qty: 2, unit: "piece", pieceWeightG: 100 },
+    source: "IFCT Reference (green gram dal, ground + pan-cooked)"
+  },
+  rolled_oats: {
+    name: "Rolled oats (dry)",
+    per100g: { kcal: 389, p: 16.9, c: 66.3, f: 6.9, fibre: 10.6 },
+    defaultPortion: { qty: 50, unit: "g" },
+    source: "USDA #20038"
   },
 
   // --- Vegetables / Sides / Flavorings ---

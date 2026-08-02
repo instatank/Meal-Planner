@@ -114,6 +114,152 @@ const baseMealsList = {
       "components": {
         "protein": null, "amount": 0, "carb": "Cooked rice", "carbAmount": 80, "veg": "Mixed veg sabzi", "vegAmount": 120, "style": "Pan-fried"
       }
+    },
+
+    // ── Phase 2 additions ────────────────────────────────────────────────
+    //
+    // Built against the measured envelope in docs/PHASE2_HANDOVER.md §2:
+    // ~35-45g protein AND 500-600 kcal AND <=55g carbs, simultaneously.
+    // Optimising protein alone is what the handover's middle-row measurement
+    // showed does not work — the two 19g breakfasts already in this list are
+    // each 1g of protein short of legal and carry 96g of carbs, so making
+    // them legal would move the calorie budget and blow the carb one.
+    //
+    // Each meal below states which budget it is bought for.
+    {
+      // Calorie-dense and carb-moderate: 40g protein at 55g carbs, which the
+      // catalog previously could not do at breakfast at all.
+      "meal_id": "breakfast_chicken-keema-bhurji-jowar-roti",
+      "canonical_name": "Chicken keema bhurji + jowar roti",
+      "display_name": "Chicken Keema Bhurji + Jowar Roti",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Chicken keema bhurji + jowar roti",
+      "parts": [
+        { "ingredientId": "chicken_keema", "qty": 120, "unit": "g" },
+        { "ingredientId": "jowar_roti", "qty": 2, "unit": "piece" },
+        { "ingredientId": "cauliflower", "qty": 80, "unit": "g" },
+        { "ingredientId": "curry_base", "qty": 20, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken keema", "amount": 120, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": "Cauliflower", "vegAmount": 80, "style": "Pan-fried"
+      }
+    },
+    {
+      // The vegetarian entry in the envelope, and the highest-fibre breakfast
+      // in the catalog at 10.4g.
+      "meal_id": "breakfast_moong-dal-chilla-paneer-hung-curd",
+      "canonical_name": "Moong dal chilla + paneer + hung curd",
+      "display_name": "Moong Dal Chilla + Paneer",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Moong dal chilla + paneer + hung curd",
+      "parts": [
+        { "ingredientId": "moong_dal_chilla", "qty": 2, "unit": "piece" },
+        { "ingredientId": "paneer", "qty": 60, "unit": "g" },
+        { "ingredientId": "greek_yogurt", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Paneer", "amount": 60, "carb": "Moong dal chilla", "carbAmount": 2, "veg": null, "style": "Pan-fried"
+      }
+    },
+    {
+      // Lowest-carb of the new set (47g) while still clearing 500 kcal — this
+      // is the one that buys carb-budget room on a day with a heavy dinner.
+      "meal_id": "breakfast_oats-whey-porridge-nuts",
+      "canonical_name": "Oats + whey porridge with nuts",
+      "display_name": "Oats + Whey Porridge",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Oats + whey porridge with nuts",
+      "parts": [
+        { "ingredientId": "rolled_oats", "qty": 45, "unit": "g" },
+        { "ingredientId": "milk_toned", "qty": 200, "unit": "g" },
+        { "ingredientId": "protein_shake", "qty": 1, "unit": "piece" },
+        { "ingredientId": "nuts_seeds", "qty": 15, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Whey protein + milk", "amount": 34, "carb": "Rolled oats", "carbAmount": 45, "veg": null, "style": "Porridge"
+      }
+    },
+    {
+      // Highest protein of the new set at 44g, and only 30g of carbs — the
+      // breakfast that lets a high-carb Indian dinner still clear the cap.
+      "meal_id": "breakfast_chicken-sausage-scrambled-eggs-toast",
+      "canonical_name": "Chicken sausage + scrambled eggs + toast",
+      "display_name": "Chicken Sausage + Eggs + Toast",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Chicken sausage + scrambled eggs + toast",
+      "parts": [
+        { "ingredientId": "chicken_sausage", "qty": 100, "unit": "g" },
+        { "ingredientId": "egg_whole", "qty": 3, "unit": "piece" },
+        { "ingredientId": "whole_wheat_toast", "qty": 2, "unit": "slice" },
+        { "ingredientId": "mixed_salad", "qty": 80, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken sausage + eggs", "amount": 250, "carb": "Whole wheat toast", "carbAmount": 2, "veg": "Mixed greens", "vegAmount": 80, "style": "Pan-fried"
+      }
+    },
+    {
+      // The second vegetarian entry, and the only breakfast that clears the
+      // envelope without eggs, dairy or meat.
+      "meal_id": "breakfast_tofu-spinach-scramble-avocado-toast",
+      "canonical_name": "Tofu & spinach scramble + avocado toast",
+      "display_name": "Tofu Scramble + Avocado Toast",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Tofu & spinach scramble + avocado toast",
+      "parts": [
+        { "ingredientId": "tofu_firm", "qty": 200, "unit": "g" },
+        { "ingredientId": "whole_wheat_toast", "qty": 2, "unit": "slice" },
+        { "ingredientId": "spinach", "qty": 100, "unit": "g" },
+        { "ingredientId": "avocado", "qty": 0.5, "unit": "piece" },
+        { "ingredientId": "mixed_salad", "qty": 50, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Firm tofu", "amount": 200, "carb": "Whole wheat toast", "carbAmount": 2, "veg": "Spinach + greens", "vegAmount": 150, "style": "Pan-fried"
+      }
+    },
+    {
+      // South Indian in the envelope. The existing idli/dosa plate is 19g of
+      // protein and 96g of carbs; this reaches it by cutting the dosa and
+      // adding egg bhurji rather than by lowering the 20g floor.
+      "meal_id": "breakfast_idli-sambar-masala-egg-bhurji",
+      "canonical_name": "Idli + sambar + masala egg bhurji",
+      "display_name": "Idli + Sambar + Egg Bhurji",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Idli + sambar + masala egg bhurji",
+      "parts": [
+        { "ingredientId": "idli", "qty": 2, "unit": "piece" },
+        { "ingredientId": "arhar_dal", "qty": 120, "unit": "g" },
+        { "ingredientId": "egg_whole", "qty": 4, "unit": "piece" },
+        { "ingredientId": "curry_base", "qty": 15, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Eggs (whole)", "amount": 200, "carb": "Idli", "carbAmount": 2, "veg": "Sambar", "vegAmount": 120, "style": "Steamed"
+      }
+    },
+    {
+      // The North Indian paratha breakfast, reached additively: the existing
+      // Aloo paratha + curd stays untouched at 19g protein and 96g carbs, and
+      // this stuffed version clears both the protein floor and the carb cap
+      // on merit. Lower protein than the rest, kept for its calorie density.
+      "meal_id": "breakfast_paneer-paratha-curd",
+      "canonical_name": "Paneer paratha + curd",
+      "display_name": "Paneer paratha + curd",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_02",
+      "name": "Paneer paratha + curd",
+      "parts": [
+        { "ingredientId": "plain_paratha", "qty": 1, "unit": "piece" },
+        { "ingredientId": "paneer", "qty": 80, "unit": "g" },
+        { "ingredientId": "curd", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Paneer", "amount": 80, "carb": "Whole wheat paratha", "carbAmount": 1, "veg": null, "style": "Pan-fried"
+      }
     }
   ],
   "lunchDinner": [
@@ -718,6 +864,13 @@ const handAuthoredTags = {
   "Egg white omelette + avocado": { cuisine: "Continental" },
   "Aloo paratha + curd": { cuisine: "Indian" },
   "Idli, Mysore masala dosa + sambar + chutney": { cuisine: "Indian" },
+  "Chicken keema bhurji + jowar roti": { cuisine: "Indian" },
+  "Moong dal chilla + paneer + hung curd": { cuisine: "Indian" },
+  "Oats + whey porridge with nuts": { cuisine: "Continental" },
+  "Chicken sausage + scrambled eggs + toast": { cuisine: "Continental" },
+  "Tofu & spinach scramble + avocado toast": { cuisine: "Continental" },
+  "Idli + sambar + masala egg bhurji": { cuisine: "Indian" },
+  "Paneer paratha + curd": { cuisine: "Indian" },
   "Chicken curry + jowar roti": { cuisine: "Indian" },
   "Grilled salmon fillet + sauteed veg + spaghetti aglio e olio": { cuisine: "Continental" },
   "Rajma chawal + raita": { cuisine: "Indian" },
