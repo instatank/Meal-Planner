@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Loader2, X, Check } from 'lucide-react';
-import { parseMealIntent, isGeminiConfigured } from '../lib/geminiService';
+import { parseMealIntent } from '../lib/omniboxService';
 import { mealDatabase } from '../data/mealDatabase';
 
 const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, onRequestContext, externalInputRef, prefill = "", onClearPrefill, systemConfig = null }) => {
@@ -13,8 +13,6 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
     const [isFocused, setIsFocused] = useState(false);
     const internalInputRef = useRef(null);
     const inputRef = externalInputRef || internalInputRef;
-
-    const isConfigured = isGeminiConfigured();
 
     useEffect(() => {
         if (prefill) {
@@ -63,7 +61,7 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
 
     const handleProcessIntent = async (e) => {
         e.preventDefault();
-        if (!input.trim() || disabled || !isConfigured || loading) return;
+        if (!input.trim() || disabled || loading) return;
 
         setLoading(true);
         setError(null);
@@ -122,20 +120,6 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
         // Optionally focus input again
         setTimeout(() => inputRef.current?.focus(), 100);
     };
-
-    if (!isConfigured) {
-        return (
-            <div className="w-full bg-red-50 text-red-600 rounded-xl p-4 text-sm mt-6 border border-red-200">
-                <p className="font-medium flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    AI Omnibox Disabled
-                </p>
-                <p className="mt-1 opacity-80">
-                    Missing VITE_GEMINI_API_KEY in .env.local
-                </p>
-            </div>
-        );
-    }
 
     return (
         <div className="w-full mt-1 mb-2">
