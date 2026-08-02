@@ -69,7 +69,21 @@ Budgets **pro-rate** for partial-week regenerations: a 4-day remainder gets 1 fl
 Re-measure any of this with `npm run audit:generation` — it enumerates rather than estimates and exits non-zero if an acceptance criterion fails.
 
 ### Meal Database
-`src/data/mealDatabase.js`. Categories: `breakfast`, `lunchDinner`, `snack`. Each meal carries macros, `has_fibre`, `cuisine`, `meal_weight` and `goal_fit` tags. Note that `meal_weight` is now only a display/reporting label — the optimizer tapers dinner by calories, not by this tag. Rebuild downstream artifacts with `npm run db:pack`.
+`src/data/mealDatabase.js`, **69 meals** (14 breakfast / 43 lunchDinner / 12 snack) built from `src/data/ingredients.js` (~70 ingredients).
+
+Macros are **computed from `parts[]`**, never typed. So are three tags that used to be hand-maintained beside them and drifted:
+
+| Tag | Derivation | Threshold |
+| --- | --- | --- |
+| `is_fat_heavy` | `macros.f > 25`, exclusive | `FAT_HEAVY_THRESHOLD` |
+| `has_fibre` | `macros.fibre >= 3`, inclusive | `FIBRE_MEAL_THRESHOLD` |
+| `meal_weight` | `>600` Heavy, `>=350` Medium, else Light | `HEAVY_MEAL_CALORIES` / `MEDIUM_MEAL_CALORIES` |
+
+All three live in `deriveMealTags` (`mealDataLayer.js`) and read their thresholds from `rules.js`. **Do not hand-type them** — `handAuthoredTags` (formerly `csvTagsMap`) keeps only `cuisine`, and a test fails if a derived field reappears. Fibre is a real number in grams on every ingredient (IFCT 2017 / USDA), rolled up by `computeMacros` to one decimal.
+
+`meal_weight` is display/reporting only — the optimizer tapers dinner by calories, not by this label.
+
+Rebuild downstream artifacts with `npm run db:pack` (needs `npm install` — it imports `xlsx`).
 
 ---
 
@@ -79,8 +93,8 @@ Re-measure any of this with `npm run audit:generation` — it enumerates rather 
 | --- | --- | --- |
 | **Claude structured output** | Prefill (`"[":`) is not a reliable way to force JSON. Use `tool_use` with `tool_choice: {type: 'tool', name}`. | See `buildSubmitPlanTool` in `src/lib/planService.js` and `tool` handling in `api/generate-plan.js`. |
 | **Vercel timeouts** | `api/generate-plan.js` declares `maxDuration: 60`. Hobby plan caps at 10s regardless — upgrade to Pro or the regen will 504. | The proxy runs at `effort: 'low'` to stay inside the cap. Lower it further before reaching for a smaller model. |
-| **The calorie floor is the binding budget** | Only 19.6% of legal day combinations reach 1600 kcal, and just 0.9% satisfy all three Tier-2 budgets at once. The week still validates, but there is very little slack. | Phase 2 catalog expansion. Measure with `npm run audit:generation`. |
-| **Only 5 legal breakfasts for 7 days** | The 20g per-meal floor leaves 5 of 7 breakfasts, best 37g. This caps every day and is why the weekly floor sits at 85% rather than higher. | Phase 2: high-protein breakfasts are the single highest-leverage addition. |
+| **Optimizer enumeration is quadratic** | `breakfasts × lunchDinner²`, run **client-side before** the Anthropic call. Measured: 69 meals = 780ms, 92 = 1.5s, 123 = **3.7s** of blocked main thread. The roadmap's ~120-meal target needs an engine change, not more data. | Trim the candidate pool *before* the quadratic, or move the pass to a Web Worker. See `docs/PHASE2_HANDOVER.md` §9.6 for the measured curve. |
+| **`buildPromotedCustomMeal` fabricates macros** | Still assigns `{p: 24, c: 42, f: 14}` to every user-added lunch/dinner. Those invented numbers clear the 20g floor and flow into an optimizer that now trusts its inputs completely. | Now the *only* unmeasured path into a fully measured catalog — the gap widened in Phase 2, it did not close. Fix it or keep it disabled. |
 | **Sampling parameters** | Sonnet 5 returns a 400 for any non-default `temperature`/`top_p`/`top_k`. A model swap without removing them breaks the endpoint outright. | `buildAnthropicRequest` in `api/generate-plan.js` strips them defensively, so a stale cached client bundle degrades instead of breaking. |
 | **Thinking shares `max_tokens`** | Adaptive thinking is on by default on Sonnet 5 and counts against `max_tokens`. A budget sized for the response alone truncates mid-answer. | `DEFAULT_MAX_TOKENS` is 8192 for a response that is only a few enum picks. |
 | **Sonnet 5 tokenizer** | ~30% more tokens for the same text than Sonnet 4.6, so cost baselines shift even though per-token pricing did not. | Re-baseline before reacting to the numbers. Also note prompt caching needs a 1024-token prefix; a short system prompt silently will not cache. |
@@ -95,7 +109,7 @@ Re-measure any of this with `npm run audit:generation` — it enumerates rather 
 npm install
 npm run dev              # local dev (no serverless functions — use `vercel dev` for those)
 npm run build            # production build
-npm run test:logic       # all tests (102, all green)
+npm run test:logic       # all tests (124, all green)
 npm run test:planner     # planner regression only
 npm run audit:generation # enumerate combinations + score a week against the acceptance criteria
 npm run db:pack          # regenerate database packs under database/ + exports/
@@ -126,18 +140,21 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 - **Priority 2 (Vercel proxy) — shipped.** Weekly generation runs through `api/generate-plan.js`. `tool_use` replaces the old JSON-prompting hack. Prompt caching active. API key server-only.
 - **Phase 1 (generation engine rebuild) — shipped.** The three-tier rule model in `rules.js`; `constraintFilter.js` deleted and replaced by the `planOptimizer.js` day/week search; `planValidator.js` added; tool schema constrained with per-slot enums; prompts rewritten to state real numbers and stop claiming constraints were pre-verified; the hard dinner taper replaced by calorie-based scoring. See `docs/PHASE1_HANDOVER.md`.
 - **Auto-generation useEffect hooks — disabled** (still present but wrapped in `if (false)`). Keep them off unless you're redesigning the "plan pushed externally vs plan auto-generated" contract.
+- **Phase 2 (database repair + expansion) — shipped.** Catalog 41 → 69 meals. Joint Tier-2 compliance across enumerated day combinations went **0.9% → 6.7%**, legal breakfasts 5 → 12, Asian lunch/dinner 3 → 10, and the generated week from 7/5/5 to **7/7/7** with weekly protein at 100.5% of nominal. `is_fat_heavy`/`has_fibre`/`meal_weight` are derived rather than typed; fibre is in grams on every ingredient. No `rules.js` threshold changed. See `docs/PHASE2_HANDOVER.md` §9.
 - **Priority 3 (Omnibox → Claude) — shipped.** `src/lib/omniboxService.js` replaces `geminiService.js` for intent parsing, using the same `api/generate-plan.js` proxy with a new `submit_meal_intent` tool. `@google/genai` dependency removed. `VITE_GEMINI_API_KEY` is no longer read anywhere in the app — the old key still needs deleting/rotating at the Google end (see Known Gotchas).
 
 ---
 
 ## Next Priorities (updated)
 
-0. **Phase 2 — repair and expand the database. → `docs/PHASE2_HANDOVER.md`** Phase 1 made the rules real; the catalog is now the binding constraint. Only 0.9% of legal day combinations satisfy all three Tier-2 budgets at once, and the generated week passes calories at exactly the 5-of-7 minimum. The measured spec for new breakfasts is **35–45g protein, 500–600 kcal, ≤55g carbs** — optimising protein alone moves one budget and breaks another. Also: derive `is_fat_heavy` / `has_fibre` / `meal_weight` from ingredients instead of the hand-typed `csvTagsMap` (12, 10 and 3 disagreements), fibre in grams, Asian coverage (3 dishes), then expansion toward ~120 meals.
-1. **Switch timestamps to Firestore `serverTimestamp()`.** The current heal-on-read logic is defensive but brittle. Using server-assigned timestamps makes client-clock poisoning impossible and lets us delete the `isCorruptTs` / heal branches.
-2. **IF (Intermittent Fasting) mode.** `two_meals` is declared in onboarding and reconciled in `rules.js`, but has no ruleset — `getRules` throws for it by design. Give it real Tier-1/2/3 definitions and surface it so users can opt into 16/8 or 18/6 without overriding meals manually.
-3. **Tag AI-generated plans** (`_aiGenerated: true`) so future dedup/cleanup logic can tell pushed/AI/manual plans apart.
-4. **Raise the weekly protein floor above 85%** once the catalog grows. A generated week currently clears the 785g floor by ~100g (885g, 95.8% of nominal), but that is with almost no slack on the calorie budget — the headroom is real, the margin is not.
-5. **Bundle size.** 765KB, 200KB gzipped (down from 994KB/245KB — `@google/genai` removal alone was worth ~50KB gzip). Code-split Firebase, now the largest remaining offender.
+0. **Confirm the five Phase 2 decisions.** `docs/PHASE2_HANDOVER.md` §4 asked the founder five product questions before the work; they were not answered, so Phase 2 proceeded on stated assumptions (meals authored for review, additive only, fibre in grams now, unimplemented goals left throwing, protein floor unchanged). §9.7 and §9.8 record what to confirm — including the measurement for raising the weekly protein floor.
+1. **Fix or disable `buildPromotedCustomMeal`.** See Known Gotchas. It is now the only path feeding invented macros into a measured catalog.
+2. **Unblock the catalog past ~90 meals.** Enumeration is quadratic and client-side; see `docs/PHASE2_HANDOVER.md` §9.6 for the measured runtime curve. Needed before the roadmap's ~120-meal target is reachable.
+3. **Switch timestamps to Firestore `serverTimestamp()`.** The current heal-on-read logic is defensive but brittle. Using server-assigned timestamps makes client-clock poisoning impossible and lets us delete the `isCorruptTs` / heal branches.
+4. **IF (Intermittent Fasting) mode.** `two_meals` is declared in onboarding and reconciled in `rules.js`, but has no ruleset — `getRules` throws for it by design. Give it real Tier-1/2/3 definitions and surface it so users can opt into 16/8 or 18/6 without overriding meals manually.
+5. **Vegetarian goal.** Now cheap: Phase 2 added 2 vegetarian breakfasts and several vegetarian lunch/dinner dishes that sit inside the budgets. Still throws by design.
+6. **Tag AI-generated plans** (`_aiGenerated: true`) so future dedup/cleanup logic can tell pushed/AI/manual plans apart.
+7. **Bundle size.** 765KB, 200KB gzipped (down from 994KB/245KB — `@google/genai` removal alone was worth ~50KB gzip). Code-split Firebase, now the largest remaining offender.
 
 ---
 
@@ -145,7 +162,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 
 | Doc | What it is |
 | --- | --- |
-| `docs/PHASE2_HANDOVER.md` | **The current work.** Self-contained brief for the database repair + expansion, with the measured spec for new meals and the open questions for the founder. |
+| `docs/PHASE2_HANDOVER.md` | Shipped 2026-08-02. §1–§8 are the original brief; **§9 records what the database repair + expansion measured**, including the quadratic-runtime finding (§9.6) and the protein-floor measurement left for the founder (§9.7). |
 | `docs/PHASE1_HANDOVER.md` | Shipped 2026-08-02. §9 records what the generation-engine rebuild measured — read it before changing any threshold. |
 | `docs/EVAL_AND_ROADMAP.md` | The original audit. §3 is now historical (that code is deleted); §4 onward is still live. |
 
