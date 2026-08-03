@@ -260,6 +260,102 @@ const baseMealsList = {
       "components": {
         "protein": "Paneer", "amount": 80, "carb": "Whole wheat paratha", "carbAmount": 1, "veg": null, "style": "Pan-fried"
       }
+    },
+
+    // ── Research batch, 2026-08-03 ───────────────────────────────────────
+    //
+    // From a sourced research pass across Hebbar's Kitchen, Maangchi, Just One
+    // Cookbook, The Woks of Life, Ottolenghi and others. Macros are computed
+    // from parts[] as always — the researcher's own totals were used only to
+    // cross-check, and their fibre figures were consistently overstated, so
+    // trust the computed numbers here rather than any external panel.
+    {
+      "meal_id": "breakfast_paneer-egg-white-bhurji-toast",
+      "canonical_name": "Paneer & egg-white bhurji + toast",
+      "display_name": "Paneer & Egg-White Bhurji",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Paneer & egg-white bhurji + toast",
+      "parts": [
+        { "ingredientId": "paneer", "qty": 100, "unit": "g" },
+        { "ingredientId": "egg_white", "qty": 130, "unit": "g" },
+        { "ingredientId": "curry_base", "qty": 30, "unit": "g" },
+        { "ingredientId": "whole_wheat_toast", "qty": 60, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Paneer + egg whites", "amount": 230, "carb": "Whole wheat toast", "carbAmount": 60, "veg": null, "style": "Pan-fried"
+      }
+    },
+    {
+      "meal_id": "breakfast_anda-bhurji-toast",
+      "canonical_name": "Anda bhurji + toast",
+      "display_name": "Anda bhurji + toast",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Anda bhurji + toast",
+      "parts": [
+        { "ingredientId": "egg_whole", "qty": 150, "unit": "g" },
+        { "ingredientId": "egg_white", "qty": 100, "unit": "g" },
+        { "ingredientId": "curry_base", "qty": 30, "unit": "g" },
+        { "ingredientId": "whole_wheat_toast", "qty": 60, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Eggs (whole + whites)", "amount": 250, "carb": "Whole wheat toast", "carbAmount": 60, "veg": null, "style": "Pan-fried"
+      }
+    },
+    {
+      "meal_id": "breakfast_sardines-toast-avocado",
+      "canonical_name": "Sardines on toast + avocado",
+      "display_name": "Sardines on Toast + Avocado",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Sardines on toast + avocado",
+      "parts": [
+        { "ingredientId": "sardines", "qty": 120, "unit": "g" },
+        { "ingredientId": "whole_wheat_toast", "qty": 60, "unit": "g" },
+        { "ingredientId": "avocado", "qty": 50, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 80, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Sardines", "amount": 120, "carb": "Whole wheat toast", "carbAmount": 60, "veg": "Avocado + greens", "vegAmount": 130, "style": "Toast"
+      }
+    },
+    {
+      "meal_id": "breakfast_shakshuka-feta",
+      "canonical_name": "Shakshuka with feta",
+      "display_name": "Shakshuka with feta",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Shakshuka with feta",
+      "parts": [
+        { "ingredientId": "egg_whole", "qty": 150, "unit": "g" },
+        { "ingredientId": "egg_white", "qty": 80, "unit": "g" },
+        { "ingredientId": "tomato_herb_base", "qty": 40, "unit": "g" },
+        { "ingredientId": "feta", "qty": 40, "unit": "g" },
+        { "ingredientId": "whole_wheat_toast", "qty": 30, "unit": "g" },
+        { "ingredientId": "spinach", "qty": 80, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Eggs + feta", "amount": 270, "carb": "Whole wheat toast", "carbAmount": 30, "veg": "Tomato, pepper, spinach", "vegAmount": 120, "style": "Pan-fried"
+      }
+    },
+    {
+      "meal_id": "breakfast_cottage-cheese-smoked-salmon-bowl",
+      "canonical_name": "Cottage cheese & smoked salmon bowl",
+      "display_name": "Cottage Cheese & Smoked Salmon",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Cottage cheese & smoked salmon bowl",
+      "parts": [
+        { "ingredientId": "cottage_cheese", "qty": 180, "unit": "g" },
+        { "ingredientId": "smoked_salmon", "qty": 80, "unit": "g" },
+        { "ingredientId": "whole_wheat_toast", "qty": 60, "unit": "g" },
+        { "ingredientId": "avocado", "qty": 40, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 60, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Cottage cheese + smoked salmon", "amount": 260, "carb": "Whole wheat toast", "carbAmount": 60, "veg": "Avocado + greens", "vegAmount": 100, "style": "Bowl"
+      }
     }
   ],
   "lunchDinner": [
@@ -1044,6 +1140,444 @@ const baseMealsList = {
         "protein": "Paneer + rajma", "amount": 260, "carb": "No carb", "carbAmount": 0, "veg": null, "style": "Curry style"
       },
       "cuisine": "indian"
+    },
+
+    // ── Research batch, 2026-08-03 ───────────────────────────────────────
+    //
+    // Weighted toward the two gaps the audit identified: the 600-750 kcal /
+    // <=50g carb / 45g+ protein band, and vegetarian dishes clearing 35g of
+    // protein. Note that soya chunks and tofu, not paneer, are what actually
+    // unlock vegetarian protein — paneer is only 18g protein per 100g against
+    // 20g of fat, so a paneer dish reaches 35g by adding dal or chickpeas and
+    // arrives carrying 30-43g of fat.
+    {
+      "meal_id": "lunch_dinner_palak-paneer-jowar-roti",
+      "canonical_name": "Palak paneer + jowar roti",
+      "display_name": "Palak paneer + jowar roti",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Palak paneer + jowar roti",
+      "parts": [
+        { "ingredientId": "paneer", "qty": 150, "unit": "g" },
+        { "ingredientId": "spinach", "qty": 200, "unit": "g" },
+        { "ingredientId": "curry_base", "qty": 40, "unit": "g" },
+        { "ingredientId": "jowar_roti", "qty": 50, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Paneer", "amount": 150, "carb": "Jowar roti (millet)", "carbAmount": 50, "veg": "Spinach", "vegAmount": 200, "style": "Curry style"
+      },
+      "cuisine": "indian"
+    },
+    {
+      "meal_id": "lunch_dinner_achari-paneer-tikka-dal-salad",
+      "canonical_name": "Achari paneer tikka + dal + salad",
+      "display_name": "Achari Paneer Tikka + Dal",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Achari paneer tikka + dal + salad",
+      "parts": [
+        { "ingredientId": "paneer", "qty": 150, "unit": "g" },
+        { "ingredientId": "curd", "qty": 50, "unit": "g" },
+        { "ingredientId": "arhar_dal", "qty": 150, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Paneer", "amount": 150, "carb": "No carb", "carbAmount": 0, "veg": "Dal + salad", "vegAmount": 250, "style": "Tandoori"
+      },
+      "cuisine": "indian"
+    },
+    {
+      "meal_id": "lunch_dinner_soya-keema-curry-jowar-roti",
+      "canonical_name": "Soya keema curry + jowar roti",
+      "display_name": "Soya Keema + Jowar Roti",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Soya keema curry + jowar roti",
+      "parts": [
+        { "ingredientId": "soya_chunks", "qty": 70, "unit": "g" },
+        { "ingredientId": "curry_base", "qty": 60, "unit": "g" },
+        { "ingredientId": "curd", "qty": 50, "unit": "g" },
+        { "ingredientId": "jowar_roti", "qty": 30, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Soya chunks (minced)", "amount": 70, "carb": "Jowar roti (millet)", "carbAmount": 30, "veg": null, "style": "Curry style"
+      },
+      "cuisine": "indian"
+    },
+    {
+      "meal_id": "lunch_dinner_chole-paneer-bowl-salad",
+      "canonical_name": "Chole-paneer bowl + salad",
+      "display_name": "Chole-Paneer Bowl",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Chole-paneer bowl + salad",
+      "parts": [
+        { "ingredientId": "chole", "qty": 150, "unit": "g" },
+        { "ingredientId": "paneer", "qty": 120, "unit": "g" },
+        { "ingredientId": "curry_base", "qty": 30, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Paneer + chole", "amount": 270, "carb": "No carb", "carbAmount": 0, "veg": "Mixed greens salad", "vegAmount": 100, "style": "Bowl"
+      },
+      "cuisine": "indian"
+    },
+    {
+      "meal_id": "lunch_dinner_kadai-chicken-jowar-roti",
+      "canonical_name": "Kadai chicken + jowar roti",
+      "display_name": "Kadai chicken + jowar roti",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Kadai chicken + jowar roti",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 160, "unit": "g" },
+        { "ingredientId": "curry_base", "qty": 60, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 80, "unit": "g" },
+        { "ingredientId": "jowar_roti", "qty": 50, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 160, "carb": "Jowar roti (millet)", "carbAmount": 50, "veg": "Capsicum + salad", "vegAmount": 80, "style": "Curry style"
+      },
+      "cuisine": "indian"
+    },
+    {
+      "meal_id": "lunch_dinner_tandoori-fish-tikka-veg-roti",
+      "canonical_name": "Tandoori fish tikka + sauteed veg + roti",
+      "display_name": "Tandoori Fish Tikka + Veg",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Tandoori fish tikka + sauteed veg + roti",
+      "parts": [
+        { "ingredientId": "fish_fillet", "qty": 220, "unit": "g" },
+        { "ingredientId": "curd", "qty": 50, "unit": "g" },
+        { "ingredientId": "mixed_veg_sabzi", "qty": 100, "unit": "g" },
+        { "ingredientId": "jowar_roti", "qty": 40, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Fish fillet", "amount": 220, "carb": "Jowar roti (millet)", "carbAmount": 40, "veg": "Mixed veg sabzi", "vegAmount": 100, "style": "Tandoori"
+      },
+      "cuisine": "indian"
+    },
+    {
+      "meal_id": "lunch_dinner_chicken-keema-matar-jowar-roti",
+      "canonical_name": "Chicken keema matar + jowar roti",
+      "display_name": "Chicken Keema Matar + Roti",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Chicken keema matar + jowar roti",
+      "parts": [
+        { "ingredientId": "chicken_keema", "qty": 180, "unit": "g" },
+        { "ingredientId": "curry_base", "qty": 50, "unit": "g" },
+        { "ingredientId": "edamame", "qty": 60, "unit": "g" },
+        { "ingredientId": "jowar_roti", "qty": 40, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken keema", "amount": 180, "carb": "Jowar roti (millet)", "carbAmount": 40, "veg": "Peas / edamame", "vegAmount": 60, "style": "Curry style"
+      },
+      "cuisine": "indian"
+    },
+    {
+      "meal_id": "lunch_dinner_beef-bulgogi-bowl",
+      "canonical_name": "Beef bulgogi bowl",
+      "display_name": "Beef bulgogi bowl",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Beef bulgogi bowl",
+      "parts": [
+        { "ingredientId": "beef_steak", "qty": 150, "unit": "g" },
+        { "ingredientId": "cooked_rice", "qty": 100, "unit": "g" },
+        { "ingredientId": "kimchi", "qty": 80, "unit": "g" },
+        { "ingredientId": "spinach", "qty": 100, "unit": "g" },
+        { "ingredientId": "teriyaki_glaze", "qty": 20, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Beef steak (lean sirloin)", "amount": 150, "carb": "Cooked rice", "carbAmount": 100, "veg": "Kimchi + spinach", "vegAmount": 180, "style": "Bowl"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_tofu-veg-bibimbap",
+      "canonical_name": "Tofu & vegetable bibimbap",
+      "display_name": "Tofu & Veg Bibimbap",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Tofu & vegetable bibimbap",
+      "parts": [
+        { "ingredientId": "tofu_firm", "qty": 200, "unit": "g" },
+        { "ingredientId": "cooked_rice", "qty": 90, "unit": "g" },
+        { "ingredientId": "kimchi", "qty": 80, "unit": "g" },
+        { "ingredientId": "spinach", "qty": 100, "unit": "g" },
+        { "ingredientId": "egg_whole", "qty": 50, "unit": "g" },
+        { "ingredientId": "sesame_stirfry_base", "qty": 10, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Firm tofu + egg", "amount": 250, "carb": "Cooked rice", "carbAmount": 90, "veg": "Kimchi + spinach namul", "vegAmount": 180, "style": "Bowl"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_oyakodon-side-salad",
+      "canonical_name": "Oyakodon + side salad",
+      "display_name": "Oyakodon (chicken & egg)",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Oyakodon + side salad",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 140, "unit": "g" },
+        { "ingredientId": "egg_whole", "qty": 100, "unit": "g" },
+        { "ingredientId": "cooked_rice", "qty": 120, "unit": "g" },
+        { "ingredientId": "teriyaki_glaze", "qty": 25, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 80, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast + egg", "amount": 240, "carb": "Cooked rice", "carbAmount": 120, "veg": "Side salad", "vegAmount": 80, "style": "Bowl"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_dubu-jorim-rice-kimchi",
+      "canonical_name": "Dubu jorim + rice + kimchi",
+      "display_name": "Dubu Jorim (braised tofu)",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Dubu jorim + rice + kimchi",
+      "parts": [
+        { "ingredientId": "tofu_firm", "qty": 220, "unit": "g" },
+        { "ingredientId": "cooked_rice", "qty": 90, "unit": "g" },
+        { "ingredientId": "kimchi", "qty": 100, "unit": "g" },
+        { "ingredientId": "sesame_stirfry_base", "qty": 12, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Firm tofu", "amount": 220, "carb": "Cooked rice", "carbAmount": 90, "veg": "Kimchi", "vegAmount": 100, "style": "Curry style"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_home-style-tofu-chicken-stir-fry",
+      "canonical_name": "Home-style tofu & chicken stir-fry",
+      "display_name": "Home-Style Tofu & Chicken",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Home-style tofu & chicken stir-fry",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 120, "unit": "g" },
+        { "ingredientId": "tofu_firm", "qty": 120, "unit": "g" },
+        { "ingredientId": "sesame_stirfry_base", "qty": 20, "unit": "g" },
+        { "ingredientId": "broccoli", "qty": 150, "unit": "g" },
+        { "ingredientId": "cooked_rice", "qty": 80, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast + tofu", "amount": 240, "carb": "Cooked rice", "carbAmount": 80, "veg": "Broccoli", "vegAmount": 150, "style": "Pan-fried"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_vietnamese-lemongrass-chicken-bowl",
+      "canonical_name": "Vietnamese lemongrass chicken bowl",
+      "display_name": "Lemongrass Chicken Bowl",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Vietnamese lemongrass chicken bowl",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 170, "unit": "g" },
+        { "ingredientId": "rice_noodles", "qty": 100, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 120, "unit": "g" },
+        { "ingredientId": "raw_vegetables", "qty": 50, "unit": "g" },
+        { "ingredientId": "nuts_seeds", "qty": 15, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 170, "carb": "Rice noodles", "carbAmount": 100, "veg": "Herb salad + pickles", "vegAmount": 170, "style": "Bowl"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_cantonese-steamed-fish-edamame",
+      "canonical_name": "Cantonese steamed fish + edamame + rice",
+      "display_name": "Steamed Fish + Edamame",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Cantonese steamed fish + edamame + rice",
+      "parts": [
+        { "ingredientId": "fish_fillet", "qty": 200, "unit": "g" },
+        { "ingredientId": "bok_choy", "qty": 150, "unit": "g" },
+        { "ingredientId": "cooked_rice", "qty": 90, "unit": "g" },
+        { "ingredientId": "edamame", "qty": 80, "unit": "g" },
+        { "ingredientId": "sesame_stirfry_base", "qty": 12, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Fish fillet", "amount": 200, "carb": "Cooked rice", "carbAmount": 90, "veg": "Bok choy + edamame", "vegAmount": 230, "style": "Steamed"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_chicken-bulgogi-bowl",
+      "canonical_name": "Chicken bulgogi bowl",
+      "display_name": "Chicken bulgogi bowl",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Chicken bulgogi bowl",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 180, "unit": "g" },
+        { "ingredientId": "cooked_rice", "qty": 100, "unit": "g" },
+        { "ingredientId": "kimchi", "qty": 80, "unit": "g" },
+        { "ingredientId": "bok_choy", "qty": 100, "unit": "g" },
+        { "ingredientId": "gochujang", "qty": 20, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 180, "carb": "Cooked rice", "carbAmount": 100, "veg": "Kimchi + bok choy", "vegAmount": 180, "style": "Bowl"
+      },
+      "cuisine": "asian"
+    },
+    {
+      "meal_id": "lunch_dinner_chicken-souvlaki-tzatziki-greek-salad",
+      "canonical_name": "Chicken souvlaki + tzatziki + Greek salad",
+      "display_name": "Chicken Souvlaki + Greek Salad",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Chicken souvlaki + tzatziki + Greek salad",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 180, "unit": "g" },
+        { "ingredientId": "greek_yogurt", "qty": 100, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 120, "unit": "g" },
+        { "ingredientId": "feta", "qty": 30, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 8, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 180, "carb": "No carb", "carbAmount": 0, "veg": "Greek salad + tzatziki", "vegAmount": 220, "style": "Grilled"
+      },
+      "cuisine": "western"
+    },
+    {
+      "meal_id": "lunch_dinner_baked-feta-chickpea-traybake",
+      "canonical_name": "Baked feta & chickpea traybake",
+      "display_name": "Baked Feta & Chickpea Traybake",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Baked feta & chickpea traybake",
+      "parts": [
+        { "ingredientId": "chole", "qty": 130, "unit": "g" },
+        { "ingredientId": "feta", "qty": 90, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 100, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 8, "unit": "g" },
+        { "ingredientId": "greek_yogurt", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Feta + chickpeas", "amount": 220, "carb": "No carb", "carbAmount": 0, "veg": "Roast vegetables + greens", "vegAmount": 100, "style": "Plate"
+      },
+      "cuisine": "western"
+    },
+    {
+      "meal_id": "lunch_dinner_tuna-nicoise-salad",
+      "canonical_name": "Tuna Nicoise salad",
+      "display_name": "Tuna Nicoise salad",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Tuna Nicoise salad",
+      "parts": [
+        { "ingredientId": "tuna_water", "qty": 150, "unit": "g" },
+        { "ingredientId": "egg_whole", "qty": 100, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 150, "unit": "g" },
+        { "ingredientId": "olives_black", "qty": 30, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 8, "unit": "g" },
+        { "ingredientId": "sweet_potato", "qty": 80, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Tuna + egg", "amount": 250, "carb": "Sweet potato", "carbAmount": 80, "veg": "Salad + olives", "vegAmount": 180, "style": "Salad"
+      },
+      "cuisine": "western"
+    },
+    {
+      "meal_id": "lunch_dinner_halloumi-roasted-veg-quinoa-bowl",
+      "canonical_name": "Halloumi & roasted-veg quinoa bowl",
+      "display_name": "Halloumi & Quinoa Bowl",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Halloumi & roasted-veg quinoa bowl",
+      "parts": [
+        { "ingredientId": "halloumi", "qty": 100, "unit": "g" },
+        { "ingredientId": "quinoa_cooked", "qty": 120, "unit": "g" },
+        { "ingredientId": "broccoli", "qty": 120, "unit": "g" },
+        { "ingredientId": "greek_yogurt", "qty": 80, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Halloumi", "amount": 100, "carb": "Quinoa", "carbAmount": 120, "veg": "Roast broccoli", "vegAmount": 120, "style": "Bowl"
+      },
+      "cuisine": "western"
+    },
+    {
+      "meal_id": "lunch_dinner_chicken-white-bean-stew",
+      "canonical_name": "Chicken & white-bean stew",
+      "display_name": "Chicken & White-Bean Stew",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Chicken & white-bean stew",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 150, "unit": "g" },
+        { "ingredientId": "white_beans", "qty": 150, "unit": "g" },
+        { "ingredientId": "tomato_herb_base", "qty": 40, "unit": "g" },
+        { "ingredientId": "spinach", "qty": 100, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 10, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast + white beans", "amount": 270, "carb": "No carb", "carbAmount": 0, "veg": "Spinach + tomato", "vegAmount": 140, "style": "Soup style"
+      },
+      "cuisine": "western"
+    },
+    {
+      "meal_id": "lunch_dinner_chickpea-pasta-tuna-tomato",
+      "canonical_name": "Chickpea pasta with tuna & tomato",
+      "display_name": "Chickpea Pasta with Tuna",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Chickpea pasta with tuna & tomato",
+      "parts": [
+        { "ingredientId": "chickpea_pasta", "qty": 155, "unit": "g" },
+        { "ingredientId": "tuna_water", "qty": 120, "unit": "g" },
+        { "ingredientId": "tomato_herb_base", "qty": 40, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 8, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 80, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Tuna", "amount": 120, "carb": "Chickpea pasta", "carbAmount": 155, "veg": "Arrabbiata + side salad", "vegAmount": 120, "style": "Plate"
+      },
+      "cuisine": "western"
+    },
+    {
+      "meal_id": "lunch_dinner_chicken-ricotta-carbonara-style-spaghetti",
+      "canonical_name": "Chicken & ricotta carbonara-style spaghetti",
+      "display_name": "Chicken & Ricotta Spaghetti",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Chicken & ricotta carbonara-style spaghetti",
+      "parts": [
+        { "ingredientId": "spaghetti_aglio_olio", "qty": 150, "unit": "g" },
+        { "ingredientId": "chicken_breast", "qty": 120, "unit": "g" },
+        { "ingredientId": "ricotta_partskim", "qty": 60, "unit": "g" },
+        { "ingredientId": "egg_whole", "qty": 50, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast + ricotta", "amount": 180, "carb": "Spaghetti", "carbAmount": 150, "veg": null, "style": "Plate"
+      },
+      "cuisine": "western"
+    },
+    {
+      "meal_id": "lunch_dinner_mackerel-quinoa-salad",
+      "canonical_name": "Mackerel & quinoa salad",
+      "display_name": "Mackerel & Quinoa Salad",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_03",
+      "name": "Mackerel & quinoa salad",
+      "parts": [
+        { "ingredientId": "mackerel_canned", "qty": 120, "unit": "g" },
+        { "ingredientId": "quinoa_cooked", "qty": 120, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 120, "unit": "g" },
+        { "ingredientId": "avocado", "qty": 40, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 5, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Mackerel", "amount": 120, "carb": "Quinoa", "carbAmount": 120, "veg": "Salad + avocado", "vegAmount": 160, "style": "Salad"
+      },
+      "cuisine": "western"
     }
   ],
   "snack": [
@@ -1323,7 +1857,37 @@ const handAuthoredTags = {
   "Boiled eggs + hummus + veg sticks": { cuisine: "Continental" },
   "Edamame + sea salt": { cuisine: "Asian" },
   "Paneer tikka skewers": { cuisine: "Indian" },
-  "Overnight oats + whey bowl": { cuisine: "Continental" }
+  "Overnight oats + whey bowl": { cuisine: "Continental" },
+
+  // Research batch, 2026-08-03
+  "Paneer & egg-white bhurji + toast": { cuisine: "Indian" },
+  "Anda bhurji + toast": { cuisine: "Indian" },
+  "Sardines on toast + avocado": { cuisine: "Continental" },
+  "Shakshuka with feta": { cuisine: "Continental" },
+  "Cottage cheese & smoked salmon bowl": { cuisine: "Continental" },
+  "Palak paneer + jowar roti": { cuisine: "Indian" },
+  "Achari paneer tikka + dal + salad": { cuisine: "Indian" },
+  "Soya keema curry + jowar roti": { cuisine: "Indian" },
+  "Chole-paneer bowl + salad": { cuisine: "Indian" },
+  "Kadai chicken + jowar roti": { cuisine: "Indian" },
+  "Tandoori fish tikka + sauteed veg + roti": { cuisine: "Indian" },
+  "Chicken keema matar + jowar roti": { cuisine: "Indian" },
+  "Beef bulgogi bowl": { cuisine: "Asian" },
+  "Tofu & vegetable bibimbap": { cuisine: "Asian" },
+  "Oyakodon + side salad": { cuisine: "Asian" },
+  "Dubu jorim + rice + kimchi": { cuisine: "Asian" },
+  "Home-style tofu & chicken stir-fry": { cuisine: "Asian" },
+  "Vietnamese lemongrass chicken bowl": { cuisine: "Asian" },
+  "Cantonese steamed fish + edamame + rice": { cuisine: "Asian" },
+  "Chicken bulgogi bowl": { cuisine: "Asian" },
+  "Chicken souvlaki + tzatziki + Greek salad": { cuisine: "Continental" },
+  "Baked feta & chickpea traybake": { cuisine: "Continental" },
+  "Tuna Nicoise salad": { cuisine: "Continental" },
+  "Halloumi & roasted-veg quinoa bowl": { cuisine: "Continental" },
+  "Chicken & white-bean stew": { cuisine: "Continental" },
+  "Chickpea pasta with tuna & tomato": { cuisine: "Continental" },
+  "Chicken & ricotta carbonara-style spaghetti": { cuisine: "Continental" },
+  "Mackerel & quinoa salad": { cuisine: "Continental" }
 };
 
 /** Exported so tests can assert no derived field creeps back in. */

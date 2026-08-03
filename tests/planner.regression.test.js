@@ -178,10 +178,16 @@ test('planner regression snapshot for fixed fixture', () => {
     dinner: generated.dinner?.name
   };
 
+  // This snapshot tracks the catalog, not correctness — it exists to catch
+  // *accidental* changes in planner output. Adding meals legitimately changes
+  // which dish wins a slot, so update it deliberately when the catalog grows
+  // and rely on the hard-constraint and daily-target tests below for whether
+  // the plan is actually valid. Last updated for the 2026-08-03 research
+  // batch, which put a leaner 463 kcal dinner ahead of the 514 kcal one.
   assert.deepEqual(snapshot, {
     breakfast: 'Boiled eggs + ham sandwich',
     lunch: 'Chicken curry + jowar roti',
-    dinner: 'Grilled salmon + sauteed veg + garlic rice'
+    dinner: 'Mackerel & quinoa salad'
   });
 });
 
