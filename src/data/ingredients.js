@@ -137,6 +137,12 @@ export const ingredients = {
     defaultPortion: { qty: 150, unit: "g" },
     source: "IFCT Reference"
   },
+  white_beans: {
+    name: "White beans / cannellini (cooked)",
+    per100g: { kcal: 139, p: 9.7, c: 25.1, f: 0.35, fibre: 6.3 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #175196"
+  },
   arhar_dal: {
     name: "Arhar dal (cooked)",
     per100g: { kcal: 116, p: 7, c: 20, f: 0.8, fibre: 4.5 },
@@ -179,6 +185,24 @@ export const ingredients = {
     defaultPortion: { qty: 150, unit: "g" },
     source: "USDA #16427"
   },
+  sardines: {
+    name: "Sardines (canned in oil, drained, with bone)",
+    per100g: { kcal: 208, p: 24.6, c: 0, f: 11.5, fibre: 0 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #175139"
+  },
+  mackerel_canned: {
+    name: "Mackerel (jack, canned, drained)",
+    per100g: { kcal: 156, p: 23.2, c: 0, f: 6.3, fibre: 0 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #175121"
+  },
+  tuna_water: {
+    name: "Tuna (light, canned in water, drained)",
+    per100g: { kcal: 116, p: 25.5, c: 0, f: 0.8, fibre: 0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #173709"
+  },
   prawns: {
     name: "Prawns (cooked)",
     per100g: { kcal: 99, p: 24, c: 0.2, f: 0.3, fibre: 0 },
@@ -190,6 +214,41 @@ export const ingredients = {
     per100g: { kcal: 122, p: 11.9, c: 8.9, f: 5.2, fibre: 5.2 },
     defaultPortion: { qty: 80, unit: "g" },
     source: "USDA #11212"
+  },
+  feta: {
+    name: "Feta cheese",
+    per100g: { kcal: 264, p: 14.2, c: 4.1, f: 21.3, fibre: 0 },
+    defaultPortion: { qty: 40, unit: "g" },
+    source: "USDA #173420"
+  },
+  halloumi: {
+    name: "Halloumi",
+    // Brand-variable, 320-370 kcal/100g. No USDA lab entry; this is the
+    // generic mid-range figure. Treat dishes using it as ±10% on fat/kcal.
+    per100g: { kcal: 333, p: 22.1, c: 1.5, f: 26.5, fibre: 0 },
+    defaultPortion: { qty: 80, unit: "g" },
+    source: "Generic brand label (no USDA entry)"
+  },
+  ricotta_partskim: {
+    name: "Ricotta (part-skim)",
+    per100g: { kcal: 138, p: 11.4, c: 5.1, f: 7.9, fibre: 0 },
+    defaultPortion: { qty: 60, unit: "g" },
+    source: "USDA #171248"
+  },
+  cottage_cheese: {
+    name: "Cottage cheese (low-fat, creamed)",
+    per100g: { kcal: 98, p: 11.1, c: 3.4, f: 4.3, fibre: 0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #172186"
+  },
+  soya_chunks: {
+    name: "Soya chunks / TVP (dry)",
+    // USDA SR-Legacy textured vegetable protein, dry. A widely-used generic
+    // entry gives 47g protein / 330 kcal instead; if that is the truer figure
+    // the soya keema dish loses ~4g of protein and still clears 35g.
+    per100g: { kcal: 366, p: 51.1, c: 32.9, f: 3.3, fibre: 17.5 },
+    defaultPortion: { qty: 70, unit: "g" },
+    source: "USDA SR-Legacy (textured vegetable protein, dry)"
   },
   milk_toned: {
     name: "Toned milk",
@@ -277,6 +336,23 @@ export const ingredients = {
     defaultPortion: { qty: 50, unit: "g" },
     source: "USDA #20038"
   },
+  quinoa_cooked: {
+    name: "Quinoa (cooked)",
+    per100g: { kcal: 120, p: 4.4, c: 21.3, f: 1.9, fibre: 2.8 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #168917"
+  },
+  chickpea_pasta: {
+    name: "Chickpea pasta (cooked)",
+    // Stored COOKED, not dry, to match `spaghetti_aglio_olio` and the rest of
+    // the noodle entries — a dry-weight ingredient sitting in a table of
+    // cooked weights is a latent portioning bug. Derived from the Banza dry
+    // label (333 kcal, 24.6p, 56c, 6.1f, 11 fibre per 100g dry) at the ~2.2x
+    // cooked yield. Fibre is brand-variable.
+    per100g: { kcal: 151, p: 11.2, c: 25.5, f: 2.8, fibre: 5.0 },
+    defaultPortion: { qty: 155, unit: "g" },
+    source: "Banza label (dry), converted to cooked yield"
+  },
   soba_noodles: {
     name: "Soba noodles (cooked)",
     per100g: { kcal: 99, p: 5.1, c: 21.4, f: 0.1, fibre: 1.0 },
@@ -357,6 +433,34 @@ export const ingredients = {
     name: "Curry base (oil, onion, tomato)",
     per100g: { kcal: 250, p: 2, c: 15, f: 20, fibre: 1.5 },
     defaultPortion: { qty: 50, unit: "g" },
+    source: "Inferred base"
+  },
+  olive_oil: {
+    name: "Extra-virgin olive oil",
+    per100g: { kcal: 884, p: 0, c: 0, f: 100, fibre: 0 },
+    defaultPortion: { qty: 8, unit: "g" },
+    source: "USDA #171413"
+  },
+  olives_black: {
+    name: "Black olives (ripe, canned)",
+    per100g: { kcal: 115, p: 0.8, c: 6, f: 10.7, fibre: 3.2 },
+    defaultPortion: { qty: 30, unit: "g" },
+    source: "USDA #169094"
+  },
+  gochujang: {
+    name: "Gochujang (Korean chilli paste)",
+    // Label-derived; no USDA lab entry. Brand-variable and high in sodium.
+    per100g: { kcal: 220, p: 4, c: 49, f: 1, fibre: 2 },
+    defaultPortion: { qty: 20, unit: "g" },
+    source: "Brand label (no USDA entry)"
+  },
+  tomato_herb_base: {
+    name: "Tomato & herb base (olive oil, onion, tomato, pepper)",
+    // The Mediterranean counterpart to `curry_base`. Kept separate because
+    // curry_base is 20g fat per 100g — using it for shakshuka or arrabbiata
+    // would overstate the fat of every European dish by roughly 6g a serving.
+    per100g: { kcal: 90, p: 1.6, c: 7, f: 6, fibre: 1.5 },
+    defaultPortion: { qty: 40, unit: "g" },
     source: "Inferred base"
   },
   sesame_stirfry_base: {

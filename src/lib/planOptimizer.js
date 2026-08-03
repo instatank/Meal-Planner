@@ -40,16 +40,23 @@ export const getMealFat = (meal) => Number(meal?.macros?.f || 0);
 export const getMealCalories = (meal) => Number(meal?.cal || 0);
 export const getMealCuisine = (meal) => String(meal?.cuisine || '').toLowerCase();
 
+// Keep these in step with `inferProteinFamily` in mealDataLayer.js — a fish
+// the pattern does not know is silently classified `vegetarian`, which is how
+// mackerel and sardines entered the catalog as vegetarian dishes.
 const FAMILY_PATTERNS = {
-  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp)\b/i,
+  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp|mackerel|sardines?|anchov(y|ies))\b/i,
   chicken: /\b(chicken|turkey)\b/i,
-  red_meat: /\b(beef|mutton|lamb|pork|steak|keema|kofta|ham)\b/i
+  // No `keema`/`kofta` here — they name a preparation, not an animal, so
+  // soya keema and veg kofta are vegetarian. `inferProteinFamily` in
+  // mealDataLayer.js carries the nuanced version; this is only the fallback
+  // for meals that arrive without tags.
+  red_meat: /\b(beef|mutton|lamb|pork|steak|ham|goat|bacon)\b/i
 };
 
 const FAMILY_COUNT_PATTERNS = {
-  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp)\b/gi,
+  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp|mackerel|sardines?|anchov(y|ies))\b/gi,
   chicken: /\b(chicken|turkey)\b/gi,
-  red_meat: /\b(beef|mutton|lamb|pork|steak|keema|kofta)\b/gi
+  red_meat: /\b(beef|mutton|lamb|pork|steak|goat|bacon)\b/gi
 };
 
 const LEGUME_FIBRE_PATTERN = /\b(dal|rajma|chole|lentil|bean|sambar)\b/i;
