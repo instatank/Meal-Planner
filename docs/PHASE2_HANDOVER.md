@@ -420,3 +420,108 @@ of headroom, which user history and preference penalties could erode.
   breakfasts were reached additively instead.
 - **Vegetarian** is now much cheaper to build: 2 vegetarian breakfasts and
   several vegetarian lunch/dinner dishes sit inside the budgets.
+
+---
+
+## 10. Post-Phase-2: the sourced research batch (2026-08-03)
+
+After Phase 2 shipped, a sourced research pass (Hebbar's Kitchen, Maangchi,
+Just One Cookbook, The Woks of Life, Ottolenghi, Helen's Recipes, Made With
+Lau) added **27 more meals and 15 more ingredients**, taking the catalog to
+**97 meals / 83 ingredients**.
+
+### 10.1 Where the numbers landed
+
+| Measurement | Phase 2 close (69 meals) | Research batch (97 meals) |
+|---|---|---|
+| Legal breakfasts | 12 of 14 | **17 of 19** |
+| Legal lunch/dinner | 43 | **66** |
+| Legal day combinations | 21,672 | **72,930** |
+| Protein in band | 52.8% | **55.0%** |
+| Under the carb cap | 56.1% | **65.7%** |
+| Reach the 1600 kcal floor | 44.2% | **49.3%** |
+| **Satisfy all three budgets** | 6.7% | **12.1%** |
+| Weekly protein | 929g (100.5%) | 924g (100.0%) |
+| Generated week (P/C/K of 7) | 7/7/7 | 7/7/7, every day exactly 132g |
+| **Optimizer runtime** | 780ms | **~2,000ms** |
+
+Joint Tier-2 compliance is now **13.4x** the 0.9% Phase 2 started from.
+
+### 10.2 Two classification bugs the new data exposed
+
+Both were silent, and both would have corrupted the data layer:
+
+- `mackerel` and `sardines` matched no fish pattern, so both dishes would have
+  been tagged **vegetarian**. Fixed, with anchovies.
+- `keema` and `kofta` were treated as red meat, but they name a *preparation* —
+  mince and dumpling — not an animal. `Soya keema curry` was classified red
+  meat and would have spent the 3-per-week red-meat budget on a vegetarian
+  dish. They now only imply red meat when nothing else in the dish says what
+  the protein is. This also corrected the pre-existing `Kofta + dal + jowar
+  roti`, and moved the chicken-keema dishes from `mixed` to `chicken`.
+
+### 10.3 Three departures from the research's own data
+
+Recomputed all 27 against our ingredient table: 24 reproduce the researcher's
+totals exactly. The 3 that differ do so because of deliberate corrections:
+
+- **`chickpea_pasta` stored cooked, not dry.** The research portioned it dry;
+  every other pasta and noodle entry here is cooked. A dry-weight ingredient in
+  a table of cooked weights is a latent portioning bug.
+- **`white_beans` added** rather than reusing `rajma` as a "stand-in". A dish
+  called *white-bean stew* referencing kidney beans is exactly the quiet
+  mislabelling this catalog exists not to have.
+- **`tomato_herb_base` added** rather than reusing `curry_base` for European
+  dishes. `curry_base` is 20g fat per 100g; using it for shakshuka and
+  arrabbiata overstated their fat by ~6g a serving.
+
+The researcher's **fibre figures were consistently overstated** (chicken
+souvlaki claimed 4.3g against a computed 2.2g). Macros here are computed from
+`parts[]`, so this did not reach the data — but do not trust an external panel
+over `computeMacros`.
+
+### 10.4 §9.6 confirmed, and profiled
+
+The runtime prediction in §9.6 landed: 97 meals costs ~2s of blocked main
+thread. Profiling it (median of 5 runs, 72,930 combinations) shows **where**:
+
+| Step | Cost | Scales with |
+|---|---|---|
+| `enumerateFeasibleDays` | 314ms | combinations |
+| score every candidate + object spread | 387ms | combinations |
+| sort (`mealNames.join()` inside the comparator) | 220ms | combinations x log |
+| `buildSlotShortlists` | ~700ms | combinations |
+| **beam search proper** | ~350ms | **fixed** (960 pool x 40 beam x 7 days) |
+
+**About 1,600ms of the ~2,000ms scales with the combination count; only ~350ms
+is fixed.** The clever part — the beam search — is already bounded by
+`trimCandidatePool` at 960 candidates. Everything expensive is the passes that
+touch all 72,930 combinations before and after it.
+
+The clearest single symptom: per-meal properties (protein family, fibre score,
+heavy/carb-heavy/fat-heavy, name) are recomputed inside those loops, many by
+regex. 218,790 per-meal lookups run to describe **83 distinct meals** — a
+redundancy factor of **2,636x**.
+
+### 10.5 The fix, in three tiers
+
+Recorded here so it can be picked up without re-deriving the profile.
+
+**Tier 1 — pure speedups, no behaviour change.** Memoize per-meal properties
+once per meal; stop spreading every candidate into a new object; precompute the
+sort tie-break key (measured 220ms → 105ms on its own). Expect roughly half the
+runtime back. Verifiable: `npm run audit:generation` and the planner regression
+snapshot must produce byte-identical plans.
+
+**Tier 2 — stop materialising every combination.** Enumerate lazily and retain
+only the best N per budget-compliance class as you go, rather than building
+72,930 day objects and trimming afterwards. Derive the slot shortlists from that
+retained pool instead of re-walking everything.
+
+**Tier 3 — beat the quadratic itself.** Index lunch/dinner by macro bucket: for
+a given breakfast the day's remaining protein/calorie/carb range is known, so
+look up only the pairs that could land in it instead of trying all 66x65. Needed
+past roughly 200 meals. A Web Worker is complementary — it stops the UI
+freezing, it does not make the work smaller.
+
+Tier 1 alone should carry the catalog to roughly 130 meals. Tiers 1+2 to ~200.
