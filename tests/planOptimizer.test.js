@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildSlotShortlists,
   buildWeekPlan,
   enumerateFeasibleDays,
   isWeekWithinBudgets,
@@ -398,4 +399,54 @@ test('history pushes the optimizer away from meals it just served', () => {
     countB1(withHistory) <= countB1(withoutHistory),
     'the just-served breakfast should not be used more often after appearing in history'
   );
+});
+
+/**
+ * The shortlist builder takes the best 60 of a candidate set that runs to six
+ * figures, so it selects rather than sorting the whole set. Selection is only
+ * safe if it breaks ties the way the stable sort it replaced did — earliest
+ * candidate first — which is what this pins down, at deliberately high tie
+ * density.
+ */
+test('shortlist selection breaks ties exactly as a stable descending sort would', () => {
+  const rules = rulesFor();
+  const stableSortReference = (pool, limit) =>
+    [...pool].sort((a, b) => b.baseScore - a.baseScore).slice(0, limit);
+
+  let seed = 20260805;
+  const nextRandom = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+
+  for (let trial = 0; trial < 200; trial += 1) {
+    const size = 1 + Math.floor(nextRandom() * 200);
+    const limit = 1 + Math.floor(nextRandom() * 60);
+    // Few distinct scores, so most comparisons are ties.
+    const distinctScores = 1 + Math.floor(nextRandom() * 4);
+
+    const pool = Array.from({ length: size }, (unused, index) => ({
+      baseScore: Math.floor(nextRandom() * distinctScores),
+      mealNames: [`B${index}`, `L${index}`, `D${index}`],
+      breakfast: { name: `B${index}` },
+      lunch: { name: `L${index}` },
+      dinner: { name: `D${index}` }
+    }));
+
+    const weekDays = [{ dateKey: '2026-08-03', ...pool[0] }];
+    const options = { weekDays, dayCandidates: pool, rules, perSlot: 999 };
+
+    const selected = buildSlotShortlists({ ...options, scoredCandidates: pool, alternateDays: limit });
+    const sorted = buildSlotShortlists({
+      ...options,
+      scoredCandidates: stableSortReference(pool, limit),
+      alternateDays: Number.MAX_SAFE_INTEGER
+    });
+
+    assert.deepEqual(
+      selected.shortlists,
+      sorted.shortlists,
+      `bounded selection diverged from the stable sort (size ${size}, limit ${limit})`
+    );
+  }
 });
