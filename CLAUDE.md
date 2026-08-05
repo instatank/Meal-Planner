@@ -95,7 +95,7 @@ Re-measure any of this with `npm run audit:generation` — it enumerates rather 
 npm install
 npm run dev              # local dev (no serverless functions — use `vercel dev` for those)
 npm run build            # production build
-npm run test:logic       # all tests (102, all green)
+npm run test:logic       # all tests (103, all green)
 npm run test:planner     # planner regression only
 npm run audit:generation # enumerate combinations + score a week against the acceptance criteria
 npm run db:pack          # regenerate database packs under database/ + exports/
