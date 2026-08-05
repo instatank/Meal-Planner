@@ -441,6 +441,32 @@ export const buildHistoryCounts = (historyMap = {}, { lookbackDays = 14 } = {}) 
 
 // ─── Week search ────────────────────────────────────────────────────────────
 
+/**
+ * Assign every candidate its standalone score less the history penalty.
+ *
+ * The week search and the shortlist builder both need exactly this number, and
+ * both used to compute it independently over the whole candidate set — two full
+ * scoring passes to answer the same question. Callers that need both now score
+ * once and hand the result to each.
+ *
+ * The score is stamped on the candidate rather than returned in a parallel
+ * wrapper object, which is what the search used to build: one throwaway object
+ * per candidate, of which all but `maxCandidates` were discarded immediately.
+ */
+export const scoreCandidates = (candidates, { rules, preferences = {}, historyMap = {} }) => {
+  const historyCounts = buildHistoryCounts(historyMap);
+  const historyRepeatPenalty = rules.scored.historyRepeatPenalty;
+
+  for (const candidate of candidates) {
+    let historyPenalty = 0;
+    for (const name of candidate.mealNames) {
+      historyPenalty += Number(historyCounts[name] || 0) * historyRepeatPenalty;
+    }
+    candidate.baseScore = scoreDayStandalone(candidate, { rules, preferences }) - historyPenalty;
+  }
+  return candidates;
+};
+
 const DEFAULT_BEAM_WIDTH = 40;
 
 /**
@@ -569,26 +595,19 @@ export const selectWeek = ({
   lockedDays = {},
   beamWidth = DEFAULT_BEAM_WIDTH,
   maxCandidates = DEFAULT_MAX_CANDIDATES,
-  dayCandidates = null
+  dayCandidates = null,
+  scoredCandidates = null
 }) => {
   const dayCount = targetDateKeys.length;
-  const candidates = dayCandidates || enumerateFeasibleDays({ mealDatabase, rules, preferences });
+  const candidates = scoredCandidates || dayCandidates || enumerateFeasibleDays({ mealDatabase, rules, preferences });
 
   if (dayCount === 0 || candidates.length === 0) {
     return { days: [], candidateCount: candidates.length, feasible: candidates.length > 0, summary: null };
   }
 
-  const historyCounts = buildHistoryCounts(historyMap);
-  const scored = candidates.map((candidate) => {
-    const historyPenalty = candidate.mealNames.reduce(
-      (sum, name) => sum + Number(historyCounts[name] || 0) * rules.scored.historyRepeatPenalty,
-      0
-    );
-    return {
-      ...candidate,
-      baseScore: scoreDayStandalone(candidate, { rules, preferences }) - historyPenalty
-    };
-  });
+  // Sorting a copy leaves the caller's candidate order untouched — the
+  // shortlist builder relies on it for its own stable sort.
+  const scored = [...(scoredCandidates || scoreCandidates(candidates, { rules, preferences, historyMap }))];
   scored.sort((a, b) => b.baseScore - a.baseScore || (a.nameKey < b.nameKey ? -1 : 1));
 
   const pool = trimCandidatePool(scored, maxCandidates);
@@ -778,21 +797,16 @@ export const buildSlotShortlists = ({
   preferences = {},
   historyMap = {},
   perSlot = DEFAULT_SHORTLIST_PER_SLOT,
-  alternateDays = DEFAULT_ALTERNATE_DAYS
+  alternateDays = DEFAULT_ALTERNATE_DAYS,
+  scoredCandidates = null
 }) => {
-  const historyCounts = buildHistoryCounts(historyMap);
-  const ranked = dayCandidates
-    .map((candidate) => ({
-      candidate,
-      score: scoreDayStandalone(candidate, { rules, preferences }) -
-        candidate.mealNames.reduce(
-          (sum, name) => sum + Number(historyCounts[name] || 0) * rules.scored.historyRepeatPenalty,
-          0
-        )
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, alternateDays)
-    .map((entry) => entry.candidate);
+  // Same scores the week search used, computed once when the caller supplies
+  // them. Sorting a copy of the candidates in their original order keeps this
+  // stable sort landing exactly where the old wrapper-object sort did.
+  const pool = scoredCandidates || scoreCandidates(dayCandidates, { rules, preferences, historyMap });
+  const ranked = [...pool]
+    .sort((a, b) => b.baseScore - a.baseScore)
+    .slice(0, alternateDays);
 
   const shortlists = {};
   const stats = {};
@@ -838,6 +852,8 @@ export const buildWeekPlan = ({
   shortlistPerSlot = DEFAULT_SHORTLIST_PER_SLOT
 }) => {
   const dayCandidates = enumerateFeasibleDays({ mealDatabase, rules, preferences });
+  // Scored once, here, and shared by both consumers below.
+  const scoredCandidates = scoreCandidates(dayCandidates, { rules, preferences, historyMap });
   const week = selectWeek({
     mealDatabase,
     rules,
@@ -846,7 +862,8 @@ export const buildWeekPlan = ({
     preferences,
     lockedDays,
     beamWidth,
-    dayCandidates
+    dayCandidates,
+    scoredCandidates
   });
   const { shortlists, stats } = buildSlotShortlists({
     weekDays: week.days,
@@ -854,7 +871,8 @@ export const buildWeekPlan = ({
     rules,
     preferences,
     historyMap,
-    perSlot: shortlistPerSlot
+    perSlot: shortlistPerSlot,
+    scoredCandidates
   });
 
   return { ...week, dayCandidates, shortlists, stats };
