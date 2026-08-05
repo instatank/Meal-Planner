@@ -782,6 +782,43 @@ const DEFAULT_SHORTLIST_PER_SLOT = 8;
 const DEFAULT_ALTERNATE_DAYS = 60;
 
 /**
+ * The `limit` best candidates by score, in the order a stable descending sort
+ * would have produced — ties broken by position in `candidates`.
+ *
+ * The shortlist needs 60 of them. Fully sorting the candidate set to throw away
+ * the other 114,054 is the single clearest piece of waste left in the pass.
+ *
+ * Stability falls out of the strict `>` test: a candidate only displaces the
+ * worst kept entry when it scores strictly higher, so among equal scores the
+ * earliest-seen candidate stays, which is what the stable sort did.
+ */
+const topByBaseScore = (candidates, limit) => {
+  if (candidates.length <= limit) {
+    return [...candidates].sort((a, b) => b.baseScore - a.baseScore);
+  }
+
+  const kept = [];
+  for (const candidate of candidates) {
+    const score = candidate.baseScore;
+    if (kept.length === limit && !(score > kept[limit - 1].baseScore)) continue;
+
+    // First position holding a strictly lower score — where a stable sort
+    // would place this candidate, after any it ties with.
+    let low = 0;
+    let high = kept.length;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (kept[mid].baseScore < score) high = mid;
+      else low = mid + 1;
+    }
+
+    kept.splice(low, 0, candidate);
+    if (kept.length > limit) kept.pop();
+  }
+  return kept;
+};
+
+/**
  * Per-date, per-slot shortlists of legal meal names, derived from the day
  * candidates rather than from three independent slot filters.
  *
@@ -801,12 +838,10 @@ export const buildSlotShortlists = ({
   scoredCandidates = null
 }) => {
   // Same scores the week search used, computed once when the caller supplies
-  // them. Sorting a copy of the candidates in their original order keeps this
-  // stable sort landing exactly where the old wrapper-object sort did.
+  // them. Candidates stay in their original order, which is what makes the
+  // selection below tie-break exactly as the old sort did.
   const pool = scoredCandidates || scoreCandidates(dayCandidates, { rules, preferences, historyMap });
-  const ranked = [...pool]
-    .sort((a, b) => b.baseScore - a.baseScore)
-    .slice(0, alternateDays);
+  const ranked = topByBaseScore(pool, alternateDays);
 
   const shortlists = {};
   const stats = {};
