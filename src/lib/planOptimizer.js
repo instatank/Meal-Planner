@@ -96,6 +96,60 @@ const isHeavyMeal = (meal) =>
 const isCarbHeavyMeal = (meal) => getMealCarbs(meal) >= CARB_HEAVY_THRESHOLD;
 const isFatHeavyMeal = (meal) => getMealFat(meal) > FAT_HEAVY_THRESHOLD;
 
+// ─── Per-meal fact cache ────────────────────────────────────────────────────
+
+/**
+ * Everything above is a pure function of a single meal, but the search calls
+ * them once per *combination*, not once per meal. A 99-meal catalog yields
+ * ~114k day candidates, so `getProteinFamily` alone ran its regexes ~340k times
+ * to answer 99 distinct questions.
+ *
+ * `mealFacts` computes each meal's derived properties once and hands the same
+ * record back thereafter. The accessors above stay the public API — this is a
+ * memo in front of them, not a second definition of them, so there is no way
+ * for the two to disagree.
+ *
+ * Keyed by object identity, which assumes a meal is not mutated in place after
+ * it has been scored. Nothing in the app does that: meals come from the static
+ * catalog or from fixtures, and edits replace the object rather than patch it.
+ */
+const FACT_CACHE = new WeakMap();
+
+const EMPTY_FACTS = {
+  name: '', protein: 0, carbs: 0, fat: 0, calories: 0, cuisine: '',
+  family: 'vegetarian', redMeat: false, primaryMeat: false,
+  fibreScore: 0, fibre: false, heavy: false, carbHeavy: false, fatHeavy: false,
+  repeatedFamily: false
+};
+
+export const mealFacts = (meal) => {
+  if (!meal || typeof meal !== 'object') return EMPTY_FACTS;
+  const cached = FACT_CACHE.get(meal);
+  if (cached) return cached;
+
+  const family = getProteinFamily(meal);
+  const fibreScore = getFibreScore(meal);
+  const facts = {
+    name: getMealName(meal),
+    protein: getMealProtein(meal),
+    carbs: getMealCarbs(meal),
+    fat: getMealFat(meal),
+    calories: getMealCalories(meal),
+    cuisine: getMealCuisine(meal),
+    family,
+    redMeat: family === 'red_meat',
+    primaryMeat: family === 'fish' || family === 'chicken' || family === 'red_meat',
+    fibreScore,
+    fibre: Boolean(meal?.has_fibre) || fibreScore > 0,
+    heavy: isHeavyMeal(meal),
+    carbHeavy: isCarbHeavyMeal(meal),
+    fatHeavy: isFatHeavyMeal(meal),
+    repeatedFamily: hasRepeatedFamilyInsideMeal(meal)
+  };
+  FACT_CACHE.set(meal, facts);
+  return facts;
+};
+
 export const getMealsForSlot = (mealDatabase, slot) => {
   if (slot === 'lunch' || slot === 'dinner' || slot === 'lunchDinner') return mealDatabase?.lunchDinner || [];
   return mealDatabase?.[slot] || [];
@@ -211,7 +265,10 @@ export const annotateDay = (day, rules) => {
  */
 export const scoreDayStandalone = (day, { rules, preferences = {} }) => {
   const w = rules.scored;
-  const meals = CORE_SLOTS.map((slot) => day[slot]);
+  const breakfastFacts = mealFacts(day.breakfast);
+  const lunchFacts = mealFacts(day.lunch);
+  const dinnerFacts = mealFacts(day.dinner);
+  const facts = [breakfastFacts, lunchFacts, dinnerFacts];
   const totals = day.totals || summariseDay(day);
   const { dailyProteinMin, dailyProteinMax, dailyCarbCap, dailyCalorieMin, dailyCalorieMax } = rules.budgeted;
   let score = 0;
@@ -236,51 +293,71 @@ export const scoreDayStandalone = (day, { rules, preferences = {} }) => {
 
   // Dinner tapering, by calories rather than by a hand-typed weight label.
   if (totals.calories > 0) {
-    const dinnerShare = getMealCalories(day.dinner) / totals.calories;
+    const dinnerShare = dinnerFacts.calories / totals.calories;
     if (dinnerShare > w.dinnerCalorieShareTarget) {
       score -= (dinnerShare - w.dinnerCalorieShareTarget) * w.dinnerTaperPenalty * 10;
     }
   }
 
-  // Protein-family diversity within the day.
+  // One pass over the day's three meals, accumulating every count the rest of
+  // the scoring needs. This was seven separate `filter`/`map` passes; the maths
+  // is unchanged, but a day is now walked once instead of ten times.
   const familyCounts = {};
-  for (const meal of meals) {
-    if (!isPrimaryMeat(meal)) continue;
-    const family = getProteinFamily(meal);
-    familyCounts[family] = (familyCounts[family] || 0) + 1;
+  let fibreCount = 0;
+  let meatWithoutFibreCount = 0;
+  let heavyCount = 0;
+  let carbHeavyCount = 0;
+  let fatHeavyCount = 0;
+  let repeatedFamilyCount = 0;
+  let maxProtein = -Infinity;
+  let minProtein = Infinity;
+
+  for (const meal of facts) {
+    if (meal.primaryMeat) {
+      familyCounts[meal.family] = (familyCounts[meal.family] || 0) + 1;
+      if (meal.fibreScore < 1) meatWithoutFibreCount += 1;
+    }
+    if (meal.fibre) fibreCount += 1;
+    if (meal.heavy) heavyCount += 1;
+    if (meal.carbHeavy) carbHeavyCount += 1;
+    if (meal.fatHeavy) fatHeavyCount += 1;
+    if (meal.repeatedFamily) repeatedFamilyCount += 1;
+    if (meal.protein > maxProtein) maxProtein = meal.protein;
+    if (meal.protein < minProtein) minProtein = meal.protein;
   }
+
+  // Protein-family diversity within the day.
   for (const count of Object.values(familyCounts)) {
     if (count > 1) score -= (count - 1) * w.sameProteinFamilyTwiceInDayPenalty;
   }
 
   // Lunch and dinner should not read as the same meal twice.
-  const lunchCuisine = getMealCuisine(day.lunch);
-  const dinnerCuisine = getMealCuisine(day.dinner);
-  if (lunchCuisine && dinnerCuisine && lunchCuisine === dinnerCuisine) {
+  if (lunchFacts.cuisine && dinnerFacts.cuisine && lunchFacts.cuisine === dinnerFacts.cuisine) {
     score -= w.lunchDinnerCuisineClashPenalty;
   }
 
   // Fibre presence, and the old "meat meals should carry fibre" preference.
-  score += meals.filter(hasFibre).length * w.fibreBonus;
-  score -= meals.filter((meal) => isPrimaryMeat(meal) && getFibreScore(meal) < 1).length * w.fibreBonus;
+  score += fibreCount * w.fibreBonus;
+  score -= meatWithoutFibreCount * w.fibreBonus;
 
   // Meal-shape balance. These were hard rules once; as preferences they let a
   // genuine treat day exist without the engine refusing to produce one.
-  score -= Math.max(0, meals.filter(isHeavyMeal).length - 1) * w.fibreBonus * 2;
-  score -= Math.max(0, meals.filter(isCarbHeavyMeal).length - 1) * w.fibreBonus * 2;
-  score -= Math.max(0, meals.filter(isFatHeavyMeal).length - 1) * w.fibreBonus * 2;
-  score -= meals.filter(hasRepeatedFamilyInsideMeal).length * w.sameProteinFamilyTwiceInDayPenalty;
+  score -= Math.max(0, heavyCount - 1) * w.fibreBonus * 2;
+  score -= Math.max(0, carbHeavyCount - 1) * w.fibreBonus * 2;
+  score -= Math.max(0, fatHeavyCount - 1) * w.fibreBonus * 2;
+  score -= repeatedFamilyCount * w.sameProteinFamilyTwiceInDayPenalty;
 
-  const proteins = meals.map(getMealProtein);
-  const gap = Math.max(...proteins) - Math.min(...proteins);
+  const gap = maxProtein - minProtein;
   if (gap > PROTEIN_BALANCE_MAX_GAP) score -= (gap - PROTEIN_BALANCE_MAX_GAP) * 0.15;
 
-  // User preference signal from the event log.
+  // Kept as its own pass, accumulating into `score` in the original order:
+  // floating-point addition is not associative, so batching these into a
+  // subtotal can shift the last bits and flip a tie in the candidate sort.
   const accepts = preferences.accepts || {};
   const edits = preferences.edits || {};
   const avoids = preferences.avoids || {};
-  for (const meal of meals) {
-    const name = getMealName(meal);
+  for (const meal of facts) {
+    const name = meal.name;
     score += Math.min(Number(accepts[name] || 0), 4) * w.preferenceAcceptWeight;
     score += Math.min(Number(edits[name] || 0), 3) * w.preferenceEditWeight;
     score -= Math.min(Number(avoids[name] || 0), 4) * w.preferenceAvoidWeight;
