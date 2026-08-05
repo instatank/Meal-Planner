@@ -238,40 +238,95 @@ export const satisfiesDayHardConstraints = (day, { rules, preferences = {} }) =>
  * Exhaustive by design. For the 41-meal catalog this is a few thousand
  * combinations and takes single-digit milliseconds.
  */
+/**
+ * The "no meal twice in a day" cap, for the three names of one day.
+ *
+ * Equivalent to counting occurrences and rejecting any name that exceeds the
+ * cap, which is what `satisfiesDayHardConstraints` does — but without building
+ * a counts object per combination.
+ */
+const withinSameMealCap = (a, b, c, cap) => {
+  const ab = a === b;
+  const ac = a === c;
+  if (ab && ac) return cap >= 3;
+  if (ab || ac || b === c) return cap >= 2;
+  return cap >= 1;
+};
+
 export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {} }) => {
   const breakfasts = getMealsForSlot(mealDatabase, 'breakfast')
     .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
   const lunchDinners = getMealsForSlot(mealDatabase, 'lunch')
     .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
 
+  // Both pools are already filtered for admissibility, so the per-meal half of
+  // `satisfiesDayHardConstraints` is answered before the loop starts. What is
+  // left that genuinely varies per combination is the same-meal cap and the
+  // protein sanity floor, checked inline below. The rejected combinations no
+  // longer allocate a day object on their way to being discarded.
+  const { maxSameMealPerDay, dailyProteinSanityFloor } = rules.hard;
+  const lunchDinnerFacts = lunchDinners.map(mealFacts);
   const days = [];
+
   for (const breakfast of breakfasts) {
-    for (const lunch of lunchDinners) {
-      for (const dinner of lunchDinners) {
-        const day = { breakfast, lunch, dinner };
-        if (!satisfiesDayHardConstraints(day, { rules, preferences })) continue;
-        days.push(annotateDay(day, rules));
+    const b = mealFacts(breakfast);
+    for (let lunchIndex = 0; lunchIndex < lunchDinners.length; lunchIndex += 1) {
+      const l = lunchDinnerFacts[lunchIndex];
+      // Hoisted out of the innermost loop: breakfast and lunch are fixed here.
+      const pairProtein = b.protein + l.protein;
+      const pairCarbs = b.carbs + l.carbs;
+      const pairFat = b.fat + l.fat;
+      const pairCalories = b.calories + l.calories;
+
+      for (let dinnerIndex = 0; dinnerIndex < lunchDinners.length; dinnerIndex += 1) {
+        const d = lunchDinnerFacts[dinnerIndex];
+        if (!withinSameMealCap(b.name, l.name, d.name, maxSameMealPerDay)) continue;
+
+        const protein = pairProtein + d.protein;
+        if (protein < dailyProteinSanityFloor) continue;
+
+        const totals = {
+          protein,
+          carbs: pairCarbs + d.carbs,
+          fat: pairFat + d.fat,
+          calories: pairCalories + d.calories
+        };
+        const day = { breakfast, lunch: lunchDinners[lunchIndex], dinner: lunchDinners[dinnerIndex] };
+        days.push(annotateDay(day, rules, totals));
       }
     }
   }
   return days;
 };
 
-/** Attach the Tier-2 verdicts and cached shape data a day is judged on. */
-export const annotateDay = (day, rules) => {
-  const totals = summariseDay(day);
-  const meals = CORE_SLOTS.map((slot) => day[slot]);
+/**
+ * Attach the Tier-2 verdicts and cached shape data a day is judged on.
+ *
+ * `totals` may be supplied by a caller that has already summed the day — the
+ * enumeration above computes it incrementally — in which case this does not
+ * re-walk the meals to derive it a second time.
+ */
+export const annotateDay = (day, rules, totals = null) => {
+  const breakfast = mealFacts(day.breakfast);
+  const lunch = mealFacts(day.lunch);
+  const dinner = mealFacts(day.dinner);
+  const resolvedTotals = totals || summariseDay(day);
   const { dailyProteinMin, dailyProteinMax, dailyCarbCap, dailyCalorieMin, dailyCalorieMax } = rules.budgeted;
+
+  const mealNames = [breakfast.name, lunch.name, dinner.name];
 
   return {
     ...day,
-    totals,
-    mealNames: meals.map(getMealName),
-    redMeatCount: meals.filter(isRedMeat).length,
-    cuisines: meals.map(getMealCuisine),
-    proteinInBand: totals.protein >= dailyProteinMin && totals.protein <= dailyProteinMax,
-    underCarbCap: totals.carbs <= dailyCarbCap,
-    inCalorieBounds: totals.calories >= dailyCalorieMin && totals.calories <= dailyCalorieMax
+    totals: resolvedTotals,
+    mealNames,
+    // Precomputed once here because the sort tie-breaker and the beam's
+    // per-candidate hash both need it, and both used to rebuild it per call.
+    nameKey: mealNames.join('|'),
+    redMeatCount: (breakfast.redMeat ? 1 : 0) + (lunch.redMeat ? 1 : 0) + (dinner.redMeat ? 1 : 0),
+    cuisines: [breakfast.cuisine, lunch.cuisine, dinner.cuisine],
+    proteinInBand: resolvedTotals.protein >= dailyProteinMin && resolvedTotals.protein <= dailyProteinMax,
+    underCarbCap: resolvedTotals.carbs <= dailyCarbCap,
+    inCalorieBounds: resolvedTotals.calories >= dailyCalorieMin && resolvedTotals.calories <= dailyCalorieMax
   };
 };
 
@@ -552,7 +607,7 @@ export const selectWeek = ({
       baseScore: scoreDayStandalone(candidate, { rules, preferences }) - historyPenalty
     };
   });
-  scored.sort((a, b) => b.baseScore - a.baseScore || (a.mealNames.join('|') < b.mealNames.join('|') ? -1 : 1));
+  scored.sort((a, b) => b.baseScore - a.baseScore || (a.nameKey < b.nameKey ? -1 : 1));
 
   const pool = trimCandidatePool(scored, maxCandidates);
   const maxDayProtein = pool.reduce((max, day) => Math.max(max, day.totals.protein), 0);
@@ -577,8 +632,16 @@ export const selectWeek = ({
     const remainingAfter = dayCount - dayIndex - 1;
     const next = [];
 
+    // The tie-breaker depends only on the date and the candidate, not on the
+    // beam node, so it is the same value for every node on this day. Computing
+    // it per (node, candidate) meant hashing the same string `beamWidth` times.
+    const tieBreaks = pool.map(
+      (candidate) => (hashString(`${dateKey}|${candidate.nameKey}`) % 1000) / 100000
+    );
+
     for (const node of beam) {
-      for (const candidate of pool) {
+      for (let candidateIndex = 0; candidateIndex < pool.length; candidateIndex += 1) {
+        const candidate = pool[candidateIndex];
         if (!canPlaceDay(node.state, candidate, rules)) continue;
 
         // Tier-2 budgets, enforced by look-ahead rather than after the fact.
@@ -620,7 +683,7 @@ export const selectWeek = ({
           if (cuisine && !node.state.cuisines.has(cuisine)) newCuisines += 1;
         }
 
-        const tieBreak = (hashString(`${dateKey}|${candidate.mealNames.join('|')}`) % 1000) / 100000;
+        const tieBreak = tieBreaks[candidateIndex];
         const score = node.score
           + candidate.baseScore
           + newDistinct * rules.scored.distinctMealBonus
