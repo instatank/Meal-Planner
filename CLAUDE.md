@@ -150,7 +150,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 
 0. **Confirm the five Phase 2 decisions.** `docs/PHASE2_HANDOVER.md` §4 asked the founder five product questions before the work; they were not answered, so Phase 2 proceeded on stated assumptions (meals authored for review, additive only, fibre in grams now, unimplemented goals left throwing, protein floor unchanged). §9.7 and §9.8 record what to confirm — including the measurement for raising the weekly protein floor.
 1. **Fix or disable `buildPromotedCustomMeal`.** See Known Gotchas. It is now the only path feeding invented macros into a measured catalog.
-2. **Unblock the catalog — this is now the top engineering priority.** At 97 meals the deterministic pass is ~2s of blocked main thread, and more meals are waiting to be added. Profiled breakdown and the three-tier fix are in `docs/PHASE2_HANDOVER.md` §10.4–§10.5. Tier 1 is pure speedup with no behaviour change and should roughly halve it.
+2. **Unblock the optimizer — top engineering priority. → `docs/PHASE3_HANDOVER.md`** At 97 meals the deterministic pass is ~2s of blocked main thread and more meals are queued behind it. Profiled: ~1,600ms of the 2,000ms is bookkeeping around the beam search, not the search itself. Biggest single win is that the full candidate set is scored and sorted **twice** (`selectWeek` and `buildSlotShortlists`). Tier 1 is pure speedup with a byte-identical-output acceptance test.
 3. **Switch timestamps to Firestore `serverTimestamp()`.** The current heal-on-read logic is defensive but brittle. Using server-assigned timestamps makes client-clock poisoning impossible and lets us delete the `isCorruptTs` / heal branches.
 4. **IF (Intermittent Fasting) mode.** `two_meals` is declared in onboarding and reconciled in `rules.js`, but has no ruleset — `getRules` throws for it by design. Give it real Tier-1/2/3 definitions and surface it so users can opt into 16/8 or 18/6 without overriding meals manually.
 5. **Vegetarian goal.** Now cheap: Phase 2 added 2 vegetarian breakfasts and several vegetarian lunch/dinner dishes that sit inside the budgets. Still throws by design.
@@ -163,6 +163,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 
 | Doc | What it is |
 | --- | --- |
+| `docs/PHASE3_HANDOVER.md` | **The current work.** Self-contained brief for unblocking the optimizer: the profile, the specific waste sites with line numbers, three tiers of fix, and a byte-identical-output acceptance test. |
 | `docs/PHASE2_HANDOVER.md` | §1–§8 the original brief. **§9 what Phase 2 measured** — including the quadratic-runtime finding (§9.6) and the protein-floor measurement left for the founder (§9.7). **§10 the 2026-08-03 research batch**, the profiled runtime breakdown (§10.4) and the three-tier optimizer fix (§10.5). |
 | `docs/PHASE1_HANDOVER.md` | Shipped 2026-08-02. §9 records what the generation-engine rebuild measured — read it before changing any threshold. |
 | `docs/EVAL_AND_ROADMAP.md` | The original audit. §3 is now historical (that code is deleted); §4 onward is still live. |
