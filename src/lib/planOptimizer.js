@@ -158,7 +158,7 @@ export const mealFacts = (meal) => {
     redMeat: family === 'red_meat',
     primaryMeat: family === 'fish' || family === 'chicken' || family === 'red_meat',
     fibreScore,
-    fibre: Boolean(meal?.has_fibre) || fibreScore > 0,
+    fibre: hasFibre(meal),
     heavy: isHeavyMeal(meal),
     carbHeavy: isCarbHeavyMeal(meal),
     fatHeavy: isFatHeavyMeal(meal),
