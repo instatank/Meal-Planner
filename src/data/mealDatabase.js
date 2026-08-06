@@ -262,6 +262,51 @@ const baseMealsList = {
       }
     },
 
+    // ── Batch 3 additions (2026-08-06) ───────────────────────────────────
+    //
+    // Recipe URLs are attached only where a real, checked source exists.
+    // Never fabricate a source for a meal that never had one.
+    {
+      "meal_id": "breakfast_scrambled-egg-sandwich",
+      "canonical_name": "Scrambled egg sandwich",
+      "display_name": "Scrambled Egg Sandwich",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Scrambled egg sandwich",
+      "recipe_url": "https://www.eatingonadime.com/scrambled-egg-sandwich/",
+      "parts": [
+        { "ingredientId": "whole_wheat_toast", "qty": 4, "unit": "slice" },
+        { "ingredientId": "egg_whole", "qty": 3, "unit": "piece" }
+      ],
+      "components": {
+        "protein": "Eggs (whole)", "amount": 150, "carb": "Whole wheat toast", "carbAmount": 4, "veg": null, "style": "Pan-fried"
+      }
+    },
+    {
+      // Protein-boosted so it clears the breakfast floor — the plain bowl
+      // (7g protein) cannot serve as breakfast and lives in snacks instead.
+      "meal_id": "breakfast_acai-bowl-protein-boosted",
+      "canonical_name": "Acai bowl (protein-boosted)",
+      "display_name": "Acai Bowl (Protein-Boosted)",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Acai bowl (protein-boosted)",
+      "recipe_url": "https://www.cookingclassy.com/acai-bowl/",
+      "parts": [
+        { "ingredientId": "acai_pulp", "qty": 100, "unit": "g" },
+        { "ingredientId": "banana", "qty": 0.5, "unit": "piece" },
+        { "ingredientId": "strawberries", "qty": 40, "unit": "g" },
+        { "ingredientId": "blueberries", "qty": 30, "unit": "g" },
+        { "ingredientId": "almonds_5pc", "qty": 5, "unit": "piece" },
+        { "ingredientId": "pumpkin_seeds", "qty": 10, "unit": "g" },
+        { "ingredientId": "greek_yogurt", "qty": 150, "unit": "g" },
+        { "ingredientId": "protein_shake", "qty": 25, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Greek yogurt + whey", "amount": 175, "carb": "Acai + fruit", "carbAmount": 100, "veg": null, "style": "Bowl"
+      }
+    },
+
     // ── Research batch, 2026-08-03 ───────────────────────────────────────
     //
     // From a sourced research pass across Hebbar's Kitchen, Maangchi, Just One
@@ -272,6 +317,7 @@ const baseMealsList = {
     {
       "meal_id": "breakfast_paneer-egg-white-bhurji-toast",
       "canonical_name": "Paneer & egg-white bhurji + toast",
+      "recipe_url": "https://hebbarskitchen.com/easy-dry-paneer-bhurji-recipe/",
       "display_name": "Paneer & Egg-White Bhurji",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -289,6 +335,7 @@ const baseMealsList = {
     {
       "meal_id": "breakfast_anda-bhurji-toast",
       "canonical_name": "Anda bhurji + toast",
+      "recipe_url": "https://www.sanjeevkapoor.com/Recipe/Anda-Bhurji.html",
       "display_name": "Anda bhurji + toast",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -306,6 +353,7 @@ const baseMealsList = {
     {
       "meal_id": "breakfast_sardines-toast-avocado",
       "canonical_name": "Sardines on toast + avocado",
+      "recipe_url": "https://littlesunnykitchen.com/sardines-on-toast/",
       "display_name": "Sardines on Toast + Avocado",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -323,6 +371,7 @@ const baseMealsList = {
     {
       "meal_id": "breakfast_shakshuka-feta",
       "canonical_name": "Shakshuka with feta",
+      "recipe_url": "https://cooking.nytimes.com/recipes/1014721-shakshuka-with-feta",
       "display_name": "Shakshuka with feta",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -342,6 +391,7 @@ const baseMealsList = {
     {
       "meal_id": "breakfast_cottage-cheese-smoked-salmon-bowl",
       "canonical_name": "Cottage cheese & smoked salmon bowl",
+      "recipe_url": "https://lowcarbsimplified.com/smoked-salmon-cottage-cheese-bowl-high-protein/",
       "display_name": "Cottage Cheese & Smoked Salmon",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1153,6 +1203,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_palak-paneer-jowar-roti",
       "canonical_name": "Palak paneer + jowar roti",
+      "recipe_url": "https://hebbarskitchen.com/palak-paneer-recipe-restaurant-style/",
       "display_name": "Palak paneer + jowar roti",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1171,6 +1222,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_achari-paneer-tikka-dal-salad",
       "canonical_name": "Achari paneer tikka + dal + salad",
+      "recipe_url": "https://hebbarskitchen.com/easy-achari-paneer-tikka-recipe-tawa/",
       "display_name": "Achari Paneer Tikka + Dal",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1189,6 +1241,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_soya-keema-curry-jowar-roti",
       "canonical_name": "Soya keema curry + jowar roti",
+      "recipe_url": "https://hebbarskitchen.com/meal-maker-curry-recipe-soya-chunks/",
       "display_name": "Soya Keema + Jowar Roti",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1207,6 +1260,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_chole-paneer-bowl-salad",
       "canonical_name": "Chole-paneer bowl + salad",
+      "recipe_url": "https://www.indianhealthyrecipes.com/chana-paneer-recipe-paneer-chana-masala/",
       "display_name": "Chole-Paneer Bowl",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1225,6 +1279,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_kadai-chicken-jowar-roti",
       "canonical_name": "Kadai chicken + jowar roti",
+      "recipe_url": "https://www.indianhealthyrecipes.com/kadai-chicken/",
       "display_name": "Kadai chicken + jowar roti",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1243,6 +1298,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_tandoori-fish-tikka-veg-roti",
       "canonical_name": "Tandoori fish tikka + sauteed veg + roti",
+      "recipe_url": "https://www.indianhealthyrecipes.com/fish-tikka-in-oven/",
       "display_name": "Tandoori Fish Tikka + Veg",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1261,6 +1317,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_chicken-keema-matar-jowar-roti",
       "canonical_name": "Chicken keema matar + jowar roti",
+      "recipe_url": "https://www.ruchiskitchen.com/chicken-keema-recipe/",
       "display_name": "Chicken Keema Matar + Roti",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1279,6 +1336,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_beef-bulgogi-bowl",
       "canonical_name": "Beef bulgogi bowl",
+      "recipe_url": "https://www.maangchi.com/recipe/bulgogi",
       "display_name": "Beef bulgogi bowl",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1298,6 +1356,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_tofu-veg-bibimbap",
       "canonical_name": "Tofu & vegetable bibimbap",
+      "recipe_url": "https://www.maangchi.com/recipe/bibimbap",
       "display_name": "Tofu & Veg Bibimbap",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1318,6 +1377,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_oyakodon-side-salad",
       "canonical_name": "Oyakodon + side salad",
+      "recipe_url": "https://www.justonecookbook.com/oyakodon/",
       "display_name": "Oyakodon (chicken & egg)",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1337,6 +1397,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_dubu-jorim-rice-kimchi",
       "canonical_name": "Dubu jorim + rice + kimchi",
+      "recipe_url": "https://www.maangchi.com/recipe/dubu-jorim",
       "display_name": "Dubu Jorim (braised tofu)",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1355,6 +1416,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_home-style-tofu-chicken-stir-fry",
       "canonical_name": "Home-style tofu & chicken stir-fry",
+      "recipe_url": "https://thewoksoflife.com/home-style-tofu-stir-fry/",
       "display_name": "Home-Style Tofu & Chicken",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1374,6 +1436,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_vietnamese-lemongrass-chicken-bowl",
       "canonical_name": "Vietnamese lemongrass chicken bowl",
+      "recipe_url": "https://helenrecipes.com/recipe-51-ga-xao-sa-ot-lemongrass-chili-chicken/",
       "display_name": "Lemongrass Chicken Bowl",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1393,6 +1456,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_cantonese-steamed-fish-edamame",
       "canonical_name": "Cantonese steamed fish + edamame + rice",
+      "recipe_url": "https://www.madewithlau.com/recipes/steamed-fish",
       "display_name": "Steamed Fish + Edamame",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1412,6 +1476,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_chicken-bulgogi-bowl",
       "canonical_name": "Chicken bulgogi bowl",
+      "recipe_url": "https://www.koreanbapsang.com/dak-bulgogi-korean-bbq-chicken/",
       "display_name": "Chicken bulgogi bowl",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1431,6 +1496,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_chicken-souvlaki-tzatziki-greek-salad",
       "canonical_name": "Chicken souvlaki + tzatziki + Greek salad",
+      "recipe_url": "https://www.themediterraneandish.com/greek-chicken-souvlaki-recipe-tzatziki/",
       "display_name": "Chicken Souvlaki + Greek Salad",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1450,6 +1516,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_baked-feta-chickpea-traybake",
       "canonical_name": "Baked feta & chickpea traybake",
+      "recipe_url": "https://ottolenghi.co.uk/pages/recipes/braised-chickpeas-with-carrots-dates-and-feta",
       "display_name": "Baked Feta & Chickpea Traybake",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1469,6 +1536,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_tuna-nicoise-salad",
       "canonical_name": "Tuna Nicoise salad",
+      "recipe_url": "https://www.foodnetwork.com/recipes/food-network-kitchen/classic-nicoise-salad-recipe-2127613",
       "display_name": "Tuna Nicoise salad",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1489,6 +1557,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_halloumi-roasted-veg-quinoa-bowl",
       "canonical_name": "Halloumi & roasted-veg quinoa bowl",
+      "recipe_url": "https://www.bbcgoodfoodme.com/recipes/halloumi-traybake/",
       "display_name": "Halloumi & Quinoa Bowl",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1507,6 +1576,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_chicken-white-bean-stew",
       "canonical_name": "Chicken & white-bean stew",
+      "recipe_url": "https://www.recipetineats.com/tuscan-chicken-stew/",
       "display_name": "Chicken & White-Bean Stew",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1526,6 +1596,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_chickpea-pasta-tuna-tomato",
       "canonical_name": "Chickpea pasta with tuna & tomato",
+      "recipe_url": "https://www.healthyfood.com/healthy-recipes/tuna-and-chickpea-pasta/",
       "display_name": "Chickpea Pasta with Tuna",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1545,6 +1616,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_chicken-ricotta-carbonara-style-spaghetti",
       "canonical_name": "Chicken & ricotta carbonara-style spaghetti",
+      "recipe_url": "https://www.hungryhealthyhappy.com/high-protein-chicken-carbonara/",
       "display_name": "Chicken & Ricotta Spaghetti",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1563,6 +1635,7 @@ const baseMealsList = {
     {
       "meal_id": "lunch_dinner_mackerel-quinoa-salad",
       "canonical_name": "Mackerel & quinoa salad",
+      "recipe_url": "https://thecookreport.co.uk/smoked-mackerel-salad/",
       "display_name": "Mackerel & Quinoa Salad",
       "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
       "assumption_version": "assumptions_v2026_08_03",
@@ -1578,6 +1651,231 @@ const baseMealsList = {
         "protein": "Mackerel", "amount": 120, "carb": "Quinoa", "carbAmount": 120, "veg": "Salad + avocado", "vegAmount": 160, "style": "Salad"
       },
       "cuisine": "western"
+    },
+
+    // ── Batch 3 additions (2026-08-06) ───────────────────────────────────
+    //
+    // "Fish tikka plate" and "plain paneer tikka" from this research batch
+    // were dropped as duplicates — already covered by "Tandoori fish tikka +
+    // sauteed veg + roti" and "Paneer tikka + jowar roti + salad" /
+    // "Achari paneer tikka + dal + salad". "Home-style chicken biryani"
+    // (150g-rice build) was dropped for the same reason: near-identical to
+    // the existing "Chicken biryani + raita" (629/55/54/19). Adding either
+    // would be clutter, not coverage.
+    {
+      "meal_id": "lunch_dinner_grilled-chicken-veg-pasta",
+      "canonical_name": "Grilled chicken, veg + pasta",
+      "display_name": "Grilled Chicken, Veg & Pasta",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Grilled chicken, veg + pasta",
+      "recipe_url": "https://www.delallo.com/recipe/summer-pesto-pasta-with-grilled-chicken-vegetables/",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 150, "unit": "g" },
+        { "ingredientId": "mixed_veg_sabzi", "qty": 100, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 80, "unit": "g" },
+        { "ingredientId": "spaghetti_aglio_olio", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 150, "carb": "Spaghetti", "carbAmount": 100, "veg": "Sabzi + salad", "vegAmount": 180, "style": "Grilled"
+      },
+      "cuisine": "western"
+    },
+    {
+      // Rice-plate variant of "Chicken shawarma bowl" (533/57/38/17/11.2).
+      // Heavier and less fibre (more rice, less bowl veg) — genuinely
+      // different, not a re-add of the same dish.
+      "meal_id": "lunch_dinner_chicken-shawarma-plate-garlic-rice",
+      "canonical_name": "Chicken shawarma plate + garlic rice",
+      "display_name": "Chicken Shawarma Plate + Rice",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Chicken shawarma plate + garlic rice",
+      "recipe_url": "https://www.hungrypaprikas.com/shawarma-rice/",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 180, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 8, "unit": "g" },
+        { "ingredientId": "garlic_rice", "qty": 150, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 100, "unit": "g" },
+        { "ingredientId": "hummus", "qty": 20, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 180, "carb": "Garlic rice", "carbAmount": 150, "veg": "Salad + hummus", "vegAmount": 120, "style": "Plate"
+      },
+      "cuisine": "western"
+    },
+    {
+      // Leaner than the malai/achari tikkas already in the catalog — no
+      // cream, no dal. Genuinely distinct, not a re-add.
+      "meal_id": "lunch_dinner_plain-chicken-tikka-plate",
+      "canonical_name": "Plain chicken tikka plate",
+      "display_name": "Plain Chicken Tikka Plate",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Plain chicken tikka plate",
+      "recipe_url": "https://www.indianhealthyrecipes.com/chicken-tikka-in-oven/",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 180, "unit": "g" },
+        { "ingredientId": "curd", "qty": 30, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 5, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 100, "unit": "g" },
+        { "ingredientId": "jowar_roti", "qty": 45, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 180, "carb": "Jowar roti (millet)", "carbAmount": 45, "veg": "Mixed greens salad", "vegAmount": 100, "style": "Tandoori"
+      },
+      "cuisine": "indian"
+    },
+    {
+      // Millet-pasta pesto main. Carbs sit right at the ceiling by design —
+      // do not increase the pasta portion beyond 60g dry.
+      "meal_id": "lunch_dinner_pesto-millet-pasta-chicken",
+      "canonical_name": "Pesto millet pasta + chicken",
+      "display_name": "Pesto Millet Pasta + Chicken",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Pesto millet pasta + chicken",
+      "recipe_url": "https://spicedblog.com/pesto-pasta-grilled-chicken/",
+      "parts": [
+        { "ingredientId": "millet_pasta_dry", "qty": 60, "unit": "g" },
+        { "ingredientId": "basil_pesto", "qty": 30, "unit": "g" },
+        { "ingredientId": "chicken_breast", "qty": 120, "unit": "g" },
+        { "ingredientId": "raw_vegetables", "qty": 50, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast", "amount": 120, "carb": "Millet pasta", "carbAmount": 60, "veg": "Cherry tomatoes", "vegAmount": 50, "style": "Plate"
+      },
+      "cuisine": "western"
+    },
+    {
+      // Millet-pasta aglio e olio. The protein add (prawns) is mandatory —
+      // plain aglio e olio falls well short of the 20g floor on its own.
+      "meal_id": "lunch_dinner_aglio-olio-millet-pasta-prawns",
+      "canonical_name": "Aglio e olio millet pasta + prawns",
+      "display_name": "Aglio e Olio Millet Pasta + Prawns",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Aglio e olio millet pasta + prawns",
+      "recipe_url": "https://simply-delicious-food.com/easy-shrimp-aglio-e-olio/",
+      "parts": [
+        { "ingredientId": "millet_pasta_dry", "qty": 60, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 12, "unit": "g" },
+        { "ingredientId": "prawns", "qty": 150, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Prawns", "amount": 150, "carb": "Millet pasta", "carbAmount": 60, "veg": null, "style": "Plate"
+      },
+      "cuisine": "western"
+    },
+    {
+      // Fresh-grilled, distinct from the existing "Avocado and smoked salmon
+      // salad" (206/24/6/9/4) — roughly double the calories and fat, from
+      // grilled salmon's higher fat plus dressing oil. Not a duplicate.
+      "meal_id": "lunch_dinner_salmon-avocado-salad-fresh-grilled",
+      "canonical_name": "Salmon avocado salad (fresh grilled)",
+      "display_name": "Fresh Grilled Salmon & Avocado Salad",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Salmon avocado salad (fresh grilled)",
+      "recipe_url": "https://www.laylita.com/recipes/grilled-salmon-and-avocado-salad/",
+      "parts": [
+        { "ingredientId": "grilled_salmon", "qty": 120, "unit": "g" },
+        { "ingredientId": "avocado", "qty": 70, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 100, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 5, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Grilled salmon", "amount": 120, "carb": "No carb", "carbAmount": 0, "veg": "Avocado + greens", "vegAmount": 170, "style": "Salad"
+      },
+      "cuisine": "western"
+    },
+    {
+      // Full lunch-size version of "Avocado and smoked chicken salad"
+      // (244/33/6/9/4), which stays as the light-side entry. This scales
+      // the chicken and salad up to a genuine 42g-protein lunch portion.
+      "meal_id": "lunch_dinner_smoked-chicken-salad-full",
+      "canonical_name": "Smoked chicken salad (full size)",
+      "display_name": "Smoked Chicken Salad (Full Size)",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Smoked chicken salad (full size)",
+      "recipe_url": "https://www.nospoonnecessary.com/greek-chicken-loaded-hummus-bowl/",
+      "parts": [
+        { "ingredientId": "smoked_chicken", "qty": 150, "unit": "g" },
+        { "ingredientId": "avocado", "qty": 60, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 120, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 5, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Smoked chicken breast", "amount": 150, "carb": "No carb", "carbAmount": 0, "veg": "Avocado + greens", "vegAmount": 180, "style": "Salad"
+      },
+      "cuisine": "western"
+    },
+    {
+      "meal_id": "lunch_dinner_hummus-salad-protein-boosted",
+      "canonical_name": "Hummus salad (protein-boosted)",
+      "display_name": "Hummus Salad (Protein-Boosted)",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Hummus salad (protein-boosted)",
+      "recipe_url": "https://www.justalittlebitofbacon.com/chicken-souvlaki-hummus-bowl/",
+      "parts": [
+        { "ingredientId": "chicken_breast", "qty": 120, "unit": "g" },
+        { "ingredientId": "hummus", "qty": 80, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 100, "unit": "g" },
+        { "ingredientId": "raw_vegetables", "qty": 80, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 5, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Chicken breast + hummus", "amount": 200, "carb": "No carb", "carbAmount": 0, "veg": "Salad + raw veg", "vegAmount": 180, "style": "Bowl"
+      },
+      "cuisine": "western"
+    },
+    {
+      // Leaner build of the existing "Sweet potato curry + kaala chanaa
+      // sabzi + jowar roti" (731/23/127/15) — cuts carbs 127g to ~97g and
+      // calories 731 to ~525 by shrinking the roti and sweet potato. Still
+      // does not clear the <=55g carb envelope on any honest portioning;
+      // kept as an occasional carb-day meal, not claimed as compliant.
+      "meal_id": "lunch_dinner_sweet-potato-kaala-chana-leaner",
+      "canonical_name": "Sweet potato + kaala chana + roti (leaner)",
+      "display_name": "Sweet Potato & Kaala Chana (Leaner)",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Sweet potato + kaala chana + roti (leaner)",
+      "recipe_url": "https://www.indianhealthyrecipes.com/kala-chana/",
+      "parts": [
+        { "ingredientId": "kaala_chanaa", "qty": 180, "unit": "g" },
+        { "ingredientId": "sweet_potato", "qty": 100, "unit": "g" },
+        { "ingredientId": "jowar_roti", "qty": 45, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Kaala chanaa (black chickpeas)", "amount": 180, "carb": "Jowar roti (millet) + sweet potato", "carbAmount": 45, "veg": null, "style": "Curry style"
+      },
+      "cuisine": "indian"
+    },
+    {
+      // Full lunch/dinner version of the paneer cutlets — the 2-cutlet
+      // snack version lives in snacks below.
+      "meal_id": "lunch_dinner_paneer-cutlets-dal-salad",
+      "canonical_name": "Paneer cutlets + dal + salad",
+      "display_name": "Paneer Cutlets + Dal + Salad",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Paneer cutlets + dal + salad",
+      "recipe_url": "https://hebbarskitchen.com/paneer-cutlet-recipe-paneer-starter/",
+      "parts": [
+        { "ingredientId": "paneer", "qty": 110, "unit": "g" },
+        { "ingredientId": "besan", "qty": 15, "unit": "g" },
+        { "ingredientId": "breadcrumbs_panko", "qty": 15, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 9, "unit": "g" },
+        { "ingredientId": "arhar_dal", "qty": 150, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 100, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Paneer cutlets + dal", "amount": 260, "carb": "Besan + breadcrumbs", "carbAmount": 30, "veg": "Mixed greens salad", "vegAmount": 100, "style": "Pan-fried"
+      },
+      "cuisine": "indian"
     }
   ],
   "snack": [
@@ -1769,6 +2067,63 @@ const baseMealsList = {
       "components": {
         "protein": "Milk", "amount": 150, "carb": "Rolled oats", "carbAmount": 25, "veg": "Mixed berries", "vegAmount": 60, "style": "Bowl"
       }
+    },
+
+    // ── Batch 3 additions (2026-08-06) ───────────────────────────────────
+    {
+      "meal_id": "snack_hummus-salad",
+      "canonical_name": "Hummus salad",
+      "display_name": "Hummus Salad",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Hummus salad",
+      "recipe_url": "https://feelgoodfoodie.net/recipe/mediterranean-hummus-bowl/",
+      "parts": [
+        { "ingredientId": "hummus", "qty": 60, "unit": "g" },
+        { "ingredientId": "mixed_salad", "qty": 100, "unit": "g" },
+        { "ingredientId": "raw_vegetables", "qty": 80, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Hummus", "amount": 60, "carb": "No carb", "carbAmount": 0, "veg": "Salad + raw veg", "vegAmount": 180, "style": "Snack"
+      }
+    },
+    {
+      "meal_id": "snack_acai-bowl",
+      "canonical_name": "Acai bowl",
+      "display_name": "Acai Bowl",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Acai bowl",
+      "recipe_url": "https://www.cookingclassy.com/acai-bowl/",
+      "parts": [
+        { "ingredientId": "acai_pulp", "qty": 100, "unit": "g" },
+        { "ingredientId": "banana", "qty": 0.5, "unit": "piece" },
+        { "ingredientId": "strawberries", "qty": 40, "unit": "g" },
+        { "ingredientId": "blueberries", "qty": 30, "unit": "g" },
+        { "ingredientId": "almonds_5pc", "qty": 5, "unit": "piece" },
+        { "ingredientId": "pumpkin_seeds", "qty": 10, "unit": "g" }
+      ],
+      "components": {
+        "protein": null, "amount": 0, "carb": "Acai + fruit", "carbAmount": 100, "veg": null, "style": "Bowl"
+      }
+    },
+    {
+      "meal_id": "snack_paneer-cutlets",
+      "canonical_name": "Paneer cutlets",
+      "display_name": "Paneer Cutlets",
+      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
+      "assumption_version": "assumptions_v2026_08_06",
+      "name": "Paneer cutlets",
+      "recipe_url": "https://hebbarskitchen.com/paneer-cutlet-recipe-paneer-starter/",
+      "parts": [
+        { "ingredientId": "paneer", "qty": 55, "unit": "g" },
+        { "ingredientId": "besan", "qty": 8, "unit": "g" },
+        { "ingredientId": "breadcrumbs_panko", "qty": 8, "unit": "g" },
+        { "ingredientId": "olive_oil", "qty": 5, "unit": "g" }
+      ],
+      "components": {
+        "protein": "Paneer", "amount": 55, "carb": "Besan + breadcrumbs", "carbAmount": 16, "veg": null, "style": "Pan-fried"
+      }
     }
   ]
 };
@@ -1887,7 +2242,24 @@ const handAuthoredTags = {
   "Chicken & white-bean stew": { cuisine: "Continental" },
   "Chickpea pasta with tuna & tomato": { cuisine: "Continental" },
   "Chicken & ricotta carbonara-style spaghetti": { cuisine: "Continental" },
-  "Mackerel & quinoa salad": { cuisine: "Continental" }
+  "Mackerel & quinoa salad": { cuisine: "Continental" },
+
+  // Batch 3, 2026-08-06
+  "Scrambled egg sandwich": { cuisine: "Continental" },
+  "Acai bowl (protein-boosted)": { cuisine: "Continental" },
+  "Grilled chicken, veg + pasta": { cuisine: "Continental" },
+  "Chicken shawarma plate + garlic rice": { cuisine: "Continental" },
+  "Plain chicken tikka plate": { cuisine: "Indian" },
+  "Pesto millet pasta + chicken": { cuisine: "Continental" },
+  "Aglio e olio millet pasta + prawns": { cuisine: "Continental" },
+  "Salmon avocado salad (fresh grilled)": { cuisine: "Continental" },
+  "Smoked chicken salad (full size)": { cuisine: "Continental" },
+  "Hummus salad (protein-boosted)": { cuisine: "Continental" },
+  "Sweet potato + kaala chana + roti (leaner)": { cuisine: "Indian" },
+  "Paneer cutlets + dal + salad": { cuisine: "Indian" },
+  "Hummus salad": { cuisine: "Continental" },
+  "Acai bowl": { cuisine: "Continental" },
+  "Paneer cutlets": { cuisine: "Indian" }
 };
 
 /** Exported so tests can assert no derived field creeps back in. */

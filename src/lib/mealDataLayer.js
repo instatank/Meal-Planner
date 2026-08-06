@@ -88,7 +88,7 @@ export const inferProteinFamily = (meal = {}) => {
   );
 
   const hasChicken = has(text, /\bchicken\b/);
-  const hasFish = has(text, /\b(fish|salmon|tuna|prawn|shrimp|seafood|tilapia|cod|mackerel|sardines?|anchov(y|ies))\b/);
+  const hasFish = has(text, /\b(fish|salmon|tuna|prawns?|shrimp|seafood|tilapia|cod|mackerel|sardines?|anchov(y|ies))\b/);
 
   // `keema` and `kofta` name a preparation — mince and dumpling — not an
   // animal. Treating them as red meat outright classified `Soya keema curry`
