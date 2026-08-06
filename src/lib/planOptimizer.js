@@ -42,9 +42,12 @@ export const getMealCuisine = (meal) => String(meal?.cuisine || '').toLowerCase(
 
 // Keep these in step with `inferProteinFamily` in mealDataLayer.js — a fish
 // the pattern does not know is silently classified `vegetarian`, which is how
-// mackerel and sardines entered the catalog as vegetarian dishes.
+// mackerel and sardines entered the catalog as vegetarian dishes. Same reason
+// `prawn` needs the `s?`: `\bprawn\b` does not match "prawns" (no word
+// boundary between "n" and its own plural "s"), which is how a millet-pasta
+// dish with 150g of prawns in it got tagged vegetarian.
 const FAMILY_PATTERNS = {
-  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp|mackerel|sardines?|anchov(y|ies))\b/i,
+  fish: /\b(fish|salmon|tuna|cod|prawns?|shrimp|mackerel|sardines?|anchov(y|ies))\b/i,
   chicken: /\b(chicken|turkey)\b/i,
   // No `keema`/`kofta` here — they name a preparation, not an animal, so
   // soya keema and veg kofta are vegetarian. `inferProteinFamily` in
@@ -54,7 +57,7 @@ const FAMILY_PATTERNS = {
 };
 
 const FAMILY_COUNT_PATTERNS = {
-  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp|mackerel|sardines?|anchov(y|ies))\b/gi,
+  fish: /\b(fish|salmon|tuna|cod|prawns?|shrimp|mackerel|sardines?|anchov(y|ies))\b/gi,
   chicken: /\b(chicken|turkey)\b/gi,
   red_meat: /\b(beef|mutton|lamb|pork|steak|goat|bacon)\b/gi
 };
