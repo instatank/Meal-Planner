@@ -469,6 +469,67 @@ export const ingredients = {
     defaultPortion: { qty: 25, unit: "g" },
     source: "Inferred base"
   },
+
+  // Batch 3 additions (2026-08-06)
+  millet_pasta_dry: {
+    name: "Millet pasta (dry)",
+    // No USDA entry for this product form. Branded Indian panel, cross-checked
+    // against a second brand and a millet noodle (range 358-383 kcal, 7.7-13.4g
+    // protein, 69-83g carb) — treat as approximate, revisit if the brand changes.
+    per100g: { kcal: 380, p: 10.5, c: 82, f: 1.5, fibre: 10 },
+    defaultPortion: { qty: 60, unit: "g" },
+    source: "Millet Bank Multimillet Pasta (FSSAI panel, branded)"
+  },
+  basil_pesto: {
+    name: "Basil pesto sauce",
+    per100g: { kcal: 418, p: 9.8, c: 10, f: 38, fibre: 1.7 },
+    defaultPortion: { qty: 30, unit: "g" },
+    source: "USDA #basil-pesto-refrigerated (ready-to-serve)"
+  },
+  acai_pulp: {
+    name: "Acai pulp, frozen unsweetened",
+    // No USDA generic entry for this form. Brand label; unsweetened blends
+    // only — sweetened acai runs closer to 110 kcal/22g carb per 100g.
+    per100g: { kcal: 70, p: 1, c: 4, f: 5, fibre: 2 },
+    defaultPortion: { qty: 100, unit: "g" },
+    source: "Sambazon unsweetened frozen acai (brand label)"
+  },
+  pumpkin_seeds: {
+    name: "Pumpkin seeds, roasted unsalted",
+    per100g: { kcal: 574, p: 29.84, c: 14.71, f: 49.05, fibre: 6.5 },
+    defaultPortion: { qty: 10, unit: "g" },
+    source: "USDA #170557"
+  },
+  banana: {
+    name: "Banana, raw",
+    per100g: { kcal: 89, p: 1.09, c: 22.8, f: 0.33, fibre: 2.6 },
+    defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 118 },
+    source: "USDA #173944"
+  },
+  strawberries: {
+    name: "Strawberries, raw",
+    per100g: { kcal: 32, p: 0.7, c: 7.7, f: 0.3, fibre: 2.0 },
+    defaultPortion: { qty: 40, unit: "g" },
+    source: "USDA #167762"
+  },
+  blueberries: {
+    name: "Blueberries, raw",
+    per100g: { kcal: 57, p: 0.7, c: 14.5, f: 0.3, fibre: 2.4 },
+    defaultPortion: { qty: 30, unit: "g" },
+    source: "USDA #171711"
+  },
+  besan: {
+    name: "Besan / gram flour, raw",
+    per100g: { kcal: 387, p: 22.39, c: 57.82, f: 6.69, fibre: 10.8 },
+    defaultPortion: { qty: 20, unit: "g" },
+    source: "USDA #174288"
+  },
+  breadcrumbs_panko: {
+    name: "Breadcrumbs, panko (plain)",
+    per100g: { kcal: 360, p: 11, c: 73, f: 3, fibre: 4 },
+    defaultPortion: { qty: 20, unit: "g" },
+    source: "USDA Branded (panko average)"
+  },
   miso_broth: {
     name: "Miso broth",
     per100g: { kcal: 40, p: 2.5, c: 4, f: 1.5, fibre: 0.8 },
