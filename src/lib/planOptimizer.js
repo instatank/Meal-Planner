@@ -20,16 +20,16 @@
  */
 
 import {
+  CARB_HEAVY_THRESHOLD,
+  FAT_HEAVY_THRESHOLD,
+  FIBRE_MEAL_THRESHOLD,
+  HEAVY_MEAL_CALORIES,
   PROTEIN_BALANCE_MAX_GAP,
   requiredCompliantDays,
   weeklyProteinFloor
 } from './rules.js';
 
 export const CORE_SLOTS = ['breakfast', 'lunch', 'dinner'];
-
-const HEAVY_MEAL_CALORIES = 600;
-const CARB_HEAVY_THRESHOLD = 55;
-const FAT_HEAVY_THRESHOLD = 25;
 
 // ─── Meal accessors ─────────────────────────────────────────────────────────
 
@@ -40,16 +40,23 @@ export const getMealFat = (meal) => Number(meal?.macros?.f || 0);
 export const getMealCalories = (meal) => Number(meal?.cal || 0);
 export const getMealCuisine = (meal) => String(meal?.cuisine || '').toLowerCase();
 
+// Keep these in step with `inferProteinFamily` in mealDataLayer.js — a fish
+// the pattern does not know is silently classified `vegetarian`, which is how
+// mackerel and sardines entered the catalog as vegetarian dishes.
 const FAMILY_PATTERNS = {
-  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp)\b/i,
+  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp|mackerel|sardines?|anchov(y|ies))\b/i,
   chicken: /\b(chicken|turkey)\b/i,
-  red_meat: /\b(beef|mutton|lamb|pork|steak|keema|kofta|ham)\b/i
+  // No `keema`/`kofta` here — they name a preparation, not an animal, so
+  // soya keema and veg kofta are vegetarian. `inferProteinFamily` in
+  // mealDataLayer.js carries the nuanced version; this is only the fallback
+  // for meals that arrive without tags.
+  red_meat: /\b(beef|mutton|lamb|pork|steak|ham|goat|bacon)\b/i
 };
 
 const FAMILY_COUNT_PATTERNS = {
-  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp)\b/gi,
+  fish: /\b(fish|salmon|tuna|cod|prawn|shrimp|mackerel|sardines?|anchov(y|ies))\b/gi,
   chicken: /\b(chicken|turkey)\b/gi,
-  red_meat: /\b(beef|mutton|lamb|pork|steak|keema|kofta)\b/gi
+  red_meat: /\b(beef|mutton|lamb|pork|steak|goat|bacon)\b/gi
 };
 
 const LEGUME_FIBRE_PATTERN = /\b(dal|rajma|chole|lentil|bean|sambar)\b/i;
@@ -83,7 +90,18 @@ const getFibreScore = (meal) => {
   return score;
 };
 
-export const hasFibre = (meal) => Boolean(meal?.has_fibre) || getFibreScore(meal) > 0;
+/**
+ * Catalog meals now carry rolled-up fibre in grams, so measure them. The name
+ * heuristic below is the fallback for meals that carry no figure — test
+ * fixtures and, until they compute real macros, user-added meals — and it
+ * must not override a real measurement: "scrambled eggs + toast" matches the
+ * wholegrain pattern on the word "whole" while carrying 1.9g of fibre.
+ */
+export const hasFibre = (meal) => {
+  const grams = Number(meal?.macros?.fibre);
+  if (Number.isFinite(grams)) return grams >= FIBRE_MEAL_THRESHOLD;
+  return Boolean(meal?.has_fibre) || getFibreScore(meal) > 0;
+};
 
 const hasRepeatedFamilyInsideMeal = (meal) => {
   const name = getMealName(meal).toLowerCase();
@@ -95,6 +113,60 @@ const isHeavyMeal = (meal) =>
   (getMealFat(meal) > FAT_HEAVY_THRESHOLD && getMealCarbs(meal) > 35);
 const isCarbHeavyMeal = (meal) => getMealCarbs(meal) >= CARB_HEAVY_THRESHOLD;
 const isFatHeavyMeal = (meal) => getMealFat(meal) > FAT_HEAVY_THRESHOLD;
+
+// ─── Per-meal fact cache ────────────────────────────────────────────────────
+
+/**
+ * Everything above is a pure function of a single meal, but the search calls
+ * them once per *combination*, not once per meal. A 99-meal catalog yields
+ * ~114k day candidates, so `getProteinFamily` alone ran its regexes ~340k times
+ * to answer 99 distinct questions.
+ *
+ * `mealFacts` computes each meal's derived properties once and hands the same
+ * record back thereafter. The accessors above stay the public API — this is a
+ * memo in front of them, not a second definition of them, so there is no way
+ * for the two to disagree.
+ *
+ * Keyed by object identity, which assumes a meal is not mutated in place after
+ * it has been scored. Nothing in the app does that: meals come from the static
+ * catalog or from fixtures, and edits replace the object rather than patch it.
+ */
+const FACT_CACHE = new WeakMap();
+
+const EMPTY_FACTS = {
+  name: '', protein: 0, carbs: 0, fat: 0, calories: 0, cuisine: '',
+  family: 'vegetarian', redMeat: false, primaryMeat: false,
+  fibreScore: 0, fibre: false, heavy: false, carbHeavy: false, fatHeavy: false,
+  repeatedFamily: false
+};
+
+export const mealFacts = (meal) => {
+  if (!meal || typeof meal !== 'object') return EMPTY_FACTS;
+  const cached = FACT_CACHE.get(meal);
+  if (cached) return cached;
+
+  const family = getProteinFamily(meal);
+  const fibreScore = getFibreScore(meal);
+  const facts = {
+    name: getMealName(meal),
+    protein: getMealProtein(meal),
+    carbs: getMealCarbs(meal),
+    fat: getMealFat(meal),
+    calories: getMealCalories(meal),
+    cuisine: getMealCuisine(meal),
+    family,
+    redMeat: family === 'red_meat',
+    primaryMeat: family === 'fish' || family === 'chicken' || family === 'red_meat',
+    fibreScore,
+    fibre: hasFibre(meal),
+    heavy: isHeavyMeal(meal),
+    carbHeavy: isCarbHeavyMeal(meal),
+    fatHeavy: isFatHeavyMeal(meal),
+    repeatedFamily: hasRepeatedFamilyInsideMeal(meal)
+  };
+  FACT_CACHE.set(meal, facts);
+  return facts;
+};
 
 export const getMealsForSlot = (mealDatabase, slot) => {
   if (slot === 'lunch' || slot === 'dinner' || slot === 'lunchDinner') return mealDatabase?.lunchDinner || [];
@@ -166,40 +238,95 @@ export const satisfiesDayHardConstraints = (day, { rules, preferences = {} }) =>
  * Exhaustive by design. For the 41-meal catalog this is a few thousand
  * combinations and takes single-digit milliseconds.
  */
+/**
+ * The "no meal twice in a day" cap, for the three names of one day.
+ *
+ * Equivalent to counting occurrences and rejecting any name that exceeds the
+ * cap, which is what `satisfiesDayHardConstraints` does — but without building
+ * a counts object per combination.
+ */
+const withinSameMealCap = (a, b, c, cap) => {
+  const ab = a === b;
+  const ac = a === c;
+  if (ab && ac) return cap >= 3;
+  if (ab || ac || b === c) return cap >= 2;
+  return cap >= 1;
+};
+
 export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {} }) => {
   const breakfasts = getMealsForSlot(mealDatabase, 'breakfast')
     .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
   const lunchDinners = getMealsForSlot(mealDatabase, 'lunch')
     .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
 
+  // Both pools are already filtered for admissibility, so the per-meal half of
+  // `satisfiesDayHardConstraints` is answered before the loop starts. What is
+  // left that genuinely varies per combination is the same-meal cap and the
+  // protein sanity floor, checked inline below. The rejected combinations no
+  // longer allocate a day object on their way to being discarded.
+  const { maxSameMealPerDay, dailyProteinSanityFloor } = rules.hard;
+  const lunchDinnerFacts = lunchDinners.map(mealFacts);
   const days = [];
+
   for (const breakfast of breakfasts) {
-    for (const lunch of lunchDinners) {
-      for (const dinner of lunchDinners) {
-        const day = { breakfast, lunch, dinner };
-        if (!satisfiesDayHardConstraints(day, { rules, preferences })) continue;
-        days.push(annotateDay(day, rules));
+    const b = mealFacts(breakfast);
+    for (let lunchIndex = 0; lunchIndex < lunchDinners.length; lunchIndex += 1) {
+      const l = lunchDinnerFacts[lunchIndex];
+      // Hoisted out of the innermost loop: breakfast and lunch are fixed here.
+      const pairProtein = b.protein + l.protein;
+      const pairCarbs = b.carbs + l.carbs;
+      const pairFat = b.fat + l.fat;
+      const pairCalories = b.calories + l.calories;
+
+      for (let dinnerIndex = 0; dinnerIndex < lunchDinners.length; dinnerIndex += 1) {
+        const d = lunchDinnerFacts[dinnerIndex];
+        if (!withinSameMealCap(b.name, l.name, d.name, maxSameMealPerDay)) continue;
+
+        const protein = pairProtein + d.protein;
+        if (protein < dailyProteinSanityFloor) continue;
+
+        const totals = {
+          protein,
+          carbs: pairCarbs + d.carbs,
+          fat: pairFat + d.fat,
+          calories: pairCalories + d.calories
+        };
+        const day = { breakfast, lunch: lunchDinners[lunchIndex], dinner: lunchDinners[dinnerIndex] };
+        days.push(annotateDay(day, rules, totals));
       }
     }
   }
   return days;
 };
 
-/** Attach the Tier-2 verdicts and cached shape data a day is judged on. */
-export const annotateDay = (day, rules) => {
-  const totals = summariseDay(day);
-  const meals = CORE_SLOTS.map((slot) => day[slot]);
+/**
+ * Attach the Tier-2 verdicts and cached shape data a day is judged on.
+ *
+ * `totals` may be supplied by a caller that has already summed the day — the
+ * enumeration above computes it incrementally — in which case this does not
+ * re-walk the meals to derive it a second time.
+ */
+export const annotateDay = (day, rules, totals = null) => {
+  const breakfast = mealFacts(day.breakfast);
+  const lunch = mealFacts(day.lunch);
+  const dinner = mealFacts(day.dinner);
+  const resolvedTotals = totals || summariseDay(day);
   const { dailyProteinMin, dailyProteinMax, dailyCarbCap, dailyCalorieMin, dailyCalorieMax } = rules.budgeted;
+
+  const mealNames = [breakfast.name, lunch.name, dinner.name];
 
   return {
     ...day,
-    totals,
-    mealNames: meals.map(getMealName),
-    redMeatCount: meals.filter(isRedMeat).length,
-    cuisines: meals.map(getMealCuisine),
-    proteinInBand: totals.protein >= dailyProteinMin && totals.protein <= dailyProteinMax,
-    underCarbCap: totals.carbs <= dailyCarbCap,
-    inCalorieBounds: totals.calories >= dailyCalorieMin && totals.calories <= dailyCalorieMax
+    totals: resolvedTotals,
+    mealNames,
+    // Precomputed once here because the sort tie-breaker and the beam's
+    // per-candidate hash both need it, and both used to rebuild it per call.
+    nameKey: mealNames.join('|'),
+    redMeatCount: (breakfast.redMeat ? 1 : 0) + (lunch.redMeat ? 1 : 0) + (dinner.redMeat ? 1 : 0),
+    cuisines: [breakfast.cuisine, lunch.cuisine, dinner.cuisine],
+    proteinInBand: resolvedTotals.protein >= dailyProteinMin && resolvedTotals.protein <= dailyProteinMax,
+    underCarbCap: resolvedTotals.carbs <= dailyCarbCap,
+    inCalorieBounds: resolvedTotals.calories >= dailyCalorieMin && resolvedTotals.calories <= dailyCalorieMax
   };
 };
 
@@ -211,7 +338,10 @@ export const annotateDay = (day, rules) => {
  */
 export const scoreDayStandalone = (day, { rules, preferences = {} }) => {
   const w = rules.scored;
-  const meals = CORE_SLOTS.map((slot) => day[slot]);
+  const breakfastFacts = mealFacts(day.breakfast);
+  const lunchFacts = mealFacts(day.lunch);
+  const dinnerFacts = mealFacts(day.dinner);
+  const facts = [breakfastFacts, lunchFacts, dinnerFacts];
   const totals = day.totals || summariseDay(day);
   const { dailyProteinMin, dailyProteinMax, dailyCarbCap, dailyCalorieMin, dailyCalorieMax } = rules.budgeted;
   let score = 0;
@@ -236,51 +366,71 @@ export const scoreDayStandalone = (day, { rules, preferences = {} }) => {
 
   // Dinner tapering, by calories rather than by a hand-typed weight label.
   if (totals.calories > 0) {
-    const dinnerShare = getMealCalories(day.dinner) / totals.calories;
+    const dinnerShare = dinnerFacts.calories / totals.calories;
     if (dinnerShare > w.dinnerCalorieShareTarget) {
       score -= (dinnerShare - w.dinnerCalorieShareTarget) * w.dinnerTaperPenalty * 10;
     }
   }
 
-  // Protein-family diversity within the day.
+  // One pass over the day's three meals, accumulating every count the rest of
+  // the scoring needs. This was seven separate `filter`/`map` passes; the maths
+  // is unchanged, but a day is now walked once instead of ten times.
   const familyCounts = {};
-  for (const meal of meals) {
-    if (!isPrimaryMeat(meal)) continue;
-    const family = getProteinFamily(meal);
-    familyCounts[family] = (familyCounts[family] || 0) + 1;
+  let fibreCount = 0;
+  let meatWithoutFibreCount = 0;
+  let heavyCount = 0;
+  let carbHeavyCount = 0;
+  let fatHeavyCount = 0;
+  let repeatedFamilyCount = 0;
+  let maxProtein = -Infinity;
+  let minProtein = Infinity;
+
+  for (const meal of facts) {
+    if (meal.primaryMeat) {
+      familyCounts[meal.family] = (familyCounts[meal.family] || 0) + 1;
+      if (meal.fibreScore < 1) meatWithoutFibreCount += 1;
+    }
+    if (meal.fibre) fibreCount += 1;
+    if (meal.heavy) heavyCount += 1;
+    if (meal.carbHeavy) carbHeavyCount += 1;
+    if (meal.fatHeavy) fatHeavyCount += 1;
+    if (meal.repeatedFamily) repeatedFamilyCount += 1;
+    if (meal.protein > maxProtein) maxProtein = meal.protein;
+    if (meal.protein < minProtein) minProtein = meal.protein;
   }
+
+  // Protein-family diversity within the day.
   for (const count of Object.values(familyCounts)) {
     if (count > 1) score -= (count - 1) * w.sameProteinFamilyTwiceInDayPenalty;
   }
 
   // Lunch and dinner should not read as the same meal twice.
-  const lunchCuisine = getMealCuisine(day.lunch);
-  const dinnerCuisine = getMealCuisine(day.dinner);
-  if (lunchCuisine && dinnerCuisine && lunchCuisine === dinnerCuisine) {
+  if (lunchFacts.cuisine && dinnerFacts.cuisine && lunchFacts.cuisine === dinnerFacts.cuisine) {
     score -= w.lunchDinnerCuisineClashPenalty;
   }
 
   // Fibre presence, and the old "meat meals should carry fibre" preference.
-  score += meals.filter(hasFibre).length * w.fibreBonus;
-  score -= meals.filter((meal) => isPrimaryMeat(meal) && getFibreScore(meal) < 1).length * w.fibreBonus;
+  score += fibreCount * w.fibreBonus;
+  score -= meatWithoutFibreCount * w.fibreBonus;
 
   // Meal-shape balance. These were hard rules once; as preferences they let a
   // genuine treat day exist without the engine refusing to produce one.
-  score -= Math.max(0, meals.filter(isHeavyMeal).length - 1) * w.fibreBonus * 2;
-  score -= Math.max(0, meals.filter(isCarbHeavyMeal).length - 1) * w.fibreBonus * 2;
-  score -= Math.max(0, meals.filter(isFatHeavyMeal).length - 1) * w.fibreBonus * 2;
-  score -= meals.filter(hasRepeatedFamilyInsideMeal).length * w.sameProteinFamilyTwiceInDayPenalty;
+  score -= Math.max(0, heavyCount - 1) * w.fibreBonus * 2;
+  score -= Math.max(0, carbHeavyCount - 1) * w.fibreBonus * 2;
+  score -= Math.max(0, fatHeavyCount - 1) * w.fibreBonus * 2;
+  score -= repeatedFamilyCount * w.sameProteinFamilyTwiceInDayPenalty;
 
-  const proteins = meals.map(getMealProtein);
-  const gap = Math.max(...proteins) - Math.min(...proteins);
+  const gap = maxProtein - minProtein;
   if (gap > PROTEIN_BALANCE_MAX_GAP) score -= (gap - PROTEIN_BALANCE_MAX_GAP) * 0.15;
 
-  // User preference signal from the event log.
+  // Kept as its own pass, accumulating into `score` in the original order:
+  // floating-point addition is not associative, so batching these into a
+  // subtotal can shift the last bits and flip a tie in the candidate sort.
   const accepts = preferences.accepts || {};
   const edits = preferences.edits || {};
   const avoids = preferences.avoids || {};
-  for (const meal of meals) {
-    const name = getMealName(meal);
+  for (const meal of facts) {
+    const name = meal.name;
     score += Math.min(Number(accepts[name] || 0), 4) * w.preferenceAcceptWeight;
     score += Math.min(Number(edits[name] || 0), 3) * w.preferenceEditWeight;
     score -= Math.min(Number(avoids[name] || 0), 4) * w.preferenceAvoidWeight;
@@ -308,6 +458,32 @@ export const buildHistoryCounts = (historyMap = {}, { lookbackDays = 14 } = {}) 
 };
 
 // ─── Week search ────────────────────────────────────────────────────────────
+
+/**
+ * Assign every candidate its standalone score less the history penalty.
+ *
+ * The week search and the shortlist builder both need exactly this number, and
+ * both used to compute it independently over the whole candidate set — two full
+ * scoring passes to answer the same question. Callers that need both now score
+ * once and hand the result to each.
+ *
+ * The score is stamped on the candidate rather than returned in a parallel
+ * wrapper object, which is what the search used to build: one throwaway object
+ * per candidate, of which all but `maxCandidates` were discarded immediately.
+ */
+export const scoreCandidates = (candidates, { rules, preferences = {}, historyMap = {} }) => {
+  const historyCounts = buildHistoryCounts(historyMap);
+  const historyRepeatPenalty = rules.scored.historyRepeatPenalty;
+
+  for (const candidate of candidates) {
+    let historyPenalty = 0;
+    for (const name of candidate.mealNames) {
+      historyPenalty += Number(historyCounts[name] || 0) * historyRepeatPenalty;
+    }
+    candidate.baseScore = scoreDayStandalone(candidate, { rules, preferences }) - historyPenalty;
+  }
+  return candidates;
+};
 
 const DEFAULT_BEAM_WIDTH = 40;
 
@@ -437,27 +613,20 @@ export const selectWeek = ({
   lockedDays = {},
   beamWidth = DEFAULT_BEAM_WIDTH,
   maxCandidates = DEFAULT_MAX_CANDIDATES,
-  dayCandidates = null
+  dayCandidates = null,
+  scoredCandidates = null
 }) => {
   const dayCount = targetDateKeys.length;
-  const candidates = dayCandidates || enumerateFeasibleDays({ mealDatabase, rules, preferences });
+  const candidates = scoredCandidates || dayCandidates || enumerateFeasibleDays({ mealDatabase, rules, preferences });
 
   if (dayCount === 0 || candidates.length === 0) {
     return { days: [], candidateCount: candidates.length, feasible: candidates.length > 0, summary: null };
   }
 
-  const historyCounts = buildHistoryCounts(historyMap);
-  const scored = candidates.map((candidate) => {
-    const historyPenalty = candidate.mealNames.reduce(
-      (sum, name) => sum + Number(historyCounts[name] || 0) * rules.scored.historyRepeatPenalty,
-      0
-    );
-    return {
-      ...candidate,
-      baseScore: scoreDayStandalone(candidate, { rules, preferences }) - historyPenalty
-    };
-  });
-  scored.sort((a, b) => b.baseScore - a.baseScore || (a.mealNames.join('|') < b.mealNames.join('|') ? -1 : 1));
+  // Sorting a copy leaves the caller's candidate order untouched — the
+  // shortlist builder relies on it for its own stable sort.
+  const scored = [...(scoredCandidates || scoreCandidates(candidates, { rules, preferences, historyMap }))];
+  scored.sort((a, b) => b.baseScore - a.baseScore || (a.nameKey < b.nameKey ? -1 : 1));
 
   const pool = trimCandidatePool(scored, maxCandidates);
   const maxDayProtein = pool.reduce((max, day) => Math.max(max, day.totals.protein), 0);
@@ -482,8 +651,16 @@ export const selectWeek = ({
     const remainingAfter = dayCount - dayIndex - 1;
     const next = [];
 
+    // The tie-breaker depends only on the date and the candidate, not on the
+    // beam node, so it is the same value for every node on this day. Computing
+    // it per (node, candidate) meant hashing the same string `beamWidth` times.
+    const tieBreaks = pool.map(
+      (candidate) => (hashString(`${dateKey}|${candidate.nameKey}`) % 1000) / 100000
+    );
+
     for (const node of beam) {
-      for (const candidate of pool) {
+      for (let candidateIndex = 0; candidateIndex < pool.length; candidateIndex += 1) {
+        const candidate = pool[candidateIndex];
         if (!canPlaceDay(node.state, candidate, rules)) continue;
 
         // Tier-2 budgets, enforced by look-ahead rather than after the fact.
@@ -525,7 +702,7 @@ export const selectWeek = ({
           if (cuisine && !node.state.cuisines.has(cuisine)) newCuisines += 1;
         }
 
-        const tieBreak = (hashString(`${dateKey}|${candidate.mealNames.join('|')}`) % 1000) / 100000;
+        const tieBreak = tieBreaks[candidateIndex];
         const score = node.score
           + candidate.baseScore
           + newDistinct * rules.scored.distinctMealBonus
@@ -623,6 +800,43 @@ const DEFAULT_SHORTLIST_PER_SLOT = 8;
 const DEFAULT_ALTERNATE_DAYS = 60;
 
 /**
+ * The `limit` best candidates by score, in the order a stable descending sort
+ * would have produced — ties broken by position in `candidates`.
+ *
+ * The shortlist needs 60 of them. Fully sorting the candidate set to throw away
+ * the other 114,054 is the single clearest piece of waste left in the pass.
+ *
+ * Stability falls out of the strict `>` test: a candidate only displaces the
+ * worst kept entry when it scores strictly higher, so among equal scores the
+ * earliest-seen candidate stays, which is what the stable sort did.
+ */
+const topByBaseScore = (candidates, limit) => {
+  if (candidates.length <= limit) {
+    return [...candidates].sort((a, b) => b.baseScore - a.baseScore);
+  }
+
+  const kept = [];
+  for (const candidate of candidates) {
+    const score = candidate.baseScore;
+    if (kept.length === limit && !(score > kept[limit - 1].baseScore)) continue;
+
+    // First position holding a strictly lower score — where a stable sort
+    // would place this candidate, after any it ties with.
+    let low = 0;
+    let high = kept.length;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (kept[mid].baseScore < score) high = mid;
+      else low = mid + 1;
+    }
+
+    kept.splice(low, 0, candidate);
+    if (kept.length > limit) kept.pop();
+  }
+  return kept;
+};
+
+/**
  * Per-date, per-slot shortlists of legal meal names, derived from the day
  * candidates rather than from three independent slot filters.
  *
@@ -638,21 +852,14 @@ export const buildSlotShortlists = ({
   preferences = {},
   historyMap = {},
   perSlot = DEFAULT_SHORTLIST_PER_SLOT,
-  alternateDays = DEFAULT_ALTERNATE_DAYS
+  alternateDays = DEFAULT_ALTERNATE_DAYS,
+  scoredCandidates = null
 }) => {
-  const historyCounts = buildHistoryCounts(historyMap);
-  const ranked = dayCandidates
-    .map((candidate) => ({
-      candidate,
-      score: scoreDayStandalone(candidate, { rules, preferences }) -
-        candidate.mealNames.reduce(
-          (sum, name) => sum + Number(historyCounts[name] || 0) * rules.scored.historyRepeatPenalty,
-          0
-        )
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, alternateDays)
-    .map((entry) => entry.candidate);
+  // Same scores the week search used, computed once when the caller supplies
+  // them. Candidates stay in their original order, which is what makes the
+  // selection below tie-break exactly as the old sort did.
+  const pool = scoredCandidates || scoreCandidates(dayCandidates, { rules, preferences, historyMap });
+  const ranked = topByBaseScore(pool, alternateDays);
 
   const shortlists = {};
   const stats = {};
@@ -698,6 +905,8 @@ export const buildWeekPlan = ({
   shortlistPerSlot = DEFAULT_SHORTLIST_PER_SLOT
 }) => {
   const dayCandidates = enumerateFeasibleDays({ mealDatabase, rules, preferences });
+  // Scored once, here, and shared by both consumers below.
+  const scoredCandidates = scoreCandidates(dayCandidates, { rules, preferences, historyMap });
   const week = selectWeek({
     mealDatabase,
     rules,
@@ -706,7 +915,8 @@ export const buildWeekPlan = ({
     preferences,
     lockedDays,
     beamWidth,
-    dayCandidates
+    dayCandidates,
+    scoredCandidates
   });
   const { shortlists, stats } = buildSlotShortlists({
     weekDays: week.days,
@@ -714,7 +924,8 @@ export const buildWeekPlan = ({
     rules,
     preferences,
     historyMap,
-    perSlot: shortlistPerSlot
+    perSlot: shortlistPerSlot,
+    scoredCandidates
   });
 
   return { ...week, dayCandidates, shortlists, stats };

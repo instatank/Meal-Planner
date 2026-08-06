@@ -2,6 +2,12 @@ const GOAL_NAMES = ['high_protein', 'low_carb', 'two_meals'];
 const METADATA_SIMILARITY_FIELDS = ['format', 'protein_family', 'carb_level', 'cuisine'];
 
 import { ingredients } from '../data/ingredients.js';
+import {
+  FAT_HEAVY_THRESHOLD,
+  FIBRE_MEAL_THRESHOLD,
+  HEAVY_MEAL_CALORIES,
+  MEDIUM_MEAL_CALORIES
+} from './rules.js';
 
 const ALLOWED_MEAL_TYPE_TAGS = new Set(['breakfast', 'lunch_dinner', 'snack']);
 const ALLOWED_PROTEIN_FAMILIES = new Set(['chicken', 'fish', 'red_meat', 'vegetarian', 'mixed']);
@@ -10,6 +16,7 @@ const ALLOWED_FORMATS = new Set(['curry', 'soup', 'salad', 'toast', 'sandwich', 
 const ALLOWED_EFFORT = new Set(['low', 'medium', 'high']);
 
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+const round1 = (value) => Number(Number(value).toFixed(1));
 const round2 = (value) => Number(Number(value).toFixed(2));
 
 const asNumber = (value) => {
@@ -27,7 +34,7 @@ const normalizedText = (...parts) =>
 const has = (text, pattern) => pattern.test(text);
 
 export const computeMacros = (parts = []) => {
-  const totals = { cal: 0, p: 0, c: 0, f: 0 };
+  const totals = { cal: 0, p: 0, c: 0, f: 0, fibre: 0 };
 
   for (const part of parts) {
     const ing = ingredients[part.ingredientId];
@@ -46,6 +53,7 @@ export const computeMacros = (parts = []) => {
     totals.p += (ing.per100g.p || 0) * ratio;
     totals.c += (ing.per100g.c || 0) * ratio;
     totals.f += (ing.per100g.f || 0) * ratio;
+    totals.fibre += (ing.per100g.fibre || 0) * ratio;
   }
 
   return {
@@ -54,7 +62,10 @@ export const computeMacros = (parts = []) => {
     macros: {
       p: Math.round(totals.p),
       c: Math.round(totals.c),
-      f: Math.round(totals.f)
+      f: Math.round(totals.f),
+      // Fibre keeps one decimal: whole grams would round a 0.4g garnish to
+      // zero and a 2.5g side to 3, and the has_fibre threshold sits at 5.
+      fibre: round1(totals.fibre)
     }
   };
 };
@@ -77,8 +88,22 @@ export const inferProteinFamily = (meal = {}) => {
   );
 
   const hasChicken = has(text, /\bchicken\b/);
-  const hasFish = has(text, /\b(fish|salmon|tuna|prawn|shrimp|seafood|tilapia|cod)\b/);
-  const hasRedMeat = has(text, /\b(beef|steak|mutton|lamb|pork|ham|goat|keema)\b/);
+  const hasFish = has(text, /\b(fish|salmon|tuna|prawn|shrimp|seafood|tilapia|cod|mackerel|sardines?|anchov(y|ies))\b/);
+
+  // `keema` and `kofta` name a preparation — mince and dumpling — not an
+  // animal. Treating them as red meat outright classified `Soya keema curry`
+  // as red meat, which would have spent the 3-per-week red-meat budget on a
+  // vegetarian dish and hidden it from a vegetarian ruleset. They only imply
+  // red meat when nothing else in the dish says what the protein is.
+  const hasDefiniteRedMeat = has(text, /\b(beef|steak|mutton|lamb|pork|ham|goat|bacon)\b/);
+  const hasVegetarianProtein = has(
+    text,
+    /\b(soya|soy|tofu|tempeh|paneer|mushroom|lentil|dal|chana|chickpea|rajma|bean|egg|eggs)\b/
+  );
+  const hasAmbiguousMince = has(text, /\b(keema|kofta)\b/);
+  const hasRedMeat =
+    hasDefiniteRedMeat
+    || (hasAmbiguousMince && !hasChicken && !hasFish && !hasVegetarianProtein);
 
   const nonVegCount = [hasChicken, hasFish, hasRedMeat].filter(Boolean).length;
   if (nonVegCount > 1) return 'mixed';
@@ -91,10 +116,47 @@ export const inferProteinFamily = (meal = {}) => {
 export const inferMealWeightClass = (meal = {}) => {
   const calories = asNumber(meal.cal);
   if (!Number.isFinite(calories)) return 'medium';
-  if (calories > 600) return 'heavy';
-  if (calories >= 350) return 'medium';
+  if (calories > HEAVY_MEAL_CALORIES) return 'heavy';
+  if (calories >= MEDIUM_MEAL_CALORIES) return 'medium';
   return 'light';
 };
+
+// ─── Derived meal tags ──────────────────────────────────────────────────────
+//
+// These three fields used to be hand-typed in `csvTagsMap` alongside computed
+// macros, and they disagreed with the macros they sat next to: 12 of 41 meals
+// on `is_fat_heavy`, 3 of 41 on `meal_weight`, and `has_fibre` by a margin
+// that depended entirely on which heuristic you asked. A hand-typed field
+// beside a computed one always drifts, so all three are now derived from the
+// ingredient list and the hand-authored map keeps only subjective fields.
+//
+// Each rule is stated once, here, and reads its threshold from `rules.js`.
+
+/** Fat-heavy: more than FAT_HEAVY_THRESHOLD (25g) of fat in the meal. */
+export const deriveIsFatHeavy = (meal = {}) => asNumber(meal.macros?.f) > FAT_HEAVY_THRESHOLD;
+
+/**
+ * Fibre meal: at least FIBRE_MEAL_THRESHOLD (3g) of rolled-up dietary fibre.
+ * See the constant's comment in `rules.js` for why 3g and not 6g.
+ */
+export const deriveHasFibre = (meal = {}) => asNumber(meal.macros?.fibre) >= FIBRE_MEAL_THRESHOLD;
+
+/**
+ * Display weight label, by calories: >600 Heavy, >=350 Medium, else Light.
+ * Display and reporting only — Phase 1 made dinner tapering calorie-based, so
+ * nothing in the engine reads this label any more.
+ */
+export const deriveMealWeight = (meal = {}) => {
+  const cls = inferMealWeightClass(meal);
+  return cls.charAt(0).toUpperCase() + cls.slice(1);
+};
+
+/** All three derived tags for a meal that already has computed macros. */
+export const deriveMealTags = (meal = {}) => ({
+  is_fat_heavy: deriveIsFatHeavy(meal),
+  has_fibre: deriveHasFibre(meal),
+  meal_weight: deriveMealWeight(meal)
+});
 
 export const inferCarbLevel = (meal = {}) => {
   const carbs = asNumber(meal.macros?.c);

@@ -4,8 +4,17 @@
  * Core Ingredient Reference database
  * Single source of truth for all macro calculations.
  *
- * `per100g` structure: { kcal, p, c, f }
+ * `per100g` structure: { kcal, p, c, f, fibre }
  * `defaultPortion` structure: { qty, unit, pieceWeightG (optional) }
+ *
+ * `fibre` is dietary fibre in grams per 100g of the ingredient as listed
+ * (cooked where the name says cooked). Indian items come from IFCT 2017
+ * (ICMR-NIN), Western items from USDA FoodData Central, and composite items
+ * (curry_base, veg_kofta, the chaat entries) carry the weighted fibre of their
+ * stated components. It rolls up through `computeMacros` like every other
+ * macro, and `has_fibre` is derived from the rolled-up total — see
+ * `deriveHasFibre` in `src/lib/mealDataLayer.js`. Every ingredient must carry
+ * a fibre figure; a missing one is a data bug, not a zero.
  */
 
 /**
@@ -34,289 +43,489 @@ export const ingredients = {
   // --- Proteins ---
   chicken_breast: {
     name: "Chicken breast (cooked)",
-    per100g: { kcal: 165, p: 31, c: 0, f: 3.6 },
+    per100g: { kcal: 165, p: 31, c: 0, f: 3.6, fibre: 0 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "USDA #05062"
   },
   fish_fillet: {
     name: "Fish fillet (white, cooked)",
-    per100g: { kcal: 110, p: 23, c: 0, f: 2.0 },
+    per100g: { kcal: 110, p: 23, c: 0, f: 2.0, fibre: 0 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "USDA #15088"
   },
   grilled_salmon: {
     name: "Grilled salmon",
-    per100g: { kcal: 206, p: 22, c: 0, f: 13 },
+    per100g: { kcal: 206, p: 22, c: 0, f: 13, fibre: 0 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "USDA #15084"
   },
   smoked_salmon: {
     name: "Smoked salmon",
-    per100g: { kcal: 117, p: 18, c: 0, f: 4.3 },
+    per100g: { kcal: 117, p: 18, c: 0, f: 4.3, fibre: 0 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "USDA #15077"
   },
   smoked_chicken: {
     name: "Smoked chicken breast (sliced)",
-    per100g: { kcal: 148, p: 26, c: 0, f: 4.5 },
+    per100g: { kcal: 148, p: 26, c: 0, f: 4.5, fibre: 0 },
     defaultPortion: { qty: 120, unit: "g" },
     source: "USDA #05182"
   },
   beef_steak: {
     name: "Beef steak (grilled)",
-    per100g: { kcal: 250, p: 26, c: 0, f: 16 },
+    per100g: { kcal: 250, p: 26, c: 0, f: 16, fibre: 0 },
     defaultPortion: { qty: 180, unit: "g" },
     source: "USDA #13009"
   },
   pork_chop: {
     name: "Pork chop (grilled)",
-    per100g: { kcal: 233, p: 23, c: 0, f: 15 },
+    per100g: { kcal: 233, p: 23, c: 0, f: 15, fibre: 0 },
     defaultPortion: { qty: 180, unit: "g" },
     source: "USDA #10065"
   },
   mutton_keema: {
     name: "Mutton keema (cooked)",
-    per100g: { kcal: 230, p: 19, c: 0, f: 17 },
+    per100g: { kcal: 230, p: 19, c: 0, f: 17, fibre: 0 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "IFCT Reference"
   },
   lamb_seekh_kabab: {
     name: "Lamb seekh kabab",
-    per100g: { kcal: 280, p: 17, c: 2, f: 22 },
+    per100g: { kcal: 280, p: 17, c: 2, f: 22, fibre: 0.6 },
     defaultPortion: { qty: 2, unit: "piece", pieceWeightG: 75 },
     source: "IFCT Reference"
   },
   egg_whole: {
     name: "Egg (whole)",
-    per100g: { kcal: 143, p: 12.6, c: 0.7, f: 9.5 },
+    per100g: { kcal: 143, p: 12.6, c: 0.7, f: 9.5, fibre: 0 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 50 },
     source: "USDA #01123"
   },
   egg_white: {
     name: "Egg white",
-    per100g: { kcal: 52, p: 11, c: 0.7, f: 0.2 },
+    per100g: { kcal: 52, p: 11, c: 0.7, f: 0.2, fibre: 0 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 33 },
     source: "USDA #01124"
   },
   egg_yolk: {
     name: "Egg yolk",
-    per100g: { kcal: 322, p: 15.8, c: 3.6, f: 26.5 },
+    per100g: { kcal: 322, p: 15.8, c: 3.6, f: 26.5, fibre: 0 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 17 },
     source: "USDA #01125"
   },
   paneer: {
     name: "Paneer",
-    per100g: { kcal: 265, p: 18, c: 3, f: 20 },
+    per100g: { kcal: 265, p: 18, c: 3, f: 20, fibre: 0 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "IFCT Reference"
   },
   protein_shake: {
     name: "Protein shake (powder)",
-    per100g: { kcal: 412, p: 73.5, c: 14.7, f: 5.9 }, // Scaled to ~140kcal for 25g protein per 34g scoop
+    per100g: { kcal: 412, p: 73.5, c: 14.7, f: 5.9, fibre: 1.5 }, // Scaled to ~140kcal for 25g protein per 34g scoop
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 34 },
     source: "General Supplement Label"
   },
   kaala_chanaa: {
     name: "Kaala chanaa (cooked)",
-    per100g: { kcal: 164, p: 8.9, c: 27.4, f: 2.6 },
+    per100g: { kcal: 164, p: 8.9, c: 27.4, f: 2.6, fibre: 7.6 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "IFCT Reference"
   },
   rajma: {
     name: "Rajma (cooked)",
-    per100g: { kcal: 127, p: 8.7, c: 22.8, f: 0.5 },
+    per100g: { kcal: 127, p: 8.7, c: 22.8, f: 0.5, fibre: 6.4 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "IFCT Reference"
   },
+  white_beans: {
+    name: "White beans / cannellini (cooked)",
+    per100g: { kcal: 139, p: 9.7, c: 25.1, f: 0.35, fibre: 6.3 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #175196"
+  },
   arhar_dal: {
     name: "Arhar dal (cooked)",
-    per100g: { kcal: 116, p: 7, c: 20, f: 0.8 },
+    per100g: { kcal: 116, p: 7, c: 20, f: 0.8, fibre: 4.5 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "IFCT Reference"
   },
   chole: {
     name: "Chole (cooked)",
-    per100g: { kcal: 164, p: 8.9, c: 27.4, f: 2.6 },
+    per100g: { kcal: 164, p: 8.9, c: 27.4, f: 2.6, fibre: 7.6 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "IFCT Reference"
   },
   greek_yogurt: {
     name: "Greek yogurt (low fat)",
-    per100g: { kcal: 73, p: 10, c: 4, f: 1.9 },
+    per100g: { kcal: 73, p: 10, c: 4, f: 1.9, fibre: 0 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "USDA #01287"
   },
   curd: {
     name: "Curd / Raita",
-    per100g: { kcal: 61, p: 3.5, c: 4.7, f: 3.3 },
+    per100g: { kcal: 61, p: 3.5, c: 4.7, f: 3.3, fibre: 0 },
     defaultPortion: { qty: 100, unit: "g" },
+    source: "IFCT Reference"
+  },
+  chicken_keema: {
+    name: "Chicken keema (minced, cooked)",
+    per100g: { kcal: 195, p: 27, c: 0, f: 9.5, fibre: 0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #05664"
+  },
+  chicken_sausage: {
+    name: "Chicken sausage (grilled)",
+    per100g: { kcal: 172, p: 17, c: 3, f: 10, fibre: 0 },
+    defaultPortion: { qty: 100, unit: "g" },
+    source: "USDA #07940"
+  },
+  tofu_firm: {
+    name: "Tofu (firm)",
+    per100g: { kcal: 144, p: 15.8, c: 4.3, f: 8.7, fibre: 2.3 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #16427"
+  },
+  sardines: {
+    name: "Sardines (canned in oil, drained, with bone)",
+    per100g: { kcal: 208, p: 24.6, c: 0, f: 11.5, fibre: 0 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #175139"
+  },
+  mackerel_canned: {
+    name: "Mackerel (jack, canned, drained)",
+    per100g: { kcal: 156, p: 23.2, c: 0, f: 6.3, fibre: 0 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #175121"
+  },
+  tuna_water: {
+    name: "Tuna (light, canned in water, drained)",
+    per100g: { kcal: 116, p: 25.5, c: 0, f: 0.8, fibre: 0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #173709"
+  },
+  prawns: {
+    name: "Prawns (cooked)",
+    per100g: { kcal: 99, p: 24, c: 0.2, f: 0.3, fibre: 0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #15152"
+  },
+  edamame: {
+    name: "Edamame (shelled, cooked)",
+    per100g: { kcal: 122, p: 11.9, c: 8.9, f: 5.2, fibre: 5.2 },
+    defaultPortion: { qty: 80, unit: "g" },
+    source: "USDA #11212"
+  },
+  feta: {
+    name: "Feta cheese",
+    per100g: { kcal: 264, p: 14.2, c: 4.1, f: 21.3, fibre: 0 },
+    defaultPortion: { qty: 40, unit: "g" },
+    source: "USDA #173420"
+  },
+  halloumi: {
+    name: "Halloumi",
+    // Brand-variable, 320-370 kcal/100g. No USDA lab entry; this is the
+    // generic mid-range figure. Treat dishes using it as ±10% on fat/kcal.
+    per100g: { kcal: 333, p: 22.1, c: 1.5, f: 26.5, fibre: 0 },
+    defaultPortion: { qty: 80, unit: "g" },
+    source: "Generic brand label (no USDA entry)"
+  },
+  ricotta_partskim: {
+    name: "Ricotta (part-skim)",
+    per100g: { kcal: 138, p: 11.4, c: 5.1, f: 7.9, fibre: 0 },
+    defaultPortion: { qty: 60, unit: "g" },
+    source: "USDA #171248"
+  },
+  cottage_cheese: {
+    name: "Cottage cheese (low-fat, creamed)",
+    per100g: { kcal: 98, p: 11.1, c: 3.4, f: 4.3, fibre: 0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #172186"
+  },
+  soya_chunks: {
+    name: "Soya chunks / TVP (dry)",
+    // USDA SR-Legacy textured vegetable protein, dry. A widely-used generic
+    // entry gives 47g protein / 330 kcal instead; if that is the truer figure
+    // the soya keema dish loses ~4g of protein and still clears 35g.
+    per100g: { kcal: 366, p: 51.1, c: 32.9, f: 3.3, fibre: 17.5 },
+    defaultPortion: { qty: 70, unit: "g" },
+    source: "USDA SR-Legacy (textured vegetable protein, dry)"
+  },
+  milk_toned: {
+    name: "Toned milk",
+    per100g: { kcal: 58, p: 3.1, c: 4.4, f: 3.0, fibre: 0 },
+    defaultPortion: { qty: 200, unit: "g" },
     source: "IFCT Reference"
   },
 
   // --- Carbs ---
   cooked_rice: {
     name: "Cooked white rice",
-    per100g: { kcal: 130, p: 2.4, c: 28, f: 0.3 },
+    per100g: { kcal: 130, p: 2.4, c: 28, f: 0.3, fibre: 0.4 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA #20445"
   },
   garlic_rice: {
     name: "Garlic rice",
-    per100g: { kcal: 150, p: 3, c: 28, f: 3 },
+    per100g: { kcal: 150, p: 3, c: 28, f: 3, fibre: 0.5 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA/IFCT inferred"
   },
   jowar_roti: {
     name: "Jowar roti",
-    per100g: { kcal: 312, p: 6.7, c: 60, f: 3.2 },
+    per100g: { kcal: 312, p: 6.7, c: 60, f: 3.2, fibre: 6.5 },
     defaultPortion: { qty: 2, unit: "piece", pieceWeightG: 40 },
     source: "IFCT Reference"
   },
   whole_wheat_toast: {
     name: "Whole wheat toast",
-    per100g: { kcal: 247, p: 13, c: 41, f: 3.4 },
+    per100g: { kcal: 247, p: 13, c: 41, f: 3.4, fibre: 6.8 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 28 }, // 1 slice
     source: "USDA #18075"
   },
   poha: {
     name: "Poha (cooked)",
-    per100g: { kcal: 180, p: 6, c: 38, f: 1.5 },
+    per100g: { kcal: 180, p: 6, c: 38, f: 1.5, fibre: 0.9 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "IFCT Reference"
   },
   rice_noodles: {
     name: "Rice noodles (cooked)",
-    per100g: { kcal: 109, p: 0.9, c: 24, f: 0.2 },
+    per100g: { kcal: 109, p: 0.9, c: 24, f: 0.2, fibre: 0.9 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA #20133"
   },
   spaghetti_aglio_olio: {
     name: "Spaghetti aglio e olio",
-    per100g: { kcal: 185, p: 4.5, c: 29, f: 6.2 },
+    per100g: { kcal: 185, p: 4.5, c: 29, f: 6.2, fibre: 1.8 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA/Inferred"
   },
   masala_dosa: {
     name: "Mysore Masala Dosa",
-    per100g: { kcal: 220, p: 5, c: 30, f: 8 },
+    per100g: { kcal: 220, p: 5, c: 30, f: 8, fibre: 2 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 180 },
     source: "IFCT Reference"
   },
   idli: {
     name: "Idli",
-    per100g: { kcal: 140, p: 4, c: 28, f: 1.5 },
+    per100g: { kcal: 140, p: 4, c: 28, f: 1.5, fibre: 1.2 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 40 },
     source: "IFCT Reference"
   },
   aloo_paratha: {
     name: "Aloo paratha",
-    per100g: { kcal: 260, p: 6.5, c: 38, f: 9 },
+    per100g: { kcal: 260, p: 6.5, c: 38, f: 9, fibre: 3.5 },
     defaultPortion: { qty: 2, unit: "piece", pieceWeightG: 120 },
     source: "IFCT Reference"
+  },
+  plain_paratha: {
+    name: "Plain whole wheat paratha",
+    per100g: { kcal: 320, p: 8, c: 45, f: 12, fibre: 5.0 },
+    defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 100 },
+    source: "IFCT Reference"
+  },
+  moong_dal_chilla: {
+    name: "Moong dal chilla (savoury pancake)",
+    per100g: { kcal: 168, p: 10.5, c: 21, f: 4.5, fibre: 5.2 },
+    defaultPortion: { qty: 2, unit: "piece", pieceWeightG: 100 },
+    source: "IFCT Reference (green gram dal, ground + pan-cooked)"
+  },
+  rolled_oats: {
+    name: "Rolled oats (dry)",
+    per100g: { kcal: 389, p: 16.9, c: 66.3, f: 6.9, fibre: 10.6 },
+    defaultPortion: { qty: 50, unit: "g" },
+    source: "USDA #20038"
+  },
+  quinoa_cooked: {
+    name: "Quinoa (cooked)",
+    per100g: { kcal: 120, p: 4.4, c: 21.3, f: 1.9, fibre: 2.8 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #168917"
+  },
+  chickpea_pasta: {
+    name: "Chickpea pasta (cooked)",
+    // Stored COOKED, not dry, to match `spaghetti_aglio_olio` and the rest of
+    // the noodle entries — a dry-weight ingredient sitting in a table of
+    // cooked weights is a latent portioning bug. Derived from the Banza dry
+    // label (333 kcal, 24.6p, 56c, 6.1f, 11 fibre per 100g dry) at the ~2.2x
+    // cooked yield. Fibre is brand-variable.
+    per100g: { kcal: 151, p: 11.2, c: 25.5, f: 2.8, fibre: 5.0 },
+    defaultPortion: { qty: 155, unit: "g" },
+    source: "Banza label (dry), converted to cooked yield"
+  },
+  soba_noodles: {
+    name: "Soba noodles (cooked)",
+    per100g: { kcal: 99, p: 5.1, c: 21.4, f: 0.1, fibre: 1.0 },
+    defaultPortion: { qty: 150, unit: "g" },
+    source: "USDA #20135"
+  },
+  egg_noodles: {
+    name: "Egg noodles (cooked)",
+    per100g: { kcal: 138, p: 4.5, c: 25, f: 2.1, fibre: 1.2 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #20409"
   },
 
   // --- Vegetables / Sides / Flavorings ---
   mixed_salad: {
     name: "Mixed greens salad",
-    per100g: { kcal: 20, p: 1.3, c: 3.3, f: 0.2 },
+    per100g: { kcal: 20, p: 1.3, c: 3.3, f: 0.2, fibre: 1.8 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA"
   },
   pumpkin_salad: {
     name: "Pumpkin salad",
-    per100g: { kcal: 95, p: 2.2, c: 12, f: 4 },
+    per100g: { kcal: 95, p: 2.2, c: 12, f: 4, fibre: 2 },
     defaultPortion: { qty: 120, unit: "g" },
     source: "USDA"
   },
   sweet_potato: {
     name: "Sweet potato (cooked)",
-    per100g: { kcal: 90, p: 2, c: 21, f: 0.1 },
+    per100g: { kcal: 90, p: 2, c: 21, f: 0.1, fibre: 3 },
     defaultPortion: { qty: 150, unit: "g" },
     source: "USDA #11839"
   },
   broccoli: {
     name: "Sautéed broccoli",
-    per100g: { kcal: 55, p: 4, c: 7, f: 2 },
+    per100g: { kcal: 55, p: 4, c: 7, f: 2, fibre: 3.3 },
     defaultPortion: { qty: 120, unit: "g" },
     source: "USDA"
   },
   cauliflower: {
     name: "Cauliflower",
-    per100g: { kcal: 25, p: 2, c: 5, f: 0.3 },
+    per100g: { kcal: 25, p: 2, c: 5, f: 0.3, fibre: 2.3 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA #11135"
   },
   mixed_veg_sabzi: {
     name: "Mixed veg sabzi",
-    per100g: { kcal: 80, p: 3, c: 12, f: 2.5 },
+    per100g: { kcal: 80, p: 3, c: 12, f: 2.5, fibre: 3 },
     defaultPortion: { qty: 120, unit: "g" },
     source: "IFCT Reference"
   },
   veg_kofta: {
     name: "Vegetable kofta",
-    per100g: { kcal: 180, p: 4.5, c: 15, f: 11 },
+    per100g: { kcal: 180, p: 4.5, c: 15, f: 11, fibre: 2.5 },
     defaultPortion: { qty: 80, unit: "g" }, // approx 2 pieces
     source: "IFCT/Estimated"
   },
   spinach: {
     name: "Sautéed spinach",
-    per100g: { kcal: 40, p: 3, c: 4, f: 1.5 },
+    per100g: { kcal: 40, p: 3, c: 4, f: 1.5, fibre: 2.4 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA"
+  },
+  bok_choy: {
+    name: "Bok choy (steamed)",
+    per100g: { kcal: 12, p: 1.6, c: 1.8, f: 0.2, fibre: 1.0 },
+    defaultPortion: { qty: 120, unit: "g" },
+    source: "USDA #11117"
+  },
+  kimchi: {
+    name: "Kimchi",
+    per100g: { kcal: 15, p: 1.1, c: 2.4, f: 0.5, fibre: 1.6 },
+    defaultPortion: { qty: 60, unit: "g" },
+    source: "USDA #11957"
   },
 
   // --- Basics & Fats ---
   curry_base: {
     name: "Curry base (oil, onion, tomato)",
-    per100g: { kcal: 250, p: 2, c: 15, f: 20 },
+    per100g: { kcal: 250, p: 2, c: 15, f: 20, fibre: 1.5 },
     defaultPortion: { qty: 50, unit: "g" },
     source: "Inferred base"
   },
+  olive_oil: {
+    name: "Extra-virgin olive oil",
+    per100g: { kcal: 884, p: 0, c: 0, f: 100, fibre: 0 },
+    defaultPortion: { qty: 8, unit: "g" },
+    source: "USDA #171413"
+  },
+  olives_black: {
+    name: "Black olives (ripe, canned)",
+    per100g: { kcal: 115, p: 0.8, c: 6, f: 10.7, fibre: 3.2 },
+    defaultPortion: { qty: 30, unit: "g" },
+    source: "USDA #169094"
+  },
+  gochujang: {
+    name: "Gochujang (Korean chilli paste)",
+    // Label-derived; no USDA lab entry. Brand-variable and high in sodium.
+    per100g: { kcal: 220, p: 4, c: 49, f: 1, fibre: 2 },
+    defaultPortion: { qty: 20, unit: "g" },
+    source: "Brand label (no USDA entry)"
+  },
+  tomato_herb_base: {
+    name: "Tomato & herb base (olive oil, onion, tomato, pepper)",
+    // The Mediterranean counterpart to `curry_base`. Kept separate because
+    // curry_base is 20g fat per 100g — using it for shakshuka or arrabbiata
+    // would overstate the fat of every European dish by roughly 6g a serving.
+    per100g: { kcal: 90, p: 1.6, c: 7, f: 6, fibre: 1.5 },
+    defaultPortion: { qty: 40, unit: "g" },
+    source: "Inferred base"
+  },
+  sesame_stirfry_base: {
+    name: "Stir-fry base (sesame oil, garlic, ginger, soy)",
+    per100g: { kcal: 260, p: 1.5, c: 6, f: 26, fibre: 0.8 },
+    defaultPortion: { qty: 25, unit: "g" },
+    source: "Inferred base"
+  },
+  miso_broth: {
+    name: "Miso broth",
+    per100g: { kcal: 40, p: 2.5, c: 4, f: 1.5, fibre: 0.8 },
+    defaultPortion: { qty: 200, unit: "g" },
+    source: "USDA #16112 (derived)"
+  },
+  teriyaki_glaze: {
+    name: "Teriyaki glaze",
+    per100g: { kcal: 89, p: 1.5, c: 15.5, f: 0, fibre: 0.1 },
+    defaultPortion: { qty: 30, unit: "g" },
+    source: "USDA #06970"
+  },
   avocado: {
     name: "Avocado",
-    per100g: { kcal: 160, p: 2, c: 8.5, f: 14.7 },
+    per100g: { kcal: 160, p: 2, c: 8.5, f: 14.7, fibre: 6.7 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 50 }, // Half avocado
     source: "USDA #09037"
   },
   nuts_seeds: {
     name: "Mixed nuts & seeds",
-    per100g: { kcal: 600, p: 20, c: 20, f: 50 },
+    per100g: { kcal: 600, p: 20, c: 20, f: 50, fibre: 8 },
     defaultPortion: { qty: 30, unit: "g" },
     source: "USDA"
   },
   berry_mix: {
     name: "Mixed berries",
-    per100g: { kcal: 57, p: 0.7, c: 14, f: 0.3 },
+    per100g: { kcal: 57, p: 0.7, c: 14, f: 0.3, fibre: 5 },
     defaultPortion: { qty: 80, unit: "g" },
     source: "USDA"
   },
   ham_slice: {
     name: "Ham slice",
-    per100g: { kcal: 145, p: 17, c: 1.5, f: 7.5 },
+    per100g: { kcal: 145, p: 17, c: 1.5, f: 7.5, fibre: 0 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 28 }, // 1 slice
     source: "USDA"
   },
   cheese_slice: {
     name: "Cheese slice (cheddar/swiss)",
-    per100g: { kcal: 400, p: 25, c: 1.3, f: 33 },
+    per100g: { kcal: 400, p: 25, c: 1.3, f: 33, fibre: 0 },
     defaultPortion: { qty: 1, unit: "piece", pieceWeightG: 21 }, // 1 slice
     source: "USDA"
   },
   hummus: {
     name: "Hummus",
-    per100g: { kcal: 166, p: 7.9, c: 14.3, f: 9.6 },
+    per100g: { kcal: 166, p: 7.9, c: 14.3, f: 9.6, fibre: 6 },
     defaultPortion: { qty: 50, unit: "g" },
     source: "USDA #16158"
   },
   crackers: {
     name: "Seed/Wheat crackers",
-    per100g: { kcal: 502, p: 10, c: 60, f: 24 },
+    per100g: { kcal: 502, p: 10, c: 60, f: 24, fibre: 5 },
     defaultPortion: { qty: 30, unit: "g" },
     source: "USDA"
   },
   raw_vegetables: {
     name: "Raw vegetable sticks (carrot, cucumber, radish)",
-    per100g: { kcal: 20, p: 1, c: 4, f: 0.1 },
+    per100g: { kcal: 20, p: 1, c: 4, f: 0.1, fibre: 2 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA"
   },
@@ -324,31 +533,31 @@ export const ingredients = {
   // --- Custom Snacks ---
   mixed_fruit_100g: {
     name: "Mixed fruit (pomegranate, orange)",
-    per100g: { kcal: 65, p: 1.3, c: 15, f: 0.6 },
+    per100g: { kcal: 65, p: 1.3, c: 15, f: 0.6, fibre: 3 },
     defaultPortion: { qty: 100, unit: "g" },
     source: "USDA Custom Average"
   },
   almonds_5pc: {
     name: "Almonds (5 pieces)",
-    per100g: { kcal: 579, p: 21, c: 21, f: 50 },
+    per100g: { kcal: 579, p: 21, c: 21, f: 50, fibre: 12.5 },
     defaultPortion: { qty: 5, unit: "piece", pieceWeightG: 1.2 },
     source: "USDA"
   },
   plant_protein_shake_25g: {
     name: "Plant protein shake (water)",
-    per100g: { kcal: 400, p: 80, c: 10, f: 5 },
+    per100g: { kcal: 400, p: 80, c: 10, f: 5, fibre: 6 },
     defaultPortion: { qty: 25, unit: "g" },
     source: "Standard Supplement"
   },
   half_bhel_puri_no_potato: {
     name: "Bhel puri (half portion, no potato)",
-    per100g: { kcal: 157, p: 3.3, c: 23.3, f: 5.3 },
+    per100g: { kcal: 157, p: 3.3, c: 23.3, f: 5.3, fibre: 2.5 },
     defaultPortion: { qty: 75, unit: "g" },
     source: "IFCT Derived Custom"
   },
   half_papdi_chaat_baked: {
     name: "Papdi chaat (half portion, baked, no potato)",
-    per100g: { kcal: 170, p: 5.3, c: 24.6, f: 4.6 },
+    per100g: { kcal: 170, p: 5.3, c: 24.6, f: 4.6, fibre: 2.7 },
     defaultPortion: { qty: 75, unit: "g" },
     source: "IFCT Derived Custom"
   }
