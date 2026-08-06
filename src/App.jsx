@@ -75,6 +75,10 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
   const [pendingAutoGeneration, setPendingAutoGeneration] = useState(false);
   const [userMealCatalog, setUserMealCatalog] = useState(DEFAULT_USER_CATALOG);
   const omniboxRef = React.useRef(null);
+  // Week-start keys this session has already attempted to auto-generate.
+  // Guards against an unbounded retry loop when generation fails — see the
+  // auto-generation detector below.
+  const autoGenAttemptedRef = React.useRef(new Set());
   const [activeOmniboxContext, setActiveOmniboxContext] = useState(null);
   const [omniboxPrefill, setOmniboxPrefill] = useState('');
   const todayDate = new Date().toLocaleDateString('en-IN', {
@@ -658,27 +662,44 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     void saveToStorage('meal-preferences', nextPreferences);
   }, [mealEvents, loading]);
 
-  // Auto-generation detector — DISABLED (plans are pushed manually via Claude)
-  // Re-enable by removing the `if (false)` wrapper below
+  /**
+   * Auto-generation detector.
+   *
+   * Fires only when the viewed week is *entirely* empty and still has days
+   * left to plan. That emptiness check is what keeps this compatible with the
+   * "plan pushed externally" contract in CLAUDE.md — a week that already has
+   * meals in it, from any source, is never touched.
+   *
+   * `autoGenAttemptedRef` is the important part. Without it a failed
+   * generation leaves the week empty, which re-triggers this effect, which
+   * runs the generator again — an unbounded retry loop against a paid API.
+   * One attempt per week per session; the manual "Regen Week" button remains
+   * the way to retry deliberately.
+   */
   useEffect(() => {
-    if (false) { // eslint-disable-line no-constant-condition
     if (loading || isViewerMode || !mergedMealDatabase) return;
     if (isRegenerating) return;
     const today = getDateKey(new Date());
     const weekKeys = getWeekDateKeys(selectedDateKey).sort();
     if (weekKeys[6] < today) return;
+    if (autoGenAttemptedRef.current.has(weekKeys[0])) return;
     const hasAnyPlan = weekKeys.some(k => mealPlans[k] && Object.keys(mealPlans[k]).length > 0);
     if (!hasAnyPlan) { setPendingAutoGeneration(true); }
-    } // end disabled block
   }, [loading, isViewerMode, mergedMealDatabase, selectedDateKey, mealPlans, isRegenerating]);
 
-  // Auto-generation runner — DISABLED (plans are pushed manually via Claude)
+  // Auto-generation runner. Mirrors the manual "Regen Week" path exactly —
+  // same optimizer, same shortlists, same AI call, same protein target — so
+  // the two cannot drift apart in what they produce.
   useEffect(() => {
-    if (false && !loading && pendingAutoGeneration && mergedMealDatabase && !isViewerMode) { // eslint-disable-line no-constant-condition
+    if (!loading && pendingAutoGeneration && mergedMealDatabase && !isViewerMode) {
       setPendingAutoGeneration(false);
 
       const today = getDateKey(new Date());
       const selectedWeekKeys = getWeekDateKeys(selectedDateKey).sort();
+
+      // Mark before running, not after: if the generation below throws, this
+      // week must not be retried automatically on the next render.
+      autoGenAttemptedRef.current.add(selectedWeekKeys[0]);
 
       const runAutoGeneration = async () => {
         // Target all days in the currently viewed week that are >= today
@@ -756,7 +777,9 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           });
 
           setMealPlans(nextPlans);
-          saveToStorage('meal-plans', nextPlans);
+          // Awaited deliberately — CLAUDE.md sync invariant 3. Showing success
+          // before the Firestore write lands lets a fast refresh beat it.
+          await saveToStorage('meal-plans', nextPlans);
           showNotification(`✓ Successfully auto-generated plan for the week!`);
         } catch (error) {
           console.error("Auto-generation failed", error);
