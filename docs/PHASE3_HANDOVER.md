@@ -1,6 +1,10 @@
 # Phase 3 Handover — Unblock the Optimizer
 
-**Status:** Ready to build. Nothing implemented yet.
+**Status:** **Delivered (Tier 1)** — see `docs/PHASE3_REPORT.md` for what shipped
+and `docs/PHASE3_INTEGRATION.md` for how it was merged with the Phase 2 catalog.
+Re-verified at 97 meals: ~2,025ms → ~630ms warm (median of 5), output
+byte-identical. Tier 2 and Tier 3 of §4 below remain unstarted and are parked
+until the catalog is well past 200 meals.
 **Prerequisite reading:** this file, then `CLAUDE.md` (especially "The rule model"
 and "Hybrid Generation Pipeline"). `docs/PHASE2_HANDOVER.md` §10.4–§10.5 is where
 this work was first identified; everything from there is restated below, so you
