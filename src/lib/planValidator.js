@@ -189,6 +189,30 @@ const collectWeekViolations = ({ days, rules, lockedDays, summary }) => {
     }
   }
 
+  // Anchor-ingredient cap. Name-based repeat limits miss this entirely: two
+  // differently-named rajma dishes were each allowed twice, producing four
+  // rajma lunches/dinners in a week with no rule broken.
+  const primaryCap = rules.hard.maxSamePrimaryIngredientPerWeek;
+  if (Number.isFinite(primaryCap)) {
+    const primaryUse = {};
+    for (const day of [...days, ...Object.values(lockedDays || {})]) {
+      for (const slot of ['lunch', 'dinner']) {
+        const primary = day?.[slot]?.primary_ingredient;
+        if (primary) primaryUse[primary] = (primaryUse[primary] || 0) + 1;
+      }
+    }
+    for (const [primary, count] of Object.entries(primaryUse)) {
+      if (count > primaryCap) {
+        found.push(violation({
+          code: 'primary_ingredient_repeat_exceeded',
+          actual: count,
+          limit: primaryCap,
+          message: `${primary} anchors ${count} lunch/dinner meals this week (max ${primaryCap})`
+        }));
+      }
+    }
+  }
+
   const redMeat = [...days, ...Object.values(lockedDays || {})]
     .flatMap((day) => CORE_SLOTS.map((slot) => day?.[slot]))
     .filter(Boolean)
@@ -218,7 +242,8 @@ const collectWeekViolations = ({ days, rules, lockedDays, summary }) => {
   const budgets = [
     { code: 'protein_band_budget_exceeded', actual: summary.daysProteinInBand, label: 'in the protein band' },
     { code: 'carb_cap_budget_exceeded', actual: summary.daysUnderCarbCap, label: 'under the carb cap' },
-    { code: 'calorie_bounds_budget_exceeded', actual: summary.daysInCalorieBounds, label: 'within calorie bounds' }
+    { code: 'calorie_bounds_budget_exceeded', actual: summary.daysInCalorieBounds, label: 'within calorie bounds' },
+    { code: 'cuisine_balance_budget_exceeded', actual: summary.daysCuisineBalanced, label: 'balanced one Indian / one international at lunch and dinner' }
   ];
   for (const budget of budgets) {
     if (budget.actual < required) {

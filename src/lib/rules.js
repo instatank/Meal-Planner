@@ -101,6 +101,10 @@ const GOAL_DEFINITIONS = {
       maxSameMealPerDay: 1,
       maxBreakfastRepeatsPerWeek: 4,
       maxLunchDinnerRepeatsPerWeek: 2,
+      // Counts the *anchor ingredient*, not the meal name. Name-based repeat
+      // caps let `Rajma chawal + raita` and `Rajma + paneer bowl` each appear
+      // twice — four rajma dinners in one week, all individually legal.
+      maxSamePrimaryIngredientPerWeek: 2,
       redMeatMealsPerWeek: 3,
       // A meal is excluded outright once the user's avoid score passes this.
       avoidScoreExclusiveMax: 3,
@@ -154,6 +158,7 @@ const GOAL_DEFINITIONS = {
       maxSameMealPerDay: 1,
       maxBreakfastRepeatsPerWeek: 3,
       maxLunchDinnerRepeatsPerWeek: 2,
+      maxSamePrimaryIngredientPerWeek: 2,
       redMeatMealsPerWeek: 4,
       avoidScoreExclusiveMax: 3,
       weeklyProteinFloorRatio: 0.85

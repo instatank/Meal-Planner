@@ -53,9 +53,11 @@ Rules live in **`src/lib/rules.js` and nowhere else**, split into three tiers:
 
 | Tier | Meaning | Examples |
 | --- | --- | --- |
-| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, weekly repeat ceilings (breakfast ≤4, lunch/dinner ≤2), red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 785g, 50g/day sanity floor |
-| **2 — Budgeted** | Allowed to break on ≤2 of 7 days | daily protein band (119–145g), carb cap (130g), calorie bounds (1600–2200) |
+| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, weekly repeat ceilings (breakfast ≤4, lunch/dinner ≤2), **anchor-ingredient cap (≤2/wk at lunch/dinner)**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 785g, 50g/day sanity floor |
+| **2 — Budgeted** | Allowed to break on ≤2 of 7 days | daily protein band (119–145g), carb cap (130g), calorie bounds (1600–2200), **cuisine balance — exactly one Indian across lunch+dinner** |
 | **3 — Scored** | Never rejects; only ranks | variety, cuisine diversity, protein-family diversity, fibre, dinner calorie tapering, user preferences, anti-greedy |
+
+**The anchor-ingredient cap** counts the ingredient a meal is *about* (highest protein contributor, derived from `parts[]` by `derivePrimaryIngredient`), not the meal name. Name-based caps let `Rajma chawal + raita` and `Rajma + paneer bowl` each appear twice — four rajma dinners in a week, every one legal.
 
 Budgets **pro-rate** for partial-week regenerations: a 4-day remainder gets 1 flex day and a 449g floor, not the full week's allowance.
 
@@ -69,7 +71,7 @@ Budgets **pro-rate** for partial-week regenerations: a 4-day remainder gets 1 fl
 Re-measure any of this with `npm run audit:generation` — it enumerates rather than estimates and exits non-zero if an acceptance criterion fails.
 
 ### Meal Database
-`src/data/mealDatabase.js`, **97 meals** (19 breakfast / 66 lunchDinner / 12 snack) built from `src/data/ingredients.js` (83 ingredients).
+`src/data/mealDatabase.js`, **110 meals** (20 breakfast / 75 lunchDinner / 15 snack) built from `src/data/ingredients.js` (92 ingredients). Meals may carry an optional `recipe_url`.
 
 Macros are **computed from `parts[]`**, never typed. So are three tags that used to be hand-maintained beside them and drifted:
 

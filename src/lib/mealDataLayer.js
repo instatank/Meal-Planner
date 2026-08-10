@@ -158,6 +158,42 @@ export const deriveMealTags = (meal = {}) => ({
   meal_weight: deriveMealWeight(meal)
 });
 
+/**
+ * The ingredient a meal is *about* — the one contributing the most protein.
+ *
+ * This exists because the weekly repeat cap counts meal *names*, which is not
+ * what a person perceives. `Rajma chawal + raita` and `Rajma + paneer bowl`
+ * are two different names and so were each allowed twice, producing four
+ * rajma dinners in one week — every one of them legal, and the whole week
+ * obviously wrong. Capping the anchor ingredient is what stops that.
+ *
+ * Protein is the right axis rather than mass or calories: it picks `rajma`
+ * out of rajma-and-rice, and `chicken_breast` out of a chicken curry with
+ * more grams of rice than chicken. Derived from `parts[]`, never typed.
+ */
+export const derivePrimaryIngredient = (meal = {}) => {
+  let best = null;
+  let bestProtein = -1;
+
+  for (const part of meal.parts || []) {
+    const ing = ingredients[part.ingredientId];
+    if (!ing?.per100g) continue;
+
+    let weightG = part.qty;
+    if (part.unit === 'piece' || part.unit === 'slice') {
+      weightG = part.qty * (ing.defaultPortion?.pieceWeightG || 100);
+    }
+    const protein = (ing.per100g.p || 0) * (weightG / 100);
+
+    if (protein > bestProtein) {
+      bestProtein = protein;
+      best = part.ingredientId;
+    }
+  }
+
+  return best;
+};
+
 export const inferCarbLevel = (meal = {}) => {
   const carbs = asNumber(meal.macros?.c);
   if (!Number.isFinite(carbs)) return 'medium';

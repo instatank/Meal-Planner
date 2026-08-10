@@ -140,7 +140,7 @@ const EMPTY_FACTS = {
   name: '', protein: 0, carbs: 0, fat: 0, calories: 0, cuisine: '',
   family: 'vegetarian', redMeat: false, primaryMeat: false,
   fibreScore: 0, fibre: false, heavy: false, carbHeavy: false, fatHeavy: false,
-  repeatedFamily: false
+  repeatedFamily: false, primaryIngredient: null
 };
 
 export const mealFacts = (meal) => {
@@ -165,7 +165,10 @@ export const mealFacts = (meal) => {
     heavy: isHeavyMeal(meal),
     carbHeavy: isCarbHeavyMeal(meal),
     fatHeavy: isFatHeavyMeal(meal),
-    repeatedFamily: hasRepeatedFamilyInsideMeal(meal)
+    repeatedFamily: hasRepeatedFamilyInsideMeal(meal),
+    // Derived in the data layer from parts[]; null for fixtures and
+    // user-added meals that carry no ingredient list.
+    primaryIngredient: meal?.primary_ingredient || null
   };
   FACT_CACHE.set(meal, facts);
   return facts;
@@ -327,9 +330,18 @@ export const annotateDay = (day, rules, totals = null) => {
     nameKey: mealNames.join('|'),
     redMeatCount: (breakfast.redMeat ? 1 : 0) + (lunch.redMeat ? 1 : 0) + (dinner.redMeat ? 1 : 0),
     cuisines: [breakfast.cuisine, lunch.cuisine, dinner.cuisine],
+    // The anchor ingredients this day spends, for the weekly repeat cap.
+    // Breakfast is excluded: the cap exists to stop the same headline dish
+    // dominating lunch and dinner, and eggs legitimately anchor most breakfasts.
+    lunchDinnerPrimaries: [lunch.primaryIngredient, dinner.primaryIngredient].filter(Boolean),
     proteinInBand: resolvedTotals.protein >= dailyProteinMin && resolvedTotals.protein <= dailyProteinMax,
     underCarbCap: resolvedTotals.carbs <= dailyCarbCap,
-    inCalorieBounds: resolvedTotals.calories >= dailyCalorieMin && resolvedTotals.calories <= dailyCalorieMax
+    inCalorieBounds: resolvedTotals.calories >= dailyCalorieMin && resolvedTotals.calories <= dailyCalorieMax,
+    // Exactly one of lunch/dinner Indian. Two Indian meals in a day reads as
+    // repetitive in an Indian household; two international ones read as a day
+    // with no home cooking. Budgeted rather than hard, so ~5 days of 7 balance.
+    cuisineBalanced:
+      [lunch.cuisine, dinner.cuisine].filter((c) => c === 'indian').length === 1
   };
 };
 
@@ -498,13 +510,22 @@ const DEFAULT_BEAM_WIDTH = 40;
 // than "top N by score", because the days that satisfy a rare budget (only ~20%
 // of combinations reach the 1600 kcal floor) are not the highest-scoring ones
 // and a naive trim deletes exactly the days the week needs.
-const DEFAULT_MAX_CANDIDATES = 960;
+//
+// Sized off the number of budget classes rather than a flat literal. At a flat
+// 960 with four budgets each class got only 60 candidates, and the beam ran out
+// of distinct days to choose from — it produced weeks with two *identical* days
+// and 14 distinct meals. 150 per class restores that headroom: measured 20
+// distinct meals and no duplicate day on both goals.
+const CANDIDATES_PER_BUDGET_CLASS = 150;
 
 const BUDGETS = [
   { flag: 'proteinInBand', counter: 'inBand' },
   { flag: 'underCarbCap', counter: 'underCarb' },
-  { flag: 'inCalorieBounds', counter: 'inCalorieBounds' }
+  { flag: 'inCalorieBounds', counter: 'inCalorieBounds' },
+  { flag: 'cuisineBalanced', counter: 'cuisineBalanced' }
 ];
+
+const DEFAULT_MAX_CANDIDATES = (2 ** BUDGETS.length) * CANDIDATES_PER_BUDGET_CLASS;
 
 /**
  * Reduce the candidate pool to `maxCandidates`, keeping the best of each
@@ -513,13 +534,17 @@ const BUDGETS = [
 const trimCandidatePool = (sortedCandidates, maxCandidates) => {
   if (sortedCandidates.length <= maxCandidates) return sortedCandidates;
 
-  const perClass = Math.ceil(maxCandidates / 8);
+  // One class per combination of the BUDGETS flags — 2^4 now that cuisine
+  // balance is budgeted. Keeping the divisor in step with BUDGETS.length
+  // matters: strata the trim does not know about get squeezed out, which is
+  // exactly how a rare-but-required day disappears before the search sees it.
+  const perClass = Math.ceil(maxCandidates / (2 ** BUDGETS.length));
   const classCounts = new Map();
   const kept = [];
   const keptSet = new Set();
 
   for (const candidate of sortedCandidates) {
-    const key = `${candidate.proteinInBand ? 1 : 0}${candidate.underCarbCap ? 1 : 0}${candidate.inCalorieBounds ? 1 : 0}`;
+    const key = BUDGETS.map((budget) => (candidate[budget.flag] ? 1 : 0)).join('');
     const count = classCounts.get(key) || 0;
     if (count >= perClass) continue;
     classCounts.set(key, count + 1);
@@ -548,6 +573,7 @@ const cloneUsage = (usage) => ({ breakfast: { ...usage.breakfast }, lunchDinner:
  */
 const seedWeekState = (lockedDays, rules) => {
   const usage = { breakfast: {}, lunchDinner: {} };
+  const primaries = {};
   let redMeat = 0;
   for (const day of Object.values(lockedDays || {})) {
     if (!day) continue;
@@ -556,10 +582,12 @@ const seedWeekState = (lockedDays, rules) => {
     for (const slot of ['lunch', 'dinner']) {
       const name = getMealName(day[slot]);
       if (name) usage.lunchDinner[name] = (usage.lunchDinner[name] || 0) + 1;
+      const primary = mealFacts(day[slot]).primaryIngredient;
+      if (primary) primaries[primary] = (primaries[primary] || 0) + 1;
     }
     redMeat += CORE_SLOTS.map((slot) => day[slot]).filter(Boolean).filter(isRedMeat).length;
   }
-  return { usage, redMeat, cuisines: new Set(), distinct: new Set() };
+  return { usage, primaries, redMeat, cuisines: new Set(), distinct: new Set() };
 };
 
 const canPlaceDay = (state, candidate, rules) => {
@@ -572,6 +600,18 @@ const canPlaceDay = (state, candidate, rules) => {
   if ((state.usage.lunchDinner[lunchName] || 0) + 1 > cap) return false;
   const dinnerUsed = (state.usage.lunchDinner[dinnerName] || 0) + (dinnerName === lunchName ? 1 : 0);
   if (dinnerUsed + 1 > cap) return false;
+
+  // Anchor-ingredient cap. Counted within the candidate day too, so a day
+  // that puts the same anchor at both lunch and dinner spends two of its
+  // allowance rather than one.
+  const primaryCap = rules.hard.maxSamePrimaryIngredientPerWeek;
+  if (Number.isFinite(primaryCap)) {
+    const pending = {};
+    for (const primary of candidate.lunchDinnerPrimaries || []) {
+      pending[primary] = (pending[primary] || 0) + 1;
+      if ((state.primaries[primary] || 0) + pending[primary] > primaryCap) return false;
+    }
+  }
 
   if (state.redMeat + candidate.redMeatCount > rules.hard.redMeatMealsPerWeek) return false;
   return true;
@@ -587,11 +627,16 @@ const applyDay = (state, candidate) => {
   for (const name of candidate.mealNames) distinct.add(name);
   const cuisines = new Set(state.cuisines);
   for (const cuisine of candidate.cuisines) if (cuisine) cuisines.add(cuisine);
+  const primaries = { ...state.primaries };
+  for (const primary of candidate.lunchDinnerPrimaries || []) {
+    primaries[primary] = (primaries[primary] || 0) + 1;
+  }
 
   return {
     usage,
     distinct,
     cuisines,
+    primaries,
     redMeat: state.redMeat + candidate.redMeatCount,
     protein: state.protein + candidate.totals.protein,
     inBand: state.inBand + (candidate.proteinInBand ? 1 : 0),
@@ -644,7 +689,8 @@ export const selectWeek = ({
       protein: 0,
       inBand: 0,
       underCarb: 0,
-      inCalorieBounds: 0
+      inCalorieBounds: 0,
+      cuisineBalanced: 0
     },
     score: 0
   }];
@@ -760,7 +806,10 @@ export const isWeekWithinBudgets = (summary) =>
  * knowingly gives up on the Tier-2 budgets; the validator reports what broke.
  */
 const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays }) => {
-  const state = { ...seedWeekState(lockedDays, rules), protein: 0, inBand: 0, underCarb: 0, inCalorieBounds: 0 };
+  const state = {
+    ...seedWeekState(lockedDays, rules),
+    protein: 0, inBand: 0, underCarb: 0, inCalorieBounds: 0, cuisineBalanced: 0
+  };
   const days = [];
   let current = state;
 
@@ -791,6 +840,7 @@ export const summariseWeek = (days = [], rules) => {
     daysProteinInBand: days.filter((day) => day.proteinInBand).length,
     daysUnderCarbCap: days.filter((day) => day.underCarbCap).length,
     daysInCalorieBounds: days.filter((day) => day.inCalorieBounds).length,
+    daysCuisineBalanced: days.filter((day) => day.cuisineBalanced).length,
     requiredCompliantDays: requiredCompliantDays(dayCount, rules),
     redMeatMeals: days.reduce((sum, day) => sum + (day.redMeatCount || 0), 0),
     distinctMeals: distinct.size

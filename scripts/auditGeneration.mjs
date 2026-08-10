@@ -127,6 +127,40 @@ const criteria = [
     detail: `${summary.daysInCalorieBounds} of ${dayCount}`
   },
   {
+    label: `>= ${required} of ${dayCount} days one Indian + one international at lunch/dinner`,
+    pass: summary.daysCuisineBalanced >= required,
+    detail: `${summary.daysCuisineBalanced} of ${dayCount}`
+  },
+  {
+    label: `no anchor ingredient at lunch/dinner more than ${rules.hard.maxSamePrimaryIngredientPerWeek}x`,
+    pass: (() => {
+      const use = {};
+      for (const day of plan.days) {
+        for (const slot of ['lunch', 'dinner']) {
+          const p = day[slot]?.primary_ingredient;
+          if (p) use[p] = (use[p] || 0) + 1;
+        }
+      }
+      return Object.values(use).every((n) => n <= rules.hard.maxSamePrimaryIngredientPerWeek);
+    })(),
+    detail: (() => {
+      const use = {};
+      for (const day of plan.days) {
+        for (const slot of ['lunch', 'dinner']) {
+          const p = day[slot]?.primary_ingredient;
+          if (p) use[p] = (use[p] || 0) + 1;
+        }
+      }
+      const worst = Object.entries(use).sort((a, b) => b[1] - a[1])[0];
+      return worst ? `most repeated: ${worst[0]} x${worst[1]}` : 'none';
+    })()
+  },
+  {
+    label: 'no duplicate day in the week',
+    pass: new Set(plan.days.map((d) => d.nameKey)).size === plan.days.length,
+    detail: `${new Set(plan.days.map((d) => d.nameKey)).size} distinct days of ${plan.days.length}`
+  },
+  {
     label: 'no Tier-1 violation anywhere in the week',
     pass: result.hardViolations.length === 0,
     detail: `${result.hardViolations.length} found`

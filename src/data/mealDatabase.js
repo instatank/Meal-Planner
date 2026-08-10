@@ -1,4 +1,9 @@
-import { computeMacros, deriveMealTags, enrichMealForDataLayer } from '../lib/mealDataLayer.js';
+import {
+  computeMacros,
+  deriveMealTags,
+  derivePrimaryIngredient,
+  enrichMealForDataLayer
+} from '../lib/mealDataLayer.js';
 
 // Base meals converted to the new Ingredient Architecture
 const baseMealsList = {
@@ -307,31 +312,6 @@ const baseMealsList = {
       }
     },
 
-    // ── Research batch, 2026-08-03 ───────────────────────────────────────
-    //
-    // From a sourced research pass across Hebbar's Kitchen, Maangchi, Just One
-    // Cookbook, The Woks of Life, Ottolenghi and others. Macros are computed
-    // from parts[] as always — the researcher's own totals were used only to
-    // cross-check, and their fibre figures were consistently overstated, so
-    // trust the computed numbers here rather than any external panel.
-    {
-      "meal_id": "breakfast_paneer-egg-white-bhurji-toast",
-      "canonical_name": "Paneer & egg-white bhurji + toast",
-      "recipe_url": "https://hebbarskitchen.com/easy-dry-paneer-bhurji-recipe/",
-      "display_name": "Paneer & Egg-White Bhurji",
-      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
-      "assumption_version": "assumptions_v2026_08_03",
-      "name": "Paneer & egg-white bhurji + toast",
-      "parts": [
-        { "ingredientId": "paneer", "qty": 100, "unit": "g" },
-        { "ingredientId": "egg_white", "qty": 130, "unit": "g" },
-        { "ingredientId": "curry_base", "qty": 30, "unit": "g" },
-        { "ingredientId": "whole_wheat_toast", "qty": 60, "unit": "g" }
-      ],
-      "components": {
-        "protein": "Paneer + egg whites", "amount": 230, "carb": "Whole wheat toast", "carbAmount": 60, "veg": null, "style": "Pan-fried"
-      }
-    },
     {
       "meal_id": "breakfast_anda-bhurji-toast",
       "canonical_name": "Anda bhurji + toast",
@@ -1173,23 +1153,6 @@ const baseMealsList = {
         "protein": "Chicken keema", "amount": 180, "carb": "Spaghetti", "carbAmount": 150, "veg": "Mixed greens salad", "vegAmount": 100, "style": "Pan-fried"
       },
       "cuisine": "western"
-    },
-    {
-      "meal_id": "lunch_dinner_rajma-paneer-bowl",
-      "canonical_name": "Rajma + paneer bowl",
-      "display_name": "Rajma + Paneer Bowl",
-      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
-      "assumption_version": "assumptions_v2026_08_02",
-      "name": "Rajma + paneer bowl",
-      "parts": [
-        { "ingredientId": "rajma", "qty": 180, "unit": "g" },
-        { "ingredientId": "paneer", "qty": 80, "unit": "g" },
-        { "ingredientId": "curry_base", "qty": 30, "unit": "g" }
-      ],
-      "components": {
-        "protein": "Paneer + rajma", "amount": 260, "carb": "No carb", "carbAmount": 0, "veg": null, "style": "Curry style"
-      },
-      "cuisine": "indian"
     },
 
     // ── Research batch, 2026-08-03 ───────────────────────────────────────
@@ -2208,14 +2171,12 @@ const handAuthoredTags = {
   "Chicken shawarma bowl": { cuisine: "Continental" },
   "Prawn curry + rice": { cuisine: "Asian" },
   "Chicken meatballs + spaghetti + salad": { cuisine: "Continental" },
-  "Rajma + paneer bowl": { cuisine: "Indian" },
   "Boiled eggs + hummus + veg sticks": { cuisine: "Continental" },
   "Edamame + sea salt": { cuisine: "Asian" },
   "Paneer tikka skewers": { cuisine: "Indian" },
   "Overnight oats + whey bowl": { cuisine: "Continental" },
 
   // Research batch, 2026-08-03
-  "Paneer & egg-white bhurji + toast": { cuisine: "Indian" },
   "Anda bhurji + toast": { cuisine: "Indian" },
   "Sardines on toast + avocado": { cuisine: "Continental" },
   "Shakshuka with feta": { cuisine: "Continental" },
@@ -2277,6 +2238,7 @@ const buildMeal = (meal, mealType) => {
     {
       ...withMacros,
       ...deriveMealTags(withMacros),
+      primary_ingredient: derivePrimaryIngredient(withMacros),
       ...(handAuthoredTags[meal.canonical_name] || {})
     },
     mealType

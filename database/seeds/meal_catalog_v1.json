@@ -1,7 +1,7 @@
 {
   "version": "v1",
-  "generatedAt": "2026-08-06T09:57:24.367Z",
-  "mealCount": 112,
+  "generatedAt": "2026-08-10T14:50:54.503Z",
+  "mealCount": 110,
   "sourceFile": "src/data/mealDatabase.js",
   "assumptions": [
     {
@@ -328,24 +328,6 @@
       "is_active": true,
       "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"vegetarian\",\"carb_level\":\"medium\",\"cuisine\":\"continental\",\"format\":\"bowl\",\"effort\":\"low\",\"goal_fit\":[\"high_protein\"]}",
       "metadata": "{\"macros_p\":40,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"bowl\",\"effort\":\"low\",\"goal_fit\":[\"high_protein\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":470,\"delta_kcal\":13,\"tolerance_kcal\":91.4},\"issues\":[]}}"
-    },
-    {
-      "meal_id": "breakfast_paneer-egg-white-bhurji-toast",
-      "meal_type": "breakfast",
-      "canonical_name": "Paneer & egg-white bhurji + toast",
-      "display_name": "Paneer & Egg-White Bhurji",
-      "name": "Paneer & egg-white bhurji + toast",
-      "cuisine": "Indian",
-      "calories_kcal": 556,
-      "protein_g": 41,
-      "carbs_g": 33,
-      "fat_g": 28,
-      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
-      "assumption_version": "assumptions_v2026_08_03",
-      "source": "seed_v1",
-      "is_active": true,
-      "tags": "{\"meal_type\":\"breakfast\",\"protein_family\":\"vegetarian\",\"carb_level\":\"medium\",\"cuisine\":\"indian\",\"format\":\"toast\",\"effort\":\"low\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"]}",
-      "metadata": "{\"macros_p\":41,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"toast\",\"effort\":\"low\",\"goal_fit\":[\"high_protein\",\"low_carb\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":548,\"delta_kcal\":8,\"tolerance_kcal\":111.2},\"issues\":[]}}"
     },
     {
       "meal_id": "breakfast_anda-bhurji-toast",
@@ -1174,24 +1156,6 @@
       "is_active": true,
       "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"chicken\",\"carb_level\":\"medium\",\"cuisine\":\"continental\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"]}",
       "metadata": "{\"macros_p\":57,\"protein_family\":\"chicken\",\"meal_weight_class\":\"heavy\",\"carb_level\":\"medium\",\"format\":\"salad\",\"effort\":\"medium\",\"goal_fit\":[\"high_protein\",\"two_meals\"],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":659,\"delta_kcal\":10,\"tolerance_kcal\":129.8},\"issues\":[]}}"
-    },
-    {
-      "meal_id": "lunch_dinner_rajma-paneer-bowl",
-      "meal_type": "lunch_dinner",
-      "canonical_name": "Rajma + paneer bowl",
-      "display_name": "Rajma + Paneer Bowl",
-      "name": "Rajma + paneer bowl",
-      "cuisine": "Indian",
-      "calories_kcal": 516,
-      "protein_g": 31,
-      "carbs_g": 48,
-      "fat_g": 23,
-      "nutrition_source": "IFCT/ICMR-NIN + USDA references + user assumptions",
-      "assumption_version": "assumptions_v2026_08_02",
-      "source": "seed_v1",
-      "is_active": true,
-      "tags": "{\"meal_type\":\"lunch_dinner\",\"protein_family\":\"vegetarian\",\"carb_level\":\"medium\",\"cuisine\":\"indian\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[]}",
-      "metadata": "{\"macros_p\":31,\"protein_family\":\"vegetarian\",\"meal_weight_class\":\"medium\",\"carb_level\":\"medium\",\"format\":\"curry\",\"effort\":\"medium\",\"goal_fit\":[],\"source_type\":\"composite_reference\",\"source_url\":\"\",\"confidence_score\":0.83,\"needs_review\":false,\"validation\":{\"macro_calorie\":{\"is_consistent\":true,\"expected_kcal\":523,\"delta_kcal\":7,\"tolerance_kcal\":103.2},\"issues\":[]}}"
     },
     {
       "meal_id": "lunch_dinner_palak-paneer-jowar-roti",
@@ -2236,17 +2200,6 @@
       "metadata": "{}"
     },
     {
-      "meal_id": "breakfast_paneer-egg-white-bhurji-toast",
-      "protein_name": "Paneer + egg whites",
-      "protein_amount_g": 230,
-      "carb_name": "Whole wheat toast",
-      "carb_amount_g": 60,
-      "veg_name": "",
-      "veg_amount_g": "",
-      "style": "Pan-fried",
-      "metadata": "{}"
-    },
-    {
       "meal_id": "breakfast_anda-bhurji-toast",
       "protein_name": "Eggs (whole + whites)",
       "protein_amount_g": 250,
@@ -2750,17 +2703,6 @@
       "veg_name": "Mixed greens salad",
       "veg_amount_g": 100,
       "style": "Pan-fried",
-      "metadata": "{}"
-    },
-    {
-      "meal_id": "lunch_dinner_rajma-paneer-bowl",
-      "protein_name": "Paneer + rajma",
-      "protein_amount_g": 260,
-      "carb_name": "No carb",
-      "carb_amount_g": 0,
-      "veg_name": "",
-      "veg_amount_g": "",
-      "style": "Curry style",
       "metadata": "{}"
     },
     {
