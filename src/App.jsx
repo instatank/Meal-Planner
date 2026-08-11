@@ -1666,6 +1666,37 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       setIsRegenerating(false);
     }
   };
+  const rejectWeek = async () => {
+    if (!requireWriteAccess('Rejecting plans')) return;
+
+    const reason = window.prompt("Why are you rejecting this week's plan? (one line)");
+    if (reason === null) return; // user cancelled
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
+      showNotification('⚠️ Rejection needs a reason');
+      return;
+    }
+
+    const weekKeys = getWeekDateKeys(selectedDateKey).sort();
+    const plan = {};
+    for (const key of weekKeys) {
+      if (mealPlans[key]) plan[key] = mealPlans[key];
+    }
+
+    const existingRejections = await storageGet('rejected-plans');
+    const nextRejections = [
+      ...(Array.isArray(existingRejections) ? existingRejections : []),
+      {
+        timestamp: new Date().toISOString(),
+        plan,
+        reason: trimmedReason
+      }
+    ];
+
+    await saveToStorage('rejected-plans', nextRejections);
+    showNotification('🚫 Week rejected and logged');
+  };
+
   const weekDateKeys = getWeekDateKeys(selectedDateKey);
   const selectedMealTypeOrder = getMealTypeOrder(selectedDayPlan, selectedDayHistory);
   const mealTypeLabels = {
@@ -2102,6 +2133,14 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             ⚙️ Edit Prefs
           </button>
         </div>
+
+        <button
+          onClick={rejectWeek}
+          className="w-full bg-red-100 text-red-700 py-3 rounded-lg font-semibold mb-4 hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          disabled={isViewerMode}
+        >
+          🚫 Reject Week
+        </button>
 
         <AdminTools user={user} systemConfig={systemConfig} />
       </div>
