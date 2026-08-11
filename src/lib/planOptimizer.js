@@ -587,7 +587,13 @@ const seedWeekState = (lockedDays, rules) => {
     }
     redMeat += CORE_SLOTS.map((slot) => day[slot]).filter(Boolean).filter(isRedMeat).length;
   }
-  return { usage, primaries, redMeat, cuisines: new Set(), distinct: new Set() };
+  const dayKeys = new Set();
+  for (const day of Object.values(lockedDays || {})) {
+    if (!day) continue;
+    const key = CORE_SLOTS.map((slot) => getMealName(day[slot])).join('|');
+    if (key.replace(/\|/g, '')) dayKeys.add(key);
+  }
+  return { usage, primaries, redMeat, dayKeys, cuisines: new Set(), distinct: new Set() };
 };
 
 const canPlaceDay = (state, candidate, rules) => {
@@ -613,6 +619,11 @@ const canPlaceDay = (state, candidate, rules) => {
     }
   }
 
+  // No two identical days in a week. The per-meal repeat caps allow each meal
+  // twice, so a whole day repeating verbatim broke no rule while being the
+  // most obvious defect a person sees in a generated plan.
+  if (state.dayKeys.has(candidate.nameKey)) return false;
+
   if (state.redMeat + candidate.redMeatCount > rules.hard.redMeatMealsPerWeek) return false;
   return true;
 };
@@ -631,12 +642,15 @@ const applyDay = (state, candidate) => {
   for (const primary of candidate.lunchDinnerPrimaries || []) {
     primaries[primary] = (primaries[primary] || 0) + 1;
   }
+  const dayKeys = new Set(state.dayKeys);
+  dayKeys.add(candidate.nameKey);
 
   return {
     usage,
     distinct,
     cuisines,
     primaries,
+    dayKeys,
     redMeat: state.redMeat + candidate.redMeatCount,
     protein: state.protein + candidate.totals.protein,
     inBand: state.inBand + (candidate.proteinInBand ? 1 : 0),

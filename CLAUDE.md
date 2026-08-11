@@ -53,7 +53,7 @@ Rules live in **`src/lib/rules.js` and nowhere else**, split into three tiers:
 
 | Tier | Meaning | Examples |
 | --- | --- | --- |
-| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, weekly repeat ceilings (breakfast ≤4, lunch/dinner ≤2), **anchor-ingredient cap (≤2/wk at lunch/dinner)**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 785g, 50g/day sanity floor |
+| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, weekly repeat ceilings (breakfast ≤4, lunch/dinner ≤2), **anchor-ingredient cap (≤2/wk at lunch/dinner)**, **no two identical days in a week**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 785g, 50g/day sanity floor |
 | **2 — Budgeted** | Allowed to break on ≤2 of 7 days | daily protein band (119–145g), carb cap (130g), calorie bounds (1600–2200), **cuisine balance — exactly one Indian across lunch+dinner** |
 | **3 — Scored** | Never rejects; only ranks | variety, cuisine diversity, protein-family diversity, fibre, dinner calorie tapering, user preferences, anti-greedy |
 
@@ -67,6 +67,15 @@ Budgets **pro-rate** for partial-week regenerations: a 4-day remainder gets 1 fl
 1. **Phase 1 (deterministic)** — `src/lib/planOptimizer.js` enumerates *every* Tier-1-legal breakfast/lunch/dinner combination (3,250 for the current catalog, ~250ms), scores each against Tiers 2 and 3, and beam-searches a week that satisfies the Tier-2 budgets by construction. Produces both a reference week and the per-date, per-slot shortlists.
 2. **Phase 2 (AI)** — `src/lib/planService.js` sends shortlists to `/api/generate-plan`. The `submit_weekly_plan` tool is built per request with a **per-day, per-slot `enum`** of legal meal names, so a hallucinated name is structurally impossible. The plan is keyed by date, not an array, because JSON Schema applies one `items` schema to every array element and that would collapse seven days into one shared enum.
 3. **Phase 3 (validation)** — `src/lib/planValidator.js` checks the returned week against all three tiers and repairs it deterministically if needed: first replacing only the days with Tier-1 violations, then rebuilding the whole run. Nothing invalid is ever written silently; if even the optimizer cannot satisfy the rules it returns `catalogInfeasible`.
+
+**Every path that writes a generated week MUST run Phase 3.** The optimizer's
+week-level guarantees do not survive Phase 2 on their own: the AI receives flat
+per-slot shortlists that discard week structure, so it can freely recombine them
+into a week that breaks repeat caps, the red-meat cap, or the duplicate-day rule.
+The auto-generation path shipped without calling the validator at all and wrote
+the AI's answer straight to storage — which is why bad weeks kept reaching the
+user no matter how many rules were added to the optimizer. If you add a third
+generation entry point, it validates or it does not ship.
 
 Re-measure any of this with `npm run audit:generation` — it enumerates rather than estimates and exits non-zero if an acceptance criterion fails.
 

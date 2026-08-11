@@ -353,3 +353,31 @@ test('formatViolations renders one readable line per violation', () => {
     + '- [tier 2] protein_band_budget_exceeded: Only 4 of 7 days are in the protein band'
   );
 });
+
+test('two identical days in a week are a Tier-1 violation', () => {
+  // The per-meal weekly repeat caps allow each meal twice, so a whole day
+  // repeating verbatim broke no rule — while being the single most obvious
+  // defect a person sees in a generated plan. Reported from real use.
+  const rules = getRules('high_protein');
+  const catalogue = catalog();
+  const day = (dateKey) => ({
+    dateKey,
+    breakfast: catalogue.breakfast[0],
+    lunch: catalogue.lunchDinner[0],
+    dinner: catalogue.lunchDinner[1]
+  });
+
+  const result = validateWeek({ days: [day(DATES[0]), day(DATES[1])], rules });
+  const dup = result.violations.find((v) => v.code === 'duplicate_day_in_week');
+
+  assert.ok(dup, `expected a duplicate_day_in_week violation, got: ${result.violations.map((v) => v.code).join(', ')}`);
+  assert.equal(dup.tier, TIER.HARD);
+});
+
+test('selectWeek never emits the same day twice', () => {
+  const rules = getRules('high_protein');
+  const week = selectWeek({ mealDatabase: catalog(), rules, targetDateKeys: DATES, preferences: {} });
+  const keys = week.days.map((d) => [d.breakfast, d.lunch, d.dinner].map((m) => m.name).join('|'));
+
+  assert.equal(new Set(keys).size, keys.length, `duplicate day in generated week:\n  ${keys.join('\n  ')}`);
+});

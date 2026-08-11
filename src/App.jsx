@@ -759,22 +759,39 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             shortlists
           });
 
-          const nextPlans = { ...mealPlans };
-          const catalog = [
-            ...(mergedMealDatabase.breakfast || []),
-            ...(mergedMealDatabase.lunchDinner || []),
-            ...(mergedMealDatabase.snack || [])
-          ];
-          const findMeal = (name) => { const n = String(name || '').trim().toLowerCase(); return catalog.find(m => m.canonical_name.toLowerCase() === n || m.name?.toLowerCase() === n) || null; };
-
-          generatedDays.forEach(day => {
-            const newPlan = { ...nextPlans[day.dateKey] };
-            if (day.breakfast) newPlan.breakfast = findMeal(day.breakfast) || { name: day.breakfast, protein: 0, cal: 0, macros: { p: 0, c: 0, f: 0 } };
-            if (day.lunch) newPlan.lunch = findMeal(day.lunch) || { name: day.lunch, protein: 0, cal: 0, macros: { p: 0, c: 0, f: 0 } };
-            if (day.dinner) newPlan.dinner = findMeal(day.dinner) || { name: day.dinner, protein: 0, cal: 0, macros: { p: 0, c: 0, f: 0 } };
-            if (day.snack) newPlan.snack = findMeal(day.snack) || { name: day.snack, protein: 0, cal: 0, macros: { p: 0, c: 0, f: 0 } };
-            nextPlans[day.dateKey] = newPlan;
+          // Phase 3: validate and deterministically repair, exactly as the
+          // manual regen does. This path used to write the AI's answer
+          // straight to storage with no validation at all — every week-level
+          // rule (repeat caps, red meat, duplicate days) was advisory here,
+          // which is why bad weeks kept reaching the user.
+          const { validateAndRepairWeek, formatViolations } = await import('./lib/planValidator.js');
+          const checked = validateAndRepairWeek({
+            days: generatedDays,
+            mealDatabase: mergedMealDatabase,
+            rules,
+            preferences: adjustedPrefs,
+            historyMap,
+            lockedDays: buildLockedWeekDays(targetDateKeys)
           });
+
+          if (checked.resolutionViolations.length > 0) {
+            console.warn('[AutoGen] AI returned meal names outside the shortlist:', checked.resolutionViolations);
+          }
+          if (checked.repaired) {
+            console.warn(`[AutoGen] Repaired the generated week (${checked.strategy}):\n${formatViolations(checked.validation.violations)}`);
+          }
+          console.info('[AutoGen] Week summary:', checked.validation.summary);
+
+          const nextPlans = { ...mealPlans };
+          for (const day of checked.days) {
+            if (!day.dateKey) continue;
+            nextPlans[day.dateKey] = {
+              ...nextPlans[day.dateKey],
+              breakfast: day.breakfast || nextPlans[day.dateKey]?.breakfast,
+              lunch: day.lunch || nextPlans[day.dateKey]?.lunch,
+              dinner: day.dinner || nextPlans[day.dateKey]?.dinner
+            };
+          }
 
           setMealPlans(nextPlans);
           // Awaited deliberately — CLAUDE.md sync invariant 3. Showing success

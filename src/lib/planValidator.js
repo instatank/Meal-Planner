@@ -189,6 +189,27 @@ const collectWeekViolations = ({ days, rules, lockedDays, summary }) => {
     }
   }
 
+  // Two identical days in one week. Never had a rule: the per-meal weekly
+  // repeat caps allow each meal twice, so a whole day repeating verbatim
+  // broke nothing while being the single most obvious defect a person sees
+  // in a generated plan.
+  const dayKeys = days.map((day) => CORE_SLOTS.map((slot) => getMealName(day?.[slot])).join('|'));
+  const seenDays = new Map();
+  for (const key of dayKeys) {
+    if (!key.replace(/\|/g, '')) continue;
+    seenDays.set(key, (seenDays.get(key) || 0) + 1);
+  }
+  for (const [key, count] of seenDays) {
+    if (count > 1) {
+      found.push(violation({
+        code: 'duplicate_day_in_week',
+        actual: count,
+        limit: 1,
+        message: `The same day (${key.split('|').join(' / ')}) appears ${count} times this week`
+      }));
+    }
+  }
+
   // Anchor-ingredient cap. Name-based repeat limits miss this entirely: two
   // differently-named rajma dishes were each allowed twice, producing four
   // rajma lunches/dinners in a week with no rule broken.
