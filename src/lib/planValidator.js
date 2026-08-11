@@ -14,7 +14,7 @@
  * Callers must not persist a week that comes back invalid.
  */
 
-import { requiredCompliantDays, weeklyProteinFloor } from './rules.js';
+import { anchorFamilyMaxPerWeek, requiredCompliantDays, weeklyProteinFloor } from './rules.js';
 import {
   CORE_SLOTS,
   annotateDay,
@@ -189,15 +189,23 @@ const collectWeekViolations = ({ days, rules, lockedDays, summary }) => {
     }
   }
 
-  // Two identical days in one week. Never had a rule: the per-meal weekly
-  // repeat caps allow each meal twice, so a whole day repeating verbatim
-  // broke nothing while being the single most obvious defect a person sees
-  // in a generated plan.
-  const dayKeys = days.map((day) => CORE_SLOTS.map((slot) => getMealName(day?.[slot])).join('|'));
+  // annotateDay computes each day's order-independent dish set and its
+  // anchor-ingredient families the same way the optimizer does during
+  // construction, so the validator cannot drift into checking a stricter or
+  // looser rule than the search actually enforced.
+  const annotated = [...days, ...Object.values(lockedDays || {})]
+    .filter(Boolean)
+    .map((day) => annotateDay(day, rules));
+
+  // Two identical days in one week — same dishes, any slot order. Never had
+  // a rule: the per-meal weekly repeat caps allow each meal twice, so a
+  // whole day repeating (even lunch and dinner merely swapped) broke
+  // nothing while being the single most obvious defect a person sees in a
+  // generated plan.
   const seenDays = new Map();
-  for (const key of dayKeys) {
-    if (!key.replace(/\|/g, '')) continue;
-    seenDays.set(key, (seenDays.get(key) || 0) + 1);
+  for (const { dishSetKey } of annotated) {
+    if (!dishSetKey) continue;
+    seenDays.set(dishSetKey, (seenDays.get(dishSetKey) || 0) + 1);
   }
   for (const [key, count] of seenDays) {
     if (count > 1) {
@@ -210,27 +218,26 @@ const collectWeekViolations = ({ days, rules, lockedDays, summary }) => {
     }
   }
 
-  // Anchor-ingredient cap. Name-based repeat limits miss this entirely: two
-  // differently-named rajma dishes were each allowed twice, producing four
-  // rajma lunches/dinners in a week with no rule broken.
-  const primaryCap = rules.hard.maxSamePrimaryIngredientPerWeek;
-  if (Number.isFinite(primaryCap)) {
-    const primaryUse = {};
-    for (const day of [...days, ...Object.values(lockedDays || {})]) {
-      for (const slot of ['lunch', 'dinner']) {
-        const primary = day?.[slot]?.primary_ingredient;
-        if (primary) primaryUse[primary] = (primaryUse[primary] || 0) + 1;
-      }
+  // Anchor-ingredient-family cap, counting breakfast, lunch and dinner alike.
+  // Name-based repeat limits miss this entirely: two differently-named rajma
+  // dishes were each allowed twice, producing four rajma meals in a week
+  // with no rule broken; grouping by family also catches a paneer breakfast,
+  // a feta lunch and a halloumi dinner reading as "cheese all day."
+  const familyUse = {};
+  for (const { anchorFamilies } of annotated) {
+    for (const family of anchorFamilies || []) {
+      familyUse[family] = (familyUse[family] || 0) + 1;
     }
-    for (const [primary, count] of Object.entries(primaryUse)) {
-      if (count > primaryCap) {
-        found.push(violation({
-          code: 'primary_ingredient_repeat_exceeded',
-          actual: count,
-          limit: primaryCap,
-          message: `${primary} anchors ${count} lunch/dinner meals this week (max ${primaryCap})`
-        }));
-      }
+  }
+  for (const [family, count] of Object.entries(familyUse)) {
+    const familyCap = anchorFamilyMaxPerWeek(family, rules);
+    if (count > familyCap) {
+      found.push(violation({
+        code: 'anchor_family_repeat_exceeded',
+        actual: count,
+        limit: familyCap,
+        message: `${family} anchors ${count} meals this week (max ${familyCap})`
+      }));
     }
   }
 

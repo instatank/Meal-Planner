@@ -84,6 +84,112 @@ export const isImplementedGoal = (goal) => IMPLEMENTED_GOALS.includes(normalizeG
 
 const CORE_SLOTS = Object.freeze(['breakfast', 'lunch', 'dinner']);
 
+// ─── Anchor-ingredient families ─────────────────────────────────────────────
+//
+// The anchor cap used to count a meal's primary ingredient (see
+// `derivePrimaryIngredient` in mealDataLayer.js) directly, one counter per
+// ingredient id. That missed the case a person actually notices: `Paneer
+// bowl`, `Feta salad` and `Halloumi wrap` are three different ingredients and
+// so were each allowed to their own cap independently — a week can read as
+// "cheese, cheese, cheese" while every individual counter is still legal.
+//
+// `ANCHOR_FAMILY` groups ingredients that read as the same headline protein
+// to a person. An ingredient absent from this map anchors itself (see
+// `anchorFamilyOf`), so nothing loses cap coverage by not being named here —
+// it just gets a family of one.
+export const ANCHOR_FAMILY = Object.freeze({
+  // Soft cheeses — the paneer/feta/halloumi/cottage-cheese cluster.
+  paneer: 'cheese_soft',
+  feta: 'cheese_soft',
+  halloumi: 'cheese_soft',
+  ricotta_partskim: 'cheese_soft',
+  cottage_cheese: 'cheese_soft',
+  cheese_slice: 'cheese_soft',
+  // Soy-based proteins.
+  tofu_firm: 'soy',
+  soya_chunks: 'soy',
+  edamame: 'soy',
+  // Fatty/omega-3 fish, canned or fresh.
+  grilled_salmon: 'oily_fish',
+  smoked_salmon: 'oily_fish',
+  sardines: 'oily_fish',
+  mackerel_canned: 'oily_fish',
+  tuna_water: 'oily_fish',
+  // Lean white fish and shellfish — the light-seafood counterpart to oily_fish.
+  fish_fillet: 'white_fish',
+  prawns: 'white_fish',
+  // Legumes where the dish is *about* the legume (rajma chawal, chana masala),
+  // as opposed to a dal served alongside another headline dish.
+  rajma: 'legume_feature',
+  chole: 'legume_feature',
+  kaala_chanaa: 'legume_feature',
+  white_beans: 'legume_feature',
+  // Dal-as-staple: a side/base rather than the dish's headline ingredient.
+  arhar_dal: 'legume_staple',
+  moong_dal_chilla: 'legume_staple',
+  // Poultry.
+  chicken_breast: 'poultry',
+  smoked_chicken: 'poultry',
+  chicken_keema: 'poultry',
+  chicken_sausage: 'poultry',
+  // Red meat — kept in step with `isRedMeat` in planOptimizer.js.
+  beef_steak: 'red_meat',
+  pork_chop: 'red_meat',
+  mutton_keema: 'red_meat',
+  lamb_seekh_kabab: 'red_meat',
+  ham_slice: 'red_meat',
+  // Eggs.
+  egg_whole: 'egg',
+  egg_white: 'egg',
+  egg_yolk: 'egg',
+  // Avocado.
+  avocado: 'avocado'
+});
+
+/** Family an anchor ingredient belongs to, or the ingredient itself if unmapped. */
+export const anchorFamilyOf = (primaryIngredient) => {
+  if (!primaryIngredient) return null;
+  return ANCHOR_FAMILY[primaryIngredient] || primaryIngredient;
+};
+
+/**
+ * Per-family weekly cap used by every goal unless overridden below. 2 mirrors
+ * the old per-ingredient cap, so an unmapped ingredient (a family of one)
+ * keeps exactly the coverage it had before families existed.
+ */
+const DEFAULT_ANCHOR_FAMILY_CAP = 2;
+
+/**
+ * Builds a goal's per-family anchor caps. `poultry` and `egg` sit above the
+ * default because they are catalog staples the per-meal repeat caps already
+ * keep varied by name — a family ceiling at the default would make chicken
+ * or egg breakfasts infeasible most weeks. `red_meat` is passed in rather
+ * than hard-coded so it always matches that goal's own `redMeatMealsPerWeek`
+ * instead of drifting into a second, silently different red-meat limit.
+ */
+const buildAnchorFamilyCaps = (redMeatMealsPerWeek) => ({
+  cheese_soft: DEFAULT_ANCHOR_FAMILY_CAP,
+  soy: DEFAULT_ANCHOR_FAMILY_CAP,
+  oily_fish: DEFAULT_ANCHOR_FAMILY_CAP,
+  white_fish: DEFAULT_ANCHOR_FAMILY_CAP,
+  legume_feature: DEFAULT_ANCHOR_FAMILY_CAP,
+  legume_staple: DEFAULT_ANCHOR_FAMILY_CAP,
+  avocado: DEFAULT_ANCHOR_FAMILY_CAP,
+  poultry: 5,
+  egg: 4,
+  red_meat: redMeatMealsPerWeek
+});
+
+/**
+ * The cap for `family` under `rules`, falling back to the shared default for
+ * any family (or unmapped ingredient acting as its own family) the goal's
+ * `anchorFamilyMaxPerWeek` table does not name explicitly.
+ */
+export const anchorFamilyMaxPerWeek = (family, rules) => {
+  const fromRules = rules?.hard?.anchorFamilyMaxPerWeek?.[family];
+  return Number.isFinite(fromRules) ? fromRules : DEFAULT_ANCHOR_FAMILY_CAP;
+};
+
 /**
  * The number of days a full week contains, and how many of them are permitted
  * to break each budgeted constraint. "2 of 7" is the founder's settled call.
@@ -105,6 +211,7 @@ const GOAL_DEFINITIONS = {
       // caps let `Rajma chawal + raita` and `Rajma + paneer bowl` each appear
       // twice — four rajma dinners in one week, all individually legal.
       maxSamePrimaryIngredientPerWeek: 2,
+      anchorFamilyMaxPerWeek: buildAnchorFamilyCaps(3),
       redMeatMealsPerWeek: 3,
       // A meal is excluded outright once the user's avoid score passes this.
       avoidScoreExclusiveMax: 3,
@@ -159,6 +266,7 @@ const GOAL_DEFINITIONS = {
       maxBreakfastRepeatsPerWeek: 3,
       maxLunchDinnerRepeatsPerWeek: 2,
       maxSamePrimaryIngredientPerWeek: 2,
+      anchorFamilyMaxPerWeek: buildAnchorFamilyCaps(4),
       redMeatMealsPerWeek: 4,
       avoidScoreExclusiveMax: 3,
       weeklyProteinFloorRatio: 0.85

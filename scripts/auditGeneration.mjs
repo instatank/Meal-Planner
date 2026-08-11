@@ -13,7 +13,7 @@
 
 import { buildWeekPlan, enumerateFeasibleDays } from '../src/lib/planOptimizer.js';
 import { validateWeek, formatViolations } from '../src/lib/planValidator.js';
-import { getRules } from '../src/lib/rules.js';
+import { anchorFamilyMaxPerWeek, getRules } from '../src/lib/rules.js';
 import { mealDatabase } from '../src/data/mealDatabase.js';
 
 const args = process.argv.slice(2);
@@ -94,6 +94,25 @@ console.log(`\noptimizer runtime                 ${elapsedMs}ms over ${plan.cand
 console.log(`distinct meals used               ${summary.distinctMeals}`);
 console.log(`red-meat meals                    ${summary.redMeatMeals} of ${rules.hard.redMeatMealsPerWeek} allowed`);
 
+heading('Anchor-ingredient family counts (breakfast + lunch + dinner)');
+
+const familyUse = {};
+for (const day of plan.days) {
+  for (const family of day.anchorFamilies || []) familyUse[family] = (familyUse[family] || 0) + 1;
+}
+const familyRows = Object.entries(familyUse)
+  .map(([family, count]) => ({ family, count, cap: anchorFamilyMaxPerWeek(family, rules) }))
+  .sort((a, b) => b.count - a.count || a.family.localeCompare(b.family));
+
+if (familyRows.length === 0) {
+  console.log('(no meal in the generated week carries a known primary ingredient)');
+} else {
+  for (const { family, count, cap } of familyRows) {
+    const status = count <= cap ? 'ok' : 'OVER CAP';
+    console.log(`${family.padEnd(18)}${String(count).padStart(2)} / ${String(cap).padEnd(3)} ${status}`);
+  }
+}
+
 // ─── 3. Acceptance criteria ─────────────────────────────────────────────────
 
 heading('Acceptance criteria');
@@ -132,33 +151,31 @@ const criteria = [
     detail: `${summary.daysCuisineBalanced} of ${dayCount}`
   },
   {
-    label: `no anchor ingredient at lunch/dinner more than ${rules.hard.maxSamePrimaryIngredientPerWeek}x`,
+    label: 'no anchor-ingredient family (breakfast + lunch + dinner) over its weekly cap',
     pass: (() => {
       const use = {};
       for (const day of plan.days) {
-        for (const slot of ['lunch', 'dinner']) {
-          const p = day[slot]?.primary_ingredient;
-          if (p) use[p] = (use[p] || 0) + 1;
-        }
+        for (const family of day.anchorFamilies || []) use[family] = (use[family] || 0) + 1;
       }
-      return Object.values(use).every((n) => n <= rules.hard.maxSamePrimaryIngredientPerWeek);
+      return Object.entries(use).every(([family, n]) => n <= anchorFamilyMaxPerWeek(family, rules));
     })(),
     detail: (() => {
       const use = {};
       for (const day of plan.days) {
-        for (const slot of ['lunch', 'dinner']) {
-          const p = day[slot]?.primary_ingredient;
-          if (p) use[p] = (use[p] || 0) + 1;
-        }
+        for (const family of day.anchorFamilies || []) use[family] = (use[family] || 0) + 1;
       }
-      const worst = Object.entries(use).sort((a, b) => b[1] - a[1])[0];
-      return worst ? `most repeated: ${worst[0]} x${worst[1]}` : 'none';
+      const worst = Object.entries(use)
+        .map(([family, n]) => [family, n, anchorFamilyMaxPerWeek(family, rules)])
+        .sort((a, b) => (b[1] - b[2]) - (a[1] - a[2]))[0];
+      return worst ? `closest to its cap: ${worst[0]} x${worst[1]} (cap ${worst[2]})` : 'none';
     })()
   },
   {
-    label: 'no duplicate day in the week',
-    pass: new Set(plan.days.map((d) => d.nameKey)).size === plan.days.length,
-    detail: `${new Set(plan.days.map((d) => d.nameKey)).size} distinct days of ${plan.days.length}`
+    // Same dishes regardless of which slot each lands in — a day with lunch
+    // and dinner swapped is the same day to the person eating it.
+    label: 'no duplicate day in the week (lunch/dinner swaps count as duplicates)',
+    pass: new Set(plan.days.map((d) => d.dishSetKey)).size === plan.days.length,
+    detail: `${new Set(plan.days.map((d) => d.dishSetKey)).size} distinct days of ${plan.days.length}`
   },
   {
     label: 'no Tier-1 violation anywhere in the week',

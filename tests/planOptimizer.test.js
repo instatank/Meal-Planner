@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  CORE_SLOTS,
   buildSlotShortlists,
   buildWeekPlan,
   enumerateFeasibleDays,
@@ -9,12 +10,12 @@ import {
   selectWeek,
   summariseWeek
 } from '../src/lib/planOptimizer.js';
-import { getRules } from '../src/lib/rules.js';
+import { anchorFamilyMaxPerWeek, anchorFamilyOf, getRules } from '../src/lib/rules.js';
 
 const DATES = ['2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09'];
 
 /** A meal with every field the optimizer reads, so fixtures stay explicit. */
-const meal = ({ name, p, c = 20, f = 10, cal, cuisine = 'continental', weight = 'Medium', family = 'vegetarian', fibre = true }) => ({
+const meal = ({ name, p, c = 20, f = 10, cal, cuisine = 'continental', weight = 'Medium', family = 'vegetarian', fibre = true, primaryIngredient = null }) => ({
   name,
   canonical_name: name,
   protein: p,
@@ -23,7 +24,8 @@ const meal = ({ name, p, c = 20, f = 10, cal, cuisine = 'continental', weight = 
   cuisine,
   meal_weight: weight,
   has_fibre: fibre,
-  tags: { protein_family: family }
+  tags: { protein_family: family },
+  primary_ingredient: primaryIngredient
 });
 
 /**
@@ -212,6 +214,94 @@ test('the red-meat cap is counted across the generated week, not just history', 
     summary.redMeatMeals <= rules.hard.redMeatMealsPerWeek,
     `red meat meals: ${summary.redMeatMeals}`
   );
+});
+
+test('the anchor cap counts by ingredient family, not by raw ingredient id', () => {
+  // Paneer, feta and halloumi are three different primary_ingredient ids that
+  // all read as "cheese" to a person. Each was individually allowed up to the
+  // old per-ingredient cap (2), so all three together could reach 6 cheese
+  // meals in a week with no rule broken. The family cap must catch that.
+  // Built on `roomyCatalog()` so the search has plenty of non-cheese slack
+  // and stays on its normal feasible path rather than the lenient best-effort
+  // fallback, which does not enforce this cap.
+  const rules = rulesFor();
+  const cheeseCap = anchorFamilyMaxPerWeek('cheese_soft', rules);
+  const database = roomyCatalog();
+  database.lunchDinner.push(
+    meal({ name: 'Paneer bowl', p: 44, c: 30, cal: 560, primaryIngredient: 'paneer' }),
+    meal({ name: 'Feta salad', p: 43, c: 30, cal: 555, cuisine: 'indian', primaryIngredient: 'feta' }),
+    meal({ name: 'Halloumi wrap', p: 42, c: 30, cal: 550, cuisine: 'asian', primaryIngredient: 'halloumi' })
+  );
+
+  const { days, feasible } = selectWeek({ mealDatabase: database, rules, targetDateKeys: DATES, preferences: {} });
+  assert.equal(feasible, true, 'roomyCatalog() plus three cheese dishes should stay comfortably feasible');
+
+  const cheeseSoftUses = days
+    .flatMap((day) => CORE_SLOTS.map((slot) => day[slot]))
+    .filter(Boolean)
+    .filter((m) => anchorFamilyOf(m.primary_ingredient) === 'cheese_soft')
+    .length;
+
+  assert.ok(
+    cheeseSoftUses <= cheeseCap,
+    `cheese_soft (paneer + feta + halloumi combined) used ${cheeseSoftUses} times, family cap is ${cheeseCap} — the old per-ingredient cap would have allowed up to 6`
+  );
+});
+
+test('the anchor-family cap counts breakfast, not just lunch and dinner', () => {
+  // Two of the six breakfasts are cheese_soft; the other four (roomyCatalog's
+  // B1-B4) give the search plenty of unconstrained slack so it stays on its
+  // normal feasible path rather than the lenient best-effort fallback, which
+  // does not enforce this cap.
+  const rules = rulesFor();
+  const cheeseCap = anchorFamilyMaxPerWeek('cheese_soft', rules);
+  const database = roomyCatalog();
+  database.breakfast.push(
+    meal({ name: 'Paneer poha', p: 40, c: 30, cal: 520, primaryIngredient: 'paneer' }),
+    meal({ name: 'Feta oats', p: 38, c: 30, cal: 510, cuisine: 'indian', primaryIngredient: 'feta' })
+  );
+
+  const { days, feasible } = selectWeek({ mealDatabase: database, rules, targetDateKeys: DATES, preferences: {} });
+  assert.equal(feasible, true, 'roomyCatalog() plus two cheese breakfasts should stay comfortably feasible');
+  assert.equal(days.length, 7);
+
+  const cheeseBreakfasts = days.filter(
+    (day) => anchorFamilyOf(day.breakfast?.primary_ingredient) === 'cheese_soft'
+  ).length;
+
+  assert.ok(
+    cheeseBreakfasts <= cheeseCap,
+    `cheese breakfasts used ${cheeseBreakfasts} times, family cap is ${cheeseCap} — this only binds if breakfast is counted`
+  );
+});
+
+test('a lunch/dinner swap is treated as the same day, not a distinct one', () => {
+  // Only two lunch/dinner meals exist, so the only two "shapes" available are
+  // L1-at-lunch/L2-at-dinner and its reverse — the same day to a person. The
+  // old ordered nameKey treated these as different days and would have
+  // allowed the reverse right after the locked day used the forward order.
+  const rules = rulesFor();
+  const database = {
+    breakfast: [meal({ name: 'B1', p: 40, c: 30, cal: 520 })],
+    lunchDinner: [
+      meal({ name: 'L1', p: 48, c: 35, cal: 600 }),
+      meal({ name: 'L2', p: 47, c: 35, cal: 590 })
+    ],
+    snack: []
+  };
+  const locked = {
+    '2026-08-01': { breakfast: database.breakfast[0], lunch: database.lunchDinner[0], dinner: database.lunchDinner[1] }
+  };
+
+  const { feasible } = selectWeek({
+    mealDatabase: database,
+    rules,
+    targetDateKeys: ['2026-08-03'],
+    preferences: {},
+    lockedDays: locked
+  });
+
+  assert.equal(feasible, false, 'the lunch/dinner swap of an already-used day must not be accepted as a distinct day');
 });
 
 // ─── Tier 2 — budget accounting ─────────────────────────────────────────────

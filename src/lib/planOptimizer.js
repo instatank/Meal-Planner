@@ -25,6 +25,8 @@ import {
   FIBRE_MEAL_THRESHOLD,
   HEAVY_MEAL_CALORIES,
   PROTEIN_BALANCE_MAX_GAP,
+  anchorFamilyMaxPerWeek,
+  anchorFamilyOf,
   requiredCompliantDays,
   weeklyProteinFloor
 } from './rules.js';
@@ -320,6 +322,7 @@ export const annotateDay = (day, rules, totals = null) => {
   const { dailyProteinMin, dailyProteinMax, dailyCarbCap, dailyCalorieMin, dailyCalorieMax } = rules.budgeted;
 
   const mealNames = [breakfast.name, lunch.name, dinner.name];
+  const dishNames = mealNames.filter(Boolean);
 
   return {
     ...day,
@@ -328,12 +331,18 @@ export const annotateDay = (day, rules, totals = null) => {
     // Precomputed once here because the sort tie-breaker and the beam's
     // per-candidate hash both need it, and both used to rebuild it per call.
     nameKey: mealNames.join('|'),
+    // Order-independent form of the same three names, used for the
+    // duplicate-day check: a day with lunch and dinner swapped is still the
+    // same day to a person eating it, even though `nameKey` differs.
+    dishSetKey: dishNames.length ? [...dishNames].sort().join('|') : '',
     redMeatCount: (breakfast.redMeat ? 1 : 0) + (lunch.redMeat ? 1 : 0) + (dinner.redMeat ? 1 : 0),
     cuisines: [breakfast.cuisine, lunch.cuisine, dinner.cuisine],
-    // The anchor ingredients this day spends, for the weekly repeat cap.
-    // Breakfast is excluded: the cap exists to stop the same headline dish
-    // dominating lunch and dinner, and eggs legitimately anchor most breakfasts.
-    lunchDinnerPrimaries: [lunch.primaryIngredient, dinner.primaryIngredient].filter(Boolean),
+    // The anchor-ingredient families this day spends, for the weekly cap.
+    // Breakfast counts too — a chicken breakfast spends the same poultry
+    // budget as a chicken dinner would.
+    anchorFamilies: [breakfast.primaryIngredient, lunch.primaryIngredient, dinner.primaryIngredient]
+      .map(anchorFamilyOf)
+      .filter(Boolean),
     proteinInBand: resolvedTotals.protein >= dailyProteinMin && resolvedTotals.protein <= dailyProteinMax,
     underCarbCap: resolvedTotals.carbs <= dailyCarbCap,
     inCalorieBounds: resolvedTotals.calories >= dailyCalorieMin && resolvedTotals.calories <= dailyCalorieMax,
@@ -573,7 +582,7 @@ const cloneUsage = (usage) => ({ breakfast: { ...usage.breakfast }, lunchDinner:
  */
 const seedWeekState = (lockedDays, rules) => {
   const usage = { breakfast: {}, lunchDinner: {} };
-  const primaries = {};
+  const families = {};
   let redMeat = 0;
   for (const day of Object.values(lockedDays || {})) {
     if (!day) continue;
@@ -582,18 +591,22 @@ const seedWeekState = (lockedDays, rules) => {
     for (const slot of ['lunch', 'dinner']) {
       const name = getMealName(day[slot]);
       if (name) usage.lunchDinner[name] = (usage.lunchDinner[name] || 0) + 1;
-      const primary = mealFacts(day[slot]).primaryIngredient;
-      if (primary) primaries[primary] = (primaries[primary] || 0) + 1;
+    }
+    // Anchor-family cap counts all three slots — a chicken breakfast spends
+    // the same poultry budget a chicken lunch or dinner would.
+    for (const slot of CORE_SLOTS) {
+      const family = anchorFamilyOf(mealFacts(day[slot]).primaryIngredient);
+      if (family) families[family] = (families[family] || 0) + 1;
     }
     redMeat += CORE_SLOTS.map((slot) => day[slot]).filter(Boolean).filter(isRedMeat).length;
   }
   const dayKeys = new Set();
   for (const day of Object.values(lockedDays || {})) {
     if (!day) continue;
-    const key = CORE_SLOTS.map((slot) => getMealName(day[slot])).join('|');
-    if (key.replace(/\|/g, '')) dayKeys.add(key);
+    const dishNames = CORE_SLOTS.map((slot) => getMealName(day[slot])).filter(Boolean);
+    if (dishNames.length) dayKeys.add([...dishNames].sort().join('|'));
   }
-  return { usage, primaries, redMeat, dayKeys, cuisines: new Set(), distinct: new Set() };
+  return { usage, families, redMeat, dayKeys, cuisines: new Set(), distinct: new Set() };
 };
 
 const canPlaceDay = (state, candidate, rules) => {
@@ -607,22 +620,22 @@ const canPlaceDay = (state, candidate, rules) => {
   const dinnerUsed = (state.usage.lunchDinner[dinnerName] || 0) + (dinnerName === lunchName ? 1 : 0);
   if (dinnerUsed + 1 > cap) return false;
 
-  // Anchor-ingredient cap. Counted within the candidate day too, so a day
-  // that puts the same anchor at both lunch and dinner spends two of its
-  // allowance rather than one.
-  const primaryCap = rules.hard.maxSamePrimaryIngredientPerWeek;
-  if (Number.isFinite(primaryCap)) {
-    const pending = {};
-    for (const primary of candidate.lunchDinnerPrimaries || []) {
-      pending[primary] = (pending[primary] || 0) + 1;
-      if ((state.primaries[primary] || 0) + pending[primary] > primaryCap) return false;
-    }
+  // Anchor-ingredient-family cap. Counted within the candidate day too, so a
+  // day that puts the same family at breakfast, lunch and dinner spends three
+  // of its allowance rather than one.
+  const pendingFamilies = {};
+  for (const family of candidate.anchorFamilies || []) {
+    pendingFamilies[family] = (pendingFamilies[family] || 0) + 1;
+    const familyCap = anchorFamilyMaxPerWeek(family, rules);
+    if ((state.families[family] || 0) + pendingFamilies[family] > familyCap) return false;
   }
 
-  // No two identical days in a week. The per-meal repeat caps allow each meal
-  // twice, so a whole day repeating verbatim broke no rule while being the
-  // most obvious defect a person sees in a generated plan.
-  if (state.dayKeys.has(candidate.nameKey)) return false;
+  // No two identical days in a week, regardless of which slot each dish
+  // lands in — swapping lunch and dinner is still the same day to the person
+  // eating it. The per-meal repeat caps allow each meal twice, so a whole
+  // day repeating (in any slot order) broke no rule while being the most
+  // obvious defect a person sees in a generated plan.
+  if (candidate.dishSetKey && state.dayKeys.has(candidate.dishSetKey)) return false;
 
   if (state.redMeat + candidate.redMeatCount > rules.hard.redMeatMealsPerWeek) return false;
   return true;
@@ -638,18 +651,18 @@ const applyDay = (state, candidate) => {
   for (const name of candidate.mealNames) distinct.add(name);
   const cuisines = new Set(state.cuisines);
   for (const cuisine of candidate.cuisines) if (cuisine) cuisines.add(cuisine);
-  const primaries = { ...state.primaries };
-  for (const primary of candidate.lunchDinnerPrimaries || []) {
-    primaries[primary] = (primaries[primary] || 0) + 1;
+  const families = { ...state.families };
+  for (const family of candidate.anchorFamilies || []) {
+    families[family] = (families[family] || 0) + 1;
   }
   const dayKeys = new Set(state.dayKeys);
-  dayKeys.add(candidate.nameKey);
+  if (candidate.dishSetKey) dayKeys.add(candidate.dishSetKey);
 
   return {
     usage,
     distinct,
     cuisines,
-    primaries,
+    families,
     dayKeys,
     redMeat: state.redMeat + candidate.redMeatCount,
     protein: state.protein + candidate.totals.protein,
