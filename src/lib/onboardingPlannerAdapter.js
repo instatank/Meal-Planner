@@ -1,16 +1,31 @@
 import {
   CARB_HEAVY_THRESHOLD,
   CORE_MEAL_TYPES,
-  DAILY_PROTEIN_MAX,
-  DEFAULT_DAILY_PROTEIN_TARGET,
   normalizePreferences
 } from './plannerGenerator.js';
-import { GOAL, normalizeGoalId } from './rules.js';
+import { GOAL, getRulesForProfile, isImplementedGoal, normalizeGoalId } from './rules.js';
 
 const HIGH_PROTEIN_THRESHOLD = 40;
 const HIGH_PROTEIN_ACCEPT_DELTA = 0.85;
 const LOW_CARB_AVOID_DELTA = 1.25;
-const HIGH_PROTEIN_DAILY_TARGET = 132;
+
+/**
+ * The goal's daily protein target, from `rules.js` and nowhere else.
+ *
+ * This module used to carry three numbers of its own: a `Math.max(target, 132)`
+ * ratchet, a flat `standard = 80` that contradicted rules.js's 100, and a
+ * `Math.min(target, DAILY_PROTEIN_MAX)` ceiling — where `DAILY_PROTEIN_MAX` is
+ * the *band edge* of a 120g target, not a limit on the target itself. Between
+ * the ratchet and the ceiling, an explicit target could only ever resolve to
+ * 132, so the setting would have been inert in both directions.
+ */
+const resolveDailyProteinTarget = (normalizedGoal, requested) => {
+  const explicit = Number(requested);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  // A declared-but-unimplemented goal has no ruleset to read a target from;
+  // fall back to the default ruleset rather than inventing a number here.
+  return getRulesForProfile(isImplementedGoal(normalizedGoal) ? normalizedGoal : '').dailyProteinTarget;
+};
 
 const addDelta = (bucket, mealName, delta) => {
   if (!mealName || !Number.isFinite(delta) || delta === 0) return;
@@ -44,8 +59,7 @@ export const buildGoalAdjustedPlannerInput = ({ goal, preferences = {}, mealData
     skips: { ...normalizedPreferences.skips }
   };
 
-  let nextProteinTarget = Number(dailyProteinTarget || DEFAULT_DAILY_PROTEIN_TARGET);
-  if (!Number.isFinite(nextProteinTarget)) nextProteinTarget = DEFAULT_DAILY_PROTEIN_TARGET;
+  const nextProteinTarget = resolveDailyProteinTarget(normalizedGoal, dailyProteinTarget);
 
   const meals = getPlannerMeals(mealDatabase);
   const seenMealNames = new Set();
@@ -63,14 +77,6 @@ export const buildGoalAdjustedPlannerInput = ({ goal, preferences = {}, mealData
       addDelta(adjusted.avoids, mealName, LOW_CARB_AVOID_DELTA);
     }
   }
-
-  if (normalizedGoal === GOAL.HIGH_PROTEIN) {
-    nextProteinTarget = Math.max(nextProteinTarget, HIGH_PROTEIN_DAILY_TARGET);
-  } else if (normalizedGoal === GOAL.STANDARD) {
-    nextProteinTarget = 80;
-  }
-
-  nextProteinTarget = Math.min(nextProteinTarget, DAILY_PROTEIN_MAX);
 
   return {
     preferences: adjusted,

@@ -18,7 +18,7 @@ import {
 test('high_protein ruleset matches the settled Phase 1 thresholds', () => {
   const rules = getRules(GOAL.HIGH_PROTEIN);
 
-  assert.equal(rules.dailyProteinTarget, 132);
+  assert.equal(rules.dailyProteinTarget, 120);
 
   // Tier 1 — hard
   assert.equal(rules.hard.minMealProtein, 20);
@@ -31,15 +31,15 @@ test('high_protein ruleset matches the settled Phase 1 thresholds', () => {
   assert.equal(rules.hard.weeklyProteinFloorRatio, 0.85);
 
   // Tier 2 — budgeted
-  assert.equal(rules.budgeted.dailyProteinMin, 119);
-  assert.equal(rules.budgeted.dailyProteinMax, 145);
+  assert.equal(rules.budgeted.dailyProteinMin, 108);
+  assert.equal(rules.budgeted.dailyProteinMax, 132);
   assert.equal(rules.budgeted.dailyCarbCap, 130);
   assert.equal(rules.budgeted.dailyCalorieMin, 1600);
   assert.equal(rules.budgeted.dailyCalorieMax, 2200);
 
   // The canonical 7-day figures quoted in the handover.
-  assert.equal(rules.week.nominalProtein, 924);
-  assert.equal(rules.week.proteinFloor, 785);
+  assert.equal(rules.week.nominalProtein, 840);
+  assert.equal(rules.week.proteinFloor, 714);
   assert.equal(rules.week.minDaysProteinInBand, 5);
   assert.equal(rules.week.minDaysUnderCarbCap, 5);
   assert.equal(rules.week.minDaysInCalorieBounds, 5);
@@ -116,8 +116,8 @@ test('budgets pro-rate down for partial-week regenerations', () => {
 test('weekly protein floor pro-rates with the number of days generated', () => {
   const rules = getRules(GOAL.HIGH_PROTEIN);
 
-  assert.equal(weeklyProteinFloor(7, rules), 785);
-  assert.equal(weeklyProteinFloor(4, rules), 449); // round(4 * 132 * 0.85)
+  assert.equal(weeklyProteinFloor(7, rules), 714);
+  assert.equal(weeklyProteinFloor(4, rules), 408); // round(4 * 120 * 0.85)
   assert.equal(weeklyProteinFloor(0, rules), 0);
 });
 

@@ -126,12 +126,14 @@ test('the adapter normalizes goal spellings before comparing', () => {
     const result = buildGoalAdjustedPlannerInput({
       goal: spelling,
       preferences: {},
-      mealDatabase,
-      dailyProteinTarget: 120
+      mealDatabase
     });
+    // Recognition is observable through the goal-specific accept boost. It
+    // used to be asserted via the adapter's protein-target ratchet, which
+    // finding #2 removed as a duplicate of rules.js.
     assert.ok(
-      result.dailyProteinTarget > 120,
-      `${spelling} should be recognised as high_protein and ratchet the target`
+      Object.keys(result.preferences.accepts).length > 0,
+      `${spelling} should be recognised as high_protein and boost high-protein meals`
     );
   }
 });

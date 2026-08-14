@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { mealDatabase } from '../src/data/mealDatabase.js';
 import { CARB_HEAVY_THRESHOLD } from '../src/lib/plannerGenerator.js';
 import { ONBOARDING_GOAL } from '../src/lib/onboardingProfile.js';
+import { GOAL, getRules } from '../src/lib/rules.js';
 import { buildGoalAdjustedPlannerInput, getMealTypeOrderForGoal } from '../src/lib/onboardingPlannerAdapter.js';
 
 test('two_meals_day goal returns lunch+dinner slot order by default', () => {
@@ -26,15 +27,18 @@ test('two_meals_day goal returns lunch+dinner slot order by default', () => {
   );
 });
 
-test('high_protein goal boosts protein target and accepts high-protein meals', () => {
+test('high_protein goal takes its target from rules.js and accepts high-protein meals', () => {
   const result = buildGoalAdjustedPlannerInput({
     goal: ONBOARDING_GOAL.HIGH_PROTEIN,
     preferences: { accepts: {}, avoids: {}, edits: {}, skips: {} },
-    mealDatabase,
-    dailyProteinTarget: 120
+    mealDatabase
   });
 
-  assert.ok(result.dailyProteinTarget > 120);
+  // This used to assert `> 120`, which pinned the adapter's own
+  // `Math.max(target, 132)` ratchet. That ratchet was one of the seven homes
+  // for the protein target (finding #2 of docs/CONSISTENCY_AUDIT.md) and is
+  // gone; the goal's target now comes from rules.js and nowhere else.
+  assert.equal(result.dailyProteinTarget, getRules(GOAL.HIGH_PROTEIN).dailyProteinTarget);
   assert.ok(result.preferences.accepts['Chicken curry + jowar roti'] > 0);
   assert.ok(result.preferences.accepts['Chicken soup + smoked salmon salad'] > 0);
 });

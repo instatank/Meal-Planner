@@ -729,8 +729,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           const { preferences: adjustedPrefs, dailyProteinTarget: adjustedProtein } = buildGoalAdjustedPlannerInput({
             goal: onboardingProfile?.goal,
             preferences: normalizePreferences(preferences),
-            mealDatabase: mergedMealDatabase,
-            dailyProteinTarget: 120
+            mealDatabase: mergedMealDatabase
           });
 
           const { generateWeeklyPlan } = await import('./lib/planService.js');
@@ -1569,8 +1568,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       const { preferences: adjustedPrefs, dailyProteinTarget: adjustedProtein } = buildGoalAdjustedPlannerInput({
         goal: onboardingProfile?.goal,
         preferences: normalizePreferences(preferences),
-        mealDatabase: mergedMealDatabase,
-        dailyProteinTarget: 120
+        mealDatabase: mergedMealDatabase
       });
 
       const { generateWeeklyPlan } = await import('./lib/planService.js');

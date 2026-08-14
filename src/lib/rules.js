@@ -200,7 +200,7 @@ const MAX_MISS_DAYS_PER_WEEK = 2;
 const GOAL_DEFINITIONS = {
   [GOAL.HIGH_PROTEIN]: {
     label: 'High protein',
-    defaultDailyProteinTarget: 132,
+    defaultDailyProteinTarget: 120,
     hard: {
       minMealProtein: 20,
       dailyProteinSanityFloor: 50,

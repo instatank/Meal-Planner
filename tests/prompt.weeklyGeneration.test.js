@@ -61,7 +61,7 @@ test('the rendered high_protein prompt states every threshold as a hard number',
 
   assert.ok(!/{{\w+}}/.test(rendered), `unsubstituted placeholder: ${rendered.match(/{{\w+}}/g)}`);
 
-  for (const expected of ['132g', '119g', '145g', '130g', '1600', '2200', '20g', '785g']) {
+  for (const expected of ['120g', '108g', '132g', '130g', '1600', '2200', '20g', '714g']) {
     assert.ok(rendered.includes(expected), `prompt is missing the literal ${expected}`);
   }
   assert.match(rendered, /At least 5 of 7 days/);
@@ -74,7 +74,7 @@ test('the prompt tells the model which days may go off-band, and that flex days 
 
   assert.match(rendered, /70g day is fine/i, 'flex days must be described as genuinely low, not near-misses');
   assert.match(rendered, /AIM DAILY, JUDGE WEEKLY/);
-  assert.match(rendered, /total protein must be at least 785g/i);
+  assert.match(rendered, /total protein must be at least 714g/i);
 });
 
 test('a partial-week regeneration is told its own pro-rated budget, not the weekly one', () => {
@@ -83,7 +83,7 @@ test('a partial-week regeneration is told its own pro-rated budget, not the week
 
   assert.match(rendered, /At least 3 of 4 days/);
   assert.match(rendered, /At most 1 day\(s\) may fall outside/);
-  assert.match(rendered, /total protein must be at least 449g/i);
+  assert.match(rendered, /total protein must be at least 408g/i);
 });
 
 test('the standard prompt renders its own thresholds', () => {

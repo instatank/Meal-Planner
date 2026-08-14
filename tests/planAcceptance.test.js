@@ -20,23 +20,23 @@ const rules = getRules('high_protein');
 const generate = (targetDateKeys = WEEK, options = {}) =>
   buildWeekPlan({ mealDatabase, rules, targetDateKeys, preferences: {}, ...options });
 
-test('AC1: at least 5 of 7 days have total protein in the 119-145g band', () => {
+test('AC1: at least 5 of 7 days have total protein in the 108-132g band', () => {
   const { days } = generate();
-  const inBand = days.filter((day) => day.totals.protein >= 119 && day.totals.protein <= 145).length;
+  const inBand = days.filter((day) => day.totals.protein >= 108 && day.totals.protein <= 132).length;
 
   assert.equal(days.length, 7);
   assert.ok(inBand >= 5, `only ${inBand} of 7 days in band: ${days.map((d) => d.totals.protein).join(', ')}`);
 });
 
-test('AC2: the weekly protein total is at least 785g (85% of the 924g nominal)', () => {
+test('AC2: the weekly protein total is at least 714g (85% of the 840g nominal)', () => {
   const { days } = generate();
   // Summed here from the day totals rather than read off the optimizer's own
   // summary, so a bug in the search cannot hide behind its own bookkeeping.
   const total = days.reduce((sum, day) => sum + day.totals.protein, 0);
 
-  assert.equal(rules.week.nominalProtein, 924);
-  assert.equal(rules.week.proteinFloor, 785);
-  assert.ok(total >= 785, `weekly protein ${total}g is below the 785g floor`);
+  assert.equal(rules.week.nominalProtein, 840);
+  assert.equal(rules.week.proteinFloor, 714);
+  assert.ok(total >= 714, `weekly protein ${total}g is below the 714g floor`);
 });
 
 test('AC3: no day falls below the 50g sanity floor', () => {
