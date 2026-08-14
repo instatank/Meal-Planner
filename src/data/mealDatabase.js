@@ -404,8 +404,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": "Mixed veg sabzi", "vegAmount": 120, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_grilled-salmon-fillet-sauteed-veg-spaghetti-aglio-e-olio",
@@ -421,8 +420,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Grilled salmon", "amount": 150, "carb": "Spaghetti aglio e olio (small portion)", "carbAmount": 100, "veg": "Sautéed broccoli", "vegAmount": 150, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_rajma-chawal-raita",
@@ -439,8 +437,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": null, "amount": 0, "carb": "Cooked rice", "carbAmount": 80, "veg": "Mixed veg sabzi", "vegAmount": 150, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_chole-jowar-roti-raita",
@@ -457,8 +454,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": null, "amount": 0, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": null, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_vietnamese-chicken-pho",
@@ -474,8 +470,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Rice noodles", "carbAmount": 120, "veg": "Pho greens + side salad", "vegAmount": 80, "style": "Soup style"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_grilled-steak-mixed-greens-salad",
@@ -490,8 +485,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Beef steak", "amount": 180, "carb": "No carb", "carbAmount": 0, "veg": "Mixed greens salad", "vegAmount": 150, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_thai-pad-krapow-rice",
@@ -508,8 +502,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Cooked rice", "carbAmount": 80, "veg": "Sautéed peppers + side salad", "vegAmount": 130, "style": "Pan-fried"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_mutton-keema-jowar-roti",
@@ -525,8 +518,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Mutton keema", "amount": 150, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": null, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_arhar-dal-rice-matar-paneer",
@@ -543,8 +535,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Paneer", "amount": 120, "carb": "Cooked rice", "carbAmount": 80, "veg": "Mixed veg sabzi", "vegAmount": 120, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-curry-jowar-roti-dal",
@@ -561,8 +552,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": "Mixed veg sabzi", "vegAmount": 100, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_grilled-fish-pumpkin-salad",
@@ -577,8 +567,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Fish fillet", "amount": 150, "carb": "No carb", "carbAmount": 0, "veg": "Pumpkin salad", "vegAmount": 120, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_grilled-salmon-sauteed-veg-garlic-rice",
@@ -594,8 +583,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Grilled salmon", "amount": 150, "carb": "Garlic rice (small portion)", "carbAmount": 100, "veg": "Sautéed broccoli", "vegAmount": 150, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-soup-smoked-salmon-salad",
@@ -611,8 +599,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "No carb", "carbAmount": 0, "veg": "Smoked salmon salad", "vegAmount": 120, "style": "Soup style"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_paneer-sabzi-dal-raita",
@@ -629,8 +616,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Paneer", "amount": 100, "carb": "No carb", "carbAmount": 0, "veg": "Mixed veg sabzi", "vegAmount": 150, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_pork-chop-pumpkin-salad",
@@ -645,8 +631,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Pork chop", "amount": 180, "carb": "No carb", "carbAmount": 0, "veg": "Pumpkin salad", "vegAmount": 120, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_pork-chop-mixed-greens-salad",
@@ -661,8 +646,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Pork chop", "amount": 180, "carb": "No carb", "carbAmount": 0, "veg": "Mixed greens salad", "vegAmount": 150, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_tandoori-chicken-smoked-chicken-avocado-salad",
@@ -679,8 +663,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "No carb", "carbAmount": 0, "veg": "Smoked chicken + avocado salad", "vegAmount": 120, "style": "Tandoori"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_broccoli-soup-grilled-fish-spaghetti-aglio-e-olio",
@@ -696,8 +679,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Fish fillet", "amount": 150, "carb": "Spaghetti aglio e olio (small portion)", "carbAmount": 100, "veg": "Sautéed broccoli", "vegAmount": 200, "style": "Soup style"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_saag-meat-jowar-roti-dal",
@@ -714,8 +696,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Lamb (seekh kabab)", "amount": 170, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": "Sautéed spinach", "vegAmount": 120, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_kofta-dal-jowar-roti",
@@ -732,8 +713,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Veg kofta", "amount": 150, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": "Mixed veg sabzi", "vegAmount": 120, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_kababs-dal-gobi-jowar-roti",
@@ -750,8 +730,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Lamb (seekh kabab)", "amount": 180, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": "Cauliflower", "vegAmount": 150, "style": "Tandoori"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_fish-curry-rice",
@@ -767,8 +746,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Fish fillet", "amount": 150, "carb": "Cooked rice", "carbAmount": 80, "veg": null, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_sweet-potato-curry-kaala-chanaa-sabzi-jowar-roti",
@@ -785,8 +763,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Kaala chanaa (black chickpeas)", "amount": 160, "carb": "Jowar roti (millet)", "carbAmount": 2, "veg": "Sweet potato curry", "vegAmount": 180, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_avocado-smoked-salmon-salad",
@@ -802,8 +779,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Smoked salmon", "amount": 120, "carb": "No carb", "carbAmount": 0, "veg": "Avocado & mixed greens", "vegAmount": 155, "style": "Salad"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_avocado-smoked-chicken-salad",
@@ -819,8 +795,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Smoked chicken breast", "amount": 120, "carb": "No carb", "carbAmount": 0, "veg": "Avocado & mixed greens", "vegAmount": 155, "style": "Salad"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-red-curry-rice",
@@ -836,8 +811,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Cooked rice", "carbAmount": 80, "veg": "Red curry vegetables", "vegAmount": 100, "style": "Curry style"
-      },
-      "cuisine": "asian"
+      }
     },
 
     // ── Phase 2 additions: Asian coverage ────────────────────────────────
@@ -863,8 +837,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Cooked rice", "carbAmount": 100, "veg": "Kimchi + spinach", "vegAmount": 140, "style": "Bowl"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_salmon-teriyaki-soba-noodles",
@@ -881,8 +854,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Grilled salmon", "amount": 150, "carb": "Soba noodles", "carbAmount": 150, "veg": "Bok choy", "vegAmount": 120, "style": "Grilled"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_prawn-stir-fry-edamame-rice-noodles",
@@ -899,8 +871,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Prawns", "amount": 180, "carb": "Rice noodles", "carbAmount": 120, "veg": "Edamame", "vegAmount": 80, "style": "Pan-fried"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_miso-chicken-ramen-egg",
@@ -918,8 +889,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 120, "carb": "Egg noodles", "carbAmount": 120, "veg": "Bok choy", "vegAmount": 100, "style": "Soup style"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       // The vegetarian Asian entry. Also lowers the cost of a `vegetarian`
@@ -939,8 +909,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Firm tofu", "amount": 180, "carb": "Egg noodles", "carbAmount": 100, "veg": "Bok choy + edamame", "vegAmount": 180, "style": "Soup style"
-      },
-      "cuisine": "asian"
+      }
     },
 
     // ── Phase 2 additions: the calorie-dense, carb-moderate gap ──────────
@@ -971,8 +940,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Jowar roti (millet)", "carbAmount": 1.5, "veg": "Cauliflower", "vegAmount": 100, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_grilled-chicken-sweet-potato-broccoli",
@@ -989,8 +957,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Sweet potato", "carbAmount": 150, "veg": "Broccoli", "vegAmount": 150, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_pepper-beef-garlic-rice-greens",
@@ -1007,8 +974,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Beef steak", "amount": 180, "carb": "Garlic rice", "carbAmount": 120, "veg": "Bok choy", "vegAmount": 120, "style": "Pan-fried"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_paneer-tikka-jowar-roti-salad",
@@ -1025,8 +991,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Paneer", "amount": 150, "carb": "Jowar roti (millet)", "carbAmount": 1.5, "veg": "Mixed greens salad", "vegAmount": 100, "style": "Tandoori"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_grilled-salmon-sweet-potato-spinach",
@@ -1043,8 +1008,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Grilled salmon", "amount": 180, "carb": "Sweet potato", "carbAmount": 150, "veg": "Sautéed spinach", "vegAmount": 120, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-biryani-raita",
@@ -1061,8 +1025,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Cooked rice", "carbAmount": 150, "veg": null, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_fish-moilee-rice",
@@ -1079,8 +1042,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Fish fillet", "amount": 200, "carb": "Cooked rice", "carbAmount": 120, "veg": "Mixed veg sabzi", "vegAmount": 80, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_egg-curry-dal-jowar-roti",
@@ -1097,8 +1059,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Eggs (whole)", "amount": 200, "carb": "Jowar roti (millet)", "carbAmount": 1, "veg": "Dal", "vegAmount": 80, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-shawarma-bowl",
@@ -1116,8 +1077,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 140, "carb": "Flatbread", "carbAmount": 2, "veg": "Salad + hummus", "vegAmount": 180, "style": "Bowl"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_prawn-curry-rice",
@@ -1134,8 +1094,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Prawns", "amount": 180, "carb": "Cooked rice", "carbAmount": 110, "veg": "Mixed veg sabzi", "vegAmount": 70, "style": "Curry style"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-meatballs-spaghetti-salad",
@@ -1151,8 +1110,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken keema", "amount": 180, "carb": "Spaghetti", "carbAmount": 150, "veg": "Mixed greens salad", "vegAmount": 100, "style": "Pan-fried"
-      },
-      "cuisine": "western"
+      }
     },
 
     // ── Research batch, 2026-08-03 ───────────────────────────────────────
@@ -1179,8 +1137,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Paneer", "amount": 150, "carb": "Jowar roti (millet)", "carbAmount": 50, "veg": "Spinach", "vegAmount": 200, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_achari-paneer-tikka-dal-salad",
@@ -1198,8 +1155,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Paneer", "amount": 150, "carb": "No carb", "carbAmount": 0, "veg": "Dal + salad", "vegAmount": 250, "style": "Tandoori"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_soya-keema-curry-jowar-roti",
@@ -1217,8 +1173,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Soya chunks (minced)", "amount": 70, "carb": "Jowar roti (millet)", "carbAmount": 30, "veg": null, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_chole-paneer-bowl-salad",
@@ -1236,8 +1191,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Paneer + chole", "amount": 270, "carb": "No carb", "carbAmount": 0, "veg": "Mixed greens salad", "vegAmount": 100, "style": "Bowl"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_kadai-chicken-jowar-roti",
@@ -1255,8 +1209,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 160, "carb": "Jowar roti (millet)", "carbAmount": 50, "veg": "Capsicum + salad", "vegAmount": 80, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_tandoori-fish-tikka-veg-roti",
@@ -1274,8 +1227,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Fish fillet", "amount": 220, "carb": "Jowar roti (millet)", "carbAmount": 40, "veg": "Mixed veg sabzi", "vegAmount": 100, "style": "Tandoori"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-keema-matar-jowar-roti",
@@ -1293,8 +1245,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken keema", "amount": 180, "carb": "Jowar roti (millet)", "carbAmount": 40, "veg": "Peas / edamame", "vegAmount": 60, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "lunch_dinner_beef-bulgogi-bowl",
@@ -1313,8 +1264,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Beef steak (lean sirloin)", "amount": 150, "carb": "Cooked rice", "carbAmount": 100, "veg": "Kimchi + spinach", "vegAmount": 180, "style": "Bowl"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_tofu-veg-bibimbap",
@@ -1334,8 +1284,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Firm tofu + egg", "amount": 250, "carb": "Cooked rice", "carbAmount": 90, "veg": "Kimchi + spinach namul", "vegAmount": 180, "style": "Bowl"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_oyakodon-side-salad",
@@ -1354,8 +1303,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast + egg", "amount": 240, "carb": "Cooked rice", "carbAmount": 120, "veg": "Side salad", "vegAmount": 80, "style": "Bowl"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_dubu-jorim-rice-kimchi",
@@ -1373,8 +1321,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Firm tofu", "amount": 220, "carb": "Cooked rice", "carbAmount": 90, "veg": "Kimchi", "vegAmount": 100, "style": "Curry style"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_home-style-tofu-chicken-stir-fry",
@@ -1393,8 +1340,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast + tofu", "amount": 240, "carb": "Cooked rice", "carbAmount": 80, "veg": "Broccoli", "vegAmount": 150, "style": "Pan-fried"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_vietnamese-lemongrass-chicken-bowl",
@@ -1413,8 +1359,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 170, "carb": "Rice noodles", "carbAmount": 100, "veg": "Herb salad + pickles", "vegAmount": 170, "style": "Bowl"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_cantonese-steamed-fish-edamame",
@@ -1433,8 +1378,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Fish fillet", "amount": 200, "carb": "Cooked rice", "carbAmount": 90, "veg": "Bok choy + edamame", "vegAmount": 230, "style": "Steamed"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-bulgogi-bowl",
@@ -1453,8 +1397,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 180, "carb": "Cooked rice", "carbAmount": 100, "veg": "Kimchi + bok choy", "vegAmount": 180, "style": "Bowl"
-      },
-      "cuisine": "asian"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-souvlaki-tzatziki-greek-salad",
@@ -1473,8 +1416,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 180, "carb": "No carb", "carbAmount": 0, "veg": "Greek salad + tzatziki", "vegAmount": 220, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_baked-feta-chickpea-traybake",
@@ -1493,8 +1435,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Feta + chickpeas", "amount": 220, "carb": "No carb", "carbAmount": 0, "veg": "Roast vegetables + greens", "vegAmount": 100, "style": "Plate"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_tuna-nicoise-salad",
@@ -1514,8 +1455,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Tuna + egg", "amount": 250, "carb": "Sweet potato", "carbAmount": 80, "veg": "Salad + olives", "vegAmount": 180, "style": "Salad"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_halloumi-roasted-veg-quinoa-bowl",
@@ -1533,8 +1473,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Halloumi", "amount": 100, "carb": "Quinoa", "carbAmount": 120, "veg": "Roast broccoli", "vegAmount": 120, "style": "Bowl"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-white-bean-stew",
@@ -1553,8 +1492,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast + white beans", "amount": 270, "carb": "No carb", "carbAmount": 0, "veg": "Spinach + tomato", "vegAmount": 140, "style": "Soup style"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_chickpea-pasta-tuna-tomato",
@@ -1573,8 +1511,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Tuna", "amount": 120, "carb": "Chickpea pasta", "carbAmount": 155, "veg": "Arrabbiata + side salad", "vegAmount": 120, "style": "Plate"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_chicken-ricotta-carbonara-style-spaghetti",
@@ -1592,8 +1529,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast + ricotta", "amount": 180, "carb": "Spaghetti", "carbAmount": 150, "veg": null, "style": "Plate"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_mackerel-quinoa-salad",
@@ -1612,8 +1548,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Mackerel", "amount": 120, "carb": "Quinoa", "carbAmount": 120, "veg": "Salad + avocado", "vegAmount": 160, "style": "Salad"
-      },
-      "cuisine": "western"
+      }
     },
 
     // ── Batch 3 additions (2026-08-06) ───────────────────────────────────
@@ -1641,8 +1576,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 150, "carb": "Spaghetti", "carbAmount": 100, "veg": "Sabzi + salad", "vegAmount": 180, "style": "Grilled"
-      },
-      "cuisine": "western"
+      }
     },
     {
       // Rice-plate variant of "Chicken shawarma bowl" (533/57/38/17/11.2).
@@ -1664,8 +1598,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 180, "carb": "Garlic rice", "carbAmount": 150, "veg": "Salad + hummus", "vegAmount": 120, "style": "Plate"
-      },
-      "cuisine": "western"
+      }
     },
     {
       // Leaner than the malai/achari tikkas already in the catalog — no
@@ -1686,8 +1619,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 180, "carb": "Jowar roti (millet)", "carbAmount": 45, "veg": "Mixed greens salad", "vegAmount": 100, "style": "Tandoori"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       // Millet-pasta pesto main. Carbs sit right at the ceiling by design —
@@ -1707,8 +1639,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast", "amount": 120, "carb": "Millet pasta", "carbAmount": 60, "veg": "Cherry tomatoes", "vegAmount": 50, "style": "Plate"
-      },
-      "cuisine": "western"
+      }
     },
     {
       // Millet-pasta aglio e olio. The protein add (prawns) is mandatory —
@@ -1727,8 +1658,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Prawns", "amount": 150, "carb": "Millet pasta", "carbAmount": 60, "veg": null, "style": "Plate"
-      },
-      "cuisine": "western"
+      }
     },
     {
       // Fresh-grilled, distinct from the existing "Avocado and smoked salmon
@@ -1749,8 +1679,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Grilled salmon", "amount": 120, "carb": "No carb", "carbAmount": 0, "veg": "Avocado + greens", "vegAmount": 170, "style": "Salad"
-      },
-      "cuisine": "western"
+      }
     },
     {
       // Full lunch-size version of "Avocado and smoked chicken salad"
@@ -1771,8 +1700,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Smoked chicken breast", "amount": 150, "carb": "No carb", "carbAmount": 0, "veg": "Avocado + greens", "vegAmount": 180, "style": "Salad"
-      },
-      "cuisine": "western"
+      }
     },
     {
       "meal_id": "lunch_dinner_hummus-salad-protein-boosted",
@@ -1791,8 +1719,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Chicken breast + hummus", "amount": 200, "carb": "No carb", "carbAmount": 0, "veg": "Salad + raw veg", "vegAmount": 180, "style": "Bowl"
-      },
-      "cuisine": "western"
+      }
     },
     {
       // Leaner build of the existing "Sweet potato curry + kaala chanaa
@@ -1814,8 +1741,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Kaala chanaa (black chickpeas)", "amount": 180, "carb": "Jowar roti (millet) + sweet potato", "carbAmount": 45, "veg": null, "style": "Curry style"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       // Full lunch/dinner version of the paneer cutlets — the 2-cutlet
@@ -1837,8 +1763,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Paneer cutlets + dal", "amount": 260, "carb": "Besan + breadcrumbs", "carbAmount": 30, "veg": "Mixed greens salad", "vegAmount": 100, "style": "Pan-fried"
-      },
-      "cuisine": "indian"
+      }
     }
   ],
   "snack": [
@@ -1856,8 +1781,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Plant Shake", "amount": 25, "carb": "Mixed Fruit", "carbAmount": 100, "veg": "Almonds", "vegAmount": 5, "style": "Snack"
-      },
-      "cuisine": "general"
+      }
     },
     {
       "meal_id": "snack_chaat-bhel-protein-shake",
@@ -1873,8 +1797,7 @@ const baseMealsList = {
       ],
       "components": {
         "protein": "Plant Shake", "amount": 25, "carb": "Chaat & Bhel", "carbAmount": 150, "style": "Street Food Twist"
-      },
-      "cuisine": "indian"
+      }
     },
     {
       "meal_id": "snack_greek-yogurt-berry-bowl",
@@ -2107,120 +2030,120 @@ const baseMealsList = {
  * every ingredient with an Indian curry.
  */
 const handAuthoredTags = {
-  "Scrambled eggs + toast": { cuisine: "Continental" },
-  "Boiled eggs + ham sandwich": { cuisine: "Continental" },
-  "Smoked salmon + avocado on toast": { cuisine: "Continental" },
-  "Poha + kabab/protein shake": { cuisine: "Indian" },
-  "Egg white omelette + avocado": { cuisine: "Continental" },
-  "Aloo paratha + curd": { cuisine: "Indian" },
-  "Idli, Mysore masala dosa + sambar + chutney": { cuisine: "Indian" },
-  "Chicken keema bhurji + jowar roti": { cuisine: "Indian" },
-  "Moong dal chilla + paneer + hung curd": { cuisine: "Indian" },
-  "Oats + whey porridge with nuts": { cuisine: "Continental" },
-  "Chicken sausage + scrambled eggs + toast": { cuisine: "Continental" },
-  "Tofu & spinach scramble + avocado toast": { cuisine: "Continental" },
-  "Idli + sambar + masala egg bhurji": { cuisine: "Indian" },
-  "Paneer paratha + curd": { cuisine: "Indian" },
-  "Chicken curry + jowar roti": { cuisine: "Indian" },
-  "Grilled salmon fillet + sauteed veg + spaghetti aglio e olio": { cuisine: "Continental" },
-  "Rajma chawal + raita": { cuisine: "Indian" },
-  "Chole + jowar roti + raita": { cuisine: "Indian" },
-  "Vietnamese chicken pho": { cuisine: "Asian" },
-  "Grilled steak + mixed greens salad": { cuisine: "Continental" },
-  "Thai pad krapow + rice": { cuisine: "Asian" },
-  "Mutton keema + jowar roti": { cuisine: "Indian" },
-  "Arhar dal + rice + matar paneer": { cuisine: "Indian" },
-  "Chicken curry + jowar roti + dal": { cuisine: "Indian" },
-  "Grilled fish + pumpkin salad": { cuisine: "Continental" },
-  "Grilled salmon + sauteed veg + garlic rice": { cuisine: "Continental" },
-  "Chicken soup + smoked salmon salad": { cuisine: "Continental" },
-  "Paneer sabzi + dal + raita": { cuisine: "Indian" },
-  "Pork chop + pumpkin salad": { cuisine: "Continental" },
-  "Pork chop + mixed greens salad": { cuisine: "Continental" },
-  "Tandoori chicken + smoked chicken + avocado salad": { cuisine: "Indian" },
-  "Broccoli soup + grilled fish + spaghetti aglio e olio": { cuisine: "Continental" },
-  "Saag meat + jowar roti + dal": { cuisine: "Indian" },
-  "Kofta + dal + jowar roti": { cuisine: "Indian" },
-  "Kababs + dal + gobi + jowar roti": { cuisine: "Indian" },
-  "Fish curry + rice": { cuisine: "Indian" },
-  "Sweet potato curry + kaala chanaa sabzi + jowar roti": { cuisine: "Indian" },
-  "Avocado and smoked salmon salad": { cuisine: "Continental" },
-  "Avocado and smoked chicken salad": { cuisine: "Continental" },
-  "Chicken red curry + rice": { cuisine: "Asian" },
-  "Korean chicken bibimbap bowl": { cuisine: "Asian" },
-  "Salmon teriyaki + soba noodles": { cuisine: "Asian" },
-  "Prawn stir-fry + edamame + rice noodles": { cuisine: "Asian" },
-  "Miso chicken ramen + egg": { cuisine: "Asian" },
-  "Tofu & edamame ramen": { cuisine: "Asian" },
-  "Greek yogurt + berry bowl": { cuisine: "International" },
-  "Carrot halwa (sugar-free) + protein shake": { cuisine: "Indian" },
-  "Nuts, seeds + protein shake": { cuisine: "International" },
-  "Sweet potato chaat": { cuisine: "Indian" },
-  "Kaala chana chaat": { cuisine: "Indian" },
-  "Avocado/cheese toast": { cuisine: "Continental" },
-  "Fruit + Almonds + Plant Shake": { cuisine: "General" },
-  "Chaat + Bhel + Protein Shake": { cuisine: "Indian" },
-  "Butter chicken + jowar roti": { cuisine: "Indian" },
-  "Grilled chicken + sweet potato + broccoli": { cuisine: "Continental" },
-  "Pepper beef + garlic rice + greens": { cuisine: "Asian" },
-  "Paneer tikka + jowar roti + salad": { cuisine: "Indian" },
-  "Grilled salmon + sweet potato + spinach": { cuisine: "Continental" },
-  "Chicken biryani + raita": { cuisine: "Indian" },
-  "Fish moilee + rice": { cuisine: "Indian" },
-  "Egg curry + dal + jowar roti": { cuisine: "Indian" },
-  "Chicken shawarma bowl": { cuisine: "Continental" },
-  "Prawn curry + rice": { cuisine: "Asian" },
-  "Chicken meatballs + spaghetti + salad": { cuisine: "Continental" },
-  "Boiled eggs + hummus + veg sticks": { cuisine: "Continental" },
-  "Edamame + sea salt": { cuisine: "Asian" },
-  "Paneer tikka skewers": { cuisine: "Indian" },
-  "Overnight oats + whey bowl": { cuisine: "Continental" },
+  "Scrambled eggs + toast": { cuisine: "continental" },
+  "Boiled eggs + ham sandwich": { cuisine: "continental" },
+  "Smoked salmon + avocado on toast": { cuisine: "continental" },
+  "Poha + kabab/protein shake": { cuisine: "indian" },
+  "Egg white omelette + avocado": { cuisine: "continental" },
+  "Aloo paratha + curd": { cuisine: "indian" },
+  "Idli, Mysore masala dosa + sambar + chutney": { cuisine: "indian" },
+  "Chicken keema bhurji + jowar roti": { cuisine: "indian" },
+  "Moong dal chilla + paneer + hung curd": { cuisine: "indian" },
+  "Oats + whey porridge with nuts": { cuisine: "continental" },
+  "Chicken sausage + scrambled eggs + toast": { cuisine: "continental" },
+  "Tofu & spinach scramble + avocado toast": { cuisine: "continental" },
+  "Idli + sambar + masala egg bhurji": { cuisine: "indian" },
+  "Paneer paratha + curd": { cuisine: "indian" },
+  "Chicken curry + jowar roti": { cuisine: "indian" },
+  "Grilled salmon fillet + sauteed veg + spaghetti aglio e olio": { cuisine: "continental" },
+  "Rajma chawal + raita": { cuisine: "indian" },
+  "Chole + jowar roti + raita": { cuisine: "indian" },
+  "Vietnamese chicken pho": { cuisine: "asian" },
+  "Grilled steak + mixed greens salad": { cuisine: "continental" },
+  "Thai pad krapow + rice": { cuisine: "asian" },
+  "Mutton keema + jowar roti": { cuisine: "indian" },
+  "Arhar dal + rice + matar paneer": { cuisine: "indian" },
+  "Chicken curry + jowar roti + dal": { cuisine: "indian" },
+  "Grilled fish + pumpkin salad": { cuisine: "continental" },
+  "Grilled salmon + sauteed veg + garlic rice": { cuisine: "continental" },
+  "Chicken soup + smoked salmon salad": { cuisine: "continental" },
+  "Paneer sabzi + dal + raita": { cuisine: "indian" },
+  "Pork chop + pumpkin salad": { cuisine: "continental" },
+  "Pork chop + mixed greens salad": { cuisine: "continental" },
+  "Tandoori chicken + smoked chicken + avocado salad": { cuisine: "indian" },
+  "Broccoli soup + grilled fish + spaghetti aglio e olio": { cuisine: "continental" },
+  "Saag meat + jowar roti + dal": { cuisine: "indian" },
+  "Kofta + dal + jowar roti": { cuisine: "indian" },
+  "Kababs + dal + gobi + jowar roti": { cuisine: "indian" },
+  "Fish curry + rice": { cuisine: "indian" },
+  "Sweet potato curry + kaala chanaa sabzi + jowar roti": { cuisine: "indian" },
+  "Avocado and smoked salmon salad": { cuisine: "continental" },
+  "Avocado and smoked chicken salad": { cuisine: "continental" },
+  "Chicken red curry + rice": { cuisine: "asian" },
+  "Korean chicken bibimbap bowl": { cuisine: "asian" },
+  "Salmon teriyaki + soba noodles": { cuisine: "asian" },
+  "Prawn stir-fry + edamame + rice noodles": { cuisine: "asian" },
+  "Miso chicken ramen + egg": { cuisine: "asian" },
+  "Tofu & edamame ramen": { cuisine: "asian" },
+  "Greek yogurt + berry bowl": { cuisine: "international" },
+  "Carrot halwa (sugar-free) + protein shake": { cuisine: "indian" },
+  "Nuts, seeds + protein shake": { cuisine: "international" },
+  "Sweet potato chaat": { cuisine: "indian" },
+  "Kaala chana chaat": { cuisine: "indian" },
+  "Avocado/cheese toast": { cuisine: "continental" },
+  "Fruit + Almonds + Plant Shake": { cuisine: "general" },
+  "Chaat + Bhel + Protein Shake": { cuisine: "indian" },
+  "Butter chicken + jowar roti": { cuisine: "indian" },
+  "Grilled chicken + sweet potato + broccoli": { cuisine: "continental" },
+  "Pepper beef + garlic rice + greens": { cuisine: "asian" },
+  "Paneer tikka + jowar roti + salad": { cuisine: "indian" },
+  "Grilled salmon + sweet potato + spinach": { cuisine: "continental" },
+  "Chicken biryani + raita": { cuisine: "indian" },
+  "Fish moilee + rice": { cuisine: "indian" },
+  "Egg curry + dal + jowar roti": { cuisine: "indian" },
+  "Chicken shawarma bowl": { cuisine: "continental" },
+  "Prawn curry + rice": { cuisine: "asian" },
+  "Chicken meatballs + spaghetti + salad": { cuisine: "continental" },
+  "Boiled eggs + hummus + veg sticks": { cuisine: "continental" },
+  "Edamame + sea salt": { cuisine: "asian" },
+  "Paneer tikka skewers": { cuisine: "indian" },
+  "Overnight oats + whey bowl": { cuisine: "continental" },
 
   // Research batch, 2026-08-03
-  "Anda bhurji + toast": { cuisine: "Indian" },
-  "Sardines on toast + avocado": { cuisine: "Continental" },
-  "Shakshuka with feta": { cuisine: "Continental" },
-  "Cottage cheese & smoked salmon bowl": { cuisine: "Continental" },
-  "Palak paneer + jowar roti": { cuisine: "Indian" },
-  "Achari paneer tikka + dal + salad": { cuisine: "Indian" },
-  "Soya keema curry + jowar roti": { cuisine: "Indian" },
-  "Chole-paneer bowl + salad": { cuisine: "Indian" },
-  "Kadai chicken + jowar roti": { cuisine: "Indian" },
-  "Tandoori fish tikka + sauteed veg + roti": { cuisine: "Indian" },
-  "Chicken keema matar + jowar roti": { cuisine: "Indian" },
-  "Beef bulgogi bowl": { cuisine: "Asian" },
-  "Tofu & vegetable bibimbap": { cuisine: "Asian" },
-  "Oyakodon + side salad": { cuisine: "Asian" },
-  "Dubu jorim + rice + kimchi": { cuisine: "Asian" },
-  "Home-style tofu & chicken stir-fry": { cuisine: "Asian" },
-  "Vietnamese lemongrass chicken bowl": { cuisine: "Asian" },
-  "Cantonese steamed fish + edamame + rice": { cuisine: "Asian" },
-  "Chicken bulgogi bowl": { cuisine: "Asian" },
-  "Chicken souvlaki + tzatziki + Greek salad": { cuisine: "Continental" },
-  "Baked feta & chickpea traybake": { cuisine: "Continental" },
-  "Tuna Nicoise salad": { cuisine: "Continental" },
-  "Halloumi & roasted-veg quinoa bowl": { cuisine: "Continental" },
-  "Chicken & white-bean stew": { cuisine: "Continental" },
-  "Chickpea pasta with tuna & tomato": { cuisine: "Continental" },
-  "Chicken & ricotta carbonara-style spaghetti": { cuisine: "Continental" },
-  "Mackerel & quinoa salad": { cuisine: "Continental" },
+  "Anda bhurji + toast": { cuisine: "indian" },
+  "Sardines on toast + avocado": { cuisine: "continental" },
+  "Shakshuka with feta": { cuisine: "continental" },
+  "Cottage cheese & smoked salmon bowl": { cuisine: "continental" },
+  "Palak paneer + jowar roti": { cuisine: "indian" },
+  "Achari paneer tikka + dal + salad": { cuisine: "indian" },
+  "Soya keema curry + jowar roti": { cuisine: "indian" },
+  "Chole-paneer bowl + salad": { cuisine: "indian" },
+  "Kadai chicken + jowar roti": { cuisine: "indian" },
+  "Tandoori fish tikka + sauteed veg + roti": { cuisine: "indian" },
+  "Chicken keema matar + jowar roti": { cuisine: "indian" },
+  "Beef bulgogi bowl": { cuisine: "asian" },
+  "Tofu & vegetable bibimbap": { cuisine: "asian" },
+  "Oyakodon + side salad": { cuisine: "asian" },
+  "Dubu jorim + rice + kimchi": { cuisine: "asian" },
+  "Home-style tofu & chicken stir-fry": { cuisine: "asian" },
+  "Vietnamese lemongrass chicken bowl": { cuisine: "asian" },
+  "Cantonese steamed fish + edamame + rice": { cuisine: "asian" },
+  "Chicken bulgogi bowl": { cuisine: "asian" },
+  "Chicken souvlaki + tzatziki + Greek salad": { cuisine: "continental" },
+  "Baked feta & chickpea traybake": { cuisine: "continental" },
+  "Tuna Nicoise salad": { cuisine: "continental" },
+  "Halloumi & roasted-veg quinoa bowl": { cuisine: "continental" },
+  "Chicken & white-bean stew": { cuisine: "continental" },
+  "Chickpea pasta with tuna & tomato": { cuisine: "continental" },
+  "Chicken & ricotta carbonara-style spaghetti": { cuisine: "continental" },
+  "Mackerel & quinoa salad": { cuisine: "continental" },
 
   // Batch 3, 2026-08-06
-  "Scrambled egg sandwich": { cuisine: "Continental" },
-  "Acai bowl (protein-boosted)": { cuisine: "Continental" },
-  "Grilled chicken, veg + pasta": { cuisine: "Continental" },
-  "Chicken shawarma plate + garlic rice": { cuisine: "Continental" },
-  "Plain chicken tikka plate": { cuisine: "Indian" },
-  "Pesto millet pasta + chicken": { cuisine: "Continental" },
-  "Aglio e olio millet pasta + prawns": { cuisine: "Continental" },
-  "Salmon avocado salad (fresh grilled)": { cuisine: "Continental" },
-  "Smoked chicken salad (full size)": { cuisine: "Continental" },
-  "Hummus salad (protein-boosted)": { cuisine: "Continental" },
-  "Sweet potato + kaala chana + roti (leaner)": { cuisine: "Indian" },
-  "Paneer cutlets + dal + salad": { cuisine: "Indian" },
-  "Hummus salad": { cuisine: "Continental" },
-  "Acai bowl": { cuisine: "Continental" },
-  "Paneer cutlets": { cuisine: "Indian" }
+  "Scrambled egg sandwich": { cuisine: "continental" },
+  "Acai bowl (protein-boosted)": { cuisine: "continental" },
+  "Grilled chicken, veg + pasta": { cuisine: "continental" },
+  "Chicken shawarma plate + garlic rice": { cuisine: "continental" },
+  "Plain chicken tikka plate": { cuisine: "indian" },
+  "Pesto millet pasta + chicken": { cuisine: "continental" },
+  "Aglio e olio millet pasta + prawns": { cuisine: "continental" },
+  "Salmon avocado salad (fresh grilled)": { cuisine: "continental" },
+  "Smoked chicken salad (full size)": { cuisine: "continental" },
+  "Hummus salad (protein-boosted)": { cuisine: "continental" },
+  "Sweet potato + kaala chana + roti (leaner)": { cuisine: "indian" },
+  "Paneer cutlets + dal + salad": { cuisine: "indian" },
+  "Hummus salad": { cuisine: "continental" },
+  "Acai bowl": { cuisine: "continental" },
+  "Paneer cutlets": { cuisine: "indian" }
 };
 
 /** Exported so tests can assert no derived field creeps back in. */
