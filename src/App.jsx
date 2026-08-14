@@ -292,6 +292,11 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       dateKey,
       plans,
       preferences: adaptedInput.preferences,
+      // Forwarded, not dropped: without this every day resolves to
+      // `getRulesForProfile(undefined)` — i.e. high_protein — so a standard
+      // user's days were judged by a 20g per-meal floor and a 130g carb cap
+      // while carrying the standard protein target.
+      goal: goalOverride,
       dailyProteinTarget: adaptedInput.dailyProteinTarget,
       mealDatabase: mergedMealDatabase
     });

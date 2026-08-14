@@ -1,3 +1,5 @@
+import { GOAL, isDeclaredGoal, normalizeGoalId } from './rules.js';
+
 export const ONBOARDING_PROFILE_VERSION = 1;
 
 export const ONBOARDING_MODE = {
@@ -5,13 +7,21 @@ export const ONBOARDING_MODE = {
   VIEWER: 'viewer'
 };
 
-export const ONBOARDING_GOAL = {
-  HIGH_PROTEIN: 'high_protein',
-  STANDARD: 'standard',
-  LOW_CARB: 'low_carb',
-  TWO_MEALS_DAY: 'two_meals_day',
-  VEGETARIAN: 'vegetarian'
-};
+/**
+ * The goals onboarding offers, taken from `rules.js` rather than declared a
+ * second time here. This module used to carry its own enum whose `two_meals_day`
+ * disagreed with the engine's `two_meals`, so a goal name only survived the trip
+ * from the picker to the ruleset if someone remembered to add it to
+ * `GOAL_ALIASES`.
+ *
+ * `TWO_MEALS_DAY` is retained as a key so existing callers keep resolving, but
+ * it now holds the canonical id. Profiles persisted under the old spelling are
+ * accepted and canonicalized on read below, so nobody gets re-onboarded.
+ */
+export const ONBOARDING_GOAL = Object.freeze({
+  ...GOAL,
+  TWO_MEALS_DAY: GOAL.TWO_MEALS
+});
 
 export const ONBOARDING_MODE_OPTIONS = [
   {
@@ -78,11 +88,12 @@ const asIsoString = (value) => {
 
 export const isValidOnboardingMode = (mode) => Object.values(ONBOARDING_MODE).includes(mode);
 
-export const isValidOnboardingGoal = (goal) => Object.values(ONBOARDING_GOAL).includes(goal);
+/** Accepts either spelling — `rules.js` owns the reconciliation. */
+export const isValidOnboardingGoal = (goal) => isDeclaredGoal(goal);
 
 export const getOnboardingModeLabel = (mode) => MODE_LABELS[mode] || 'Unknown';
 
-export const getOnboardingGoalLabel = (goal) => GOAL_LABELS[goal] || 'Unknown';
+export const getOnboardingGoalLabel = (goal) => GOAL_LABELS[normalizeGoalId(goal)] || 'Unknown';
 
 export const getDefaultOnboardingDraft = () => ({
   mode: ONBOARDING_MODE.OWNER,
@@ -103,7 +114,9 @@ export const normalizeOnboardingProfile = (value) => {
   return {
     version: ONBOARDING_PROFILE_VERSION,
     mode: value.mode,
-    goal: value.goal,
+    // Canonicalized on read, so a profile persisted under the legacy
+    // `two_meals_day` spelling reaches `getRules` as `two_meals`.
+    goal: normalizeGoalId(value.goal),
     completedAt,
     updatedAt
   };
@@ -118,7 +131,7 @@ export const buildOnboardingProfile = ({ mode, goal, previousProfile = null, now
   return {
     version: ONBOARDING_PROFILE_VERSION,
     mode,
-    goal,
+    goal: normalizeGoalId(goal),
     completedAt: normalizedPrevious?.completedAt || nowIso,
     updatedAt: nowIso
   };

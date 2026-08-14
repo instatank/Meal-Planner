@@ -5,7 +5,7 @@ import {
   DEFAULT_DAILY_PROTEIN_TARGET,
   normalizePreferences
 } from './plannerGenerator.js';
-import { ONBOARDING_GOAL } from './onboardingProfile.js';
+import { GOAL, normalizeGoalId } from './rules.js';
 
 const HIGH_PROTEIN_THRESHOLD = 40;
 const HIGH_PROTEIN_ACCEPT_DELTA = 0.85;
@@ -23,7 +23,11 @@ const getPlannerMeals = (mealDatabase = {}) => [...(mealDatabase.breakfast || []
 export const getMealTypeOrderForGoal = ({ goal, plan = {}, history = {} }) => {
   const hasSnack = Boolean(plan?.snack || history?.snack);
 
-  if (goal === ONBOARDING_GOAL.TWO_MEALS_DAY) {
+  // Normalized before comparing: onboarding and the engine spell some goals
+  // differently, and `rules.js` is the only place that knows how to reconcile
+  // them. Comparing raw strings meant a canonical `two_meals` fell through to
+  // the three-meal ordering.
+  if (normalizeGoalId(goal) === GOAL.TWO_MEALS) {
     return hasSnack ? ['lunch', 'snack', 'dinner'] : ['lunch', 'dinner'];
   }
 
@@ -31,6 +35,7 @@ export const getMealTypeOrderForGoal = ({ goal, plan = {}, history = {} }) => {
 };
 
 export const buildGoalAdjustedPlannerInput = ({ goal, preferences = {}, mealDatabase, dailyProteinTarget }) => {
+  const normalizedGoal = normalizeGoalId(goal);
   const normalizedPreferences = normalizePreferences(preferences);
   const adjusted = {
     accepts: { ...normalizedPreferences.accepts },
@@ -50,18 +55,18 @@ export const buildGoalAdjustedPlannerInput = ({ goal, preferences = {}, mealData
     if (!mealName || seenMealNames.has(mealName)) continue;
     seenMealNames.add(mealName);
 
-    if (goal === ONBOARDING_GOAL.HIGH_PROTEIN && Number(meal?.protein || 0) >= HIGH_PROTEIN_THRESHOLD) {
+    if (normalizedGoal === GOAL.HIGH_PROTEIN && Number(meal?.protein || 0) >= HIGH_PROTEIN_THRESHOLD) {
       addDelta(adjusted.accepts, mealName, HIGH_PROTEIN_ACCEPT_DELTA);
     }
 
-    if (goal === ONBOARDING_GOAL.LOW_CARB && Number(meal?.macros?.c || 0) >= CARB_HEAVY_THRESHOLD) {
+    if (normalizedGoal === GOAL.LOW_CARB && Number(meal?.macros?.c || 0) >= CARB_HEAVY_THRESHOLD) {
       addDelta(adjusted.avoids, mealName, LOW_CARB_AVOID_DELTA);
     }
   }
 
-  if (goal === ONBOARDING_GOAL.HIGH_PROTEIN) {
+  if (normalizedGoal === GOAL.HIGH_PROTEIN) {
     nextProteinTarget = Math.max(nextProteinTarget, HIGH_PROTEIN_DAILY_TARGET);
-  } else if (goal === ONBOARDING_GOAL.STANDARD) {
+  } else if (normalizedGoal === GOAL.STANDARD) {
     nextProteinTarget = 80;
   }
 
