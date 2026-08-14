@@ -900,6 +900,14 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     // Clear the active context state now that the prompt has returned
     setActiveOmniboxContext(null);
 
+    // The meal this action displaces, read before updateSelectedPlan replaces
+    // it. Recorded on the event only — nothing consumes it yet. The preference
+    // rule that wanted this ("avoid what the custom meal replaced") asked for
+    // `originalMealName`, which no producer ever wrote, so the signal was dead
+    // and pointing it at `mealName` would have penalised the meal the user just
+    // chose to eat. See docs/CONSISTENCY_AUDIT.md finding #6.
+    const previousMealName = selectedDayPlan[targetSlot]?.name || '';
+
     try {
       if (payload.intent === 'ADD_DB_MEAL') {
         const mealData = payload.data;
@@ -920,7 +928,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           type: 'custom',
           dateKey: selectedDateKey,
           mealType: targetSlot,
-          mealName: mealData.name
+          mealName: mealData.name,
+          previousMealName
         });
 
         showNotification(`✓ Logged ${mealData.name}`);
@@ -954,7 +963,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           type: 'custom',
           dateKey: selectedDateKey,
           mealType: targetSlot,
-          mealName: payload.data.name
+          mealName: payload.data.name,
+          previousMealName
         });
 
         showNotification(`✓ Logged ${payload.data.name}`);
@@ -996,7 +1006,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           type: 'custom',
           dateKey: selectedDateKey,
           mealType: targetSlot,
-          mealName: payload.data.name
+          mealName: payload.data.name,
+          previousMealName
         });
 
         showNotification(`🤖 Estimated: ${payload.data.name}`);
@@ -1037,7 +1048,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           type: 'custom',
           dateKey: selectedDateKey,
           mealType: targetSlot,
-          mealName: payload.data.name
+          mealName: payload.data.name,
+          previousMealName
         });
 
         showNotification(`🍱 Cheated: ${payload.data.name}`);
@@ -1276,7 +1288,25 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       orderOut: true
     };
 
+    // Read before the update, so the event records what the order-out replaced.
+    const replacedMealName = selectedDayPlan[currentModalMealType]?.name || '';
+
     updateSelectedPlan((prev) => ({ ...prev, [currentModalMealType]: newMeal }));
+
+    // The `edit` event type has had consumer weights since the event log was
+    // written and no producer at all, so `preferences.edits` was permanently
+    // empty. This is the flow it describes: the user names a specific
+    // replacement for a specific planned meal. Recorded as data only — the
+    // weights that read it have been removed pending enough data to validate
+    // an interpretation. See docs/CONSISTENCY_AUDIT.md finding #6.
+    appendMealEvent({
+      type: 'edit',
+      dateKey: selectedDateKey,
+      mealType: currentModalMealType,
+      originalMealName: replacedMealName,
+      updatedMealName: newMeal.name
+    });
+
     setShowOrderOutModal(false);
     showNotification(`✓ Ordered: ${option.name} `);
   };

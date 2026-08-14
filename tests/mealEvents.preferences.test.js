@@ -32,16 +32,26 @@ test('swap only first instance per day+slot counts as downvote', () => {
   assert.equal(prefs.avoids['Meal X'], 1.2);
 });
 
-test('edit and custom produce configured minor/major downvotes', () => {
+test('edit and custom are recorded but do not move preferences', () => {
+  // This test used to assert downvotes of 0.4 / 0.6 / 1.5 for these two event
+  // types. Those weights are gone by decision, not by accident: all three read
+  // `originalMealName` / `updatedMealName`, which no producer in App.jsx ever
+  // wrote, so `customAvoid` never fired in production and the `edit` weights
+  // had no event type to fire on at all. Note the `custom` event below carries
+  // an `originalMealName` — a shape the app has never actually produced, which
+  // is why the old assertion passed here while the signal was dead in the app.
+  //
+  // Both types are now captured in full (App.jsx records `previousMealName` on
+  // custom events and emits real `edit` events) and interpreted by nothing,
+  // until there is enough data to validate what they should mean.
+  // See docs/CONSISTENCY_AUDIT.md finding #6.
   const events = [
     createMealEvent({ id: 'e1', type: 'edit', dateKey: '2026-02-17', mealType: 'dinner', originalMealName: 'Meal Old', updatedMealName: 'Meal New', timestamp: at('2026-02-17T08:00:00Z') }),
-    createMealEvent({ id: 'e2', type: 'custom', dateKey: '2026-02-17', mealType: 'dinner', originalMealName: 'Meal Planned', customMealText: 'Sushi bowl', timestamp: at('2026-02-17T09:00:00Z') })
+    createMealEvent({ id: 'e2', type: 'custom', dateKey: '2026-02-17', mealType: 'dinner', mealName: 'Sushi bowl', previousMealName: 'Meal Planned', timestamp: at('2026-02-17T09:00:00Z') })
   ];
 
   const prefs = derivePreferencesFromEvents(events);
-  assert.equal(prefs.avoids['Meal Old'], 0.4);
-  assert.equal(prefs.accepts['Meal New'], 0.6);
-  assert.equal(prefs.avoids['Meal Planned'], 1.5);
+  assert.deepEqual(prefs, { accepts: {}, avoids: {}, edits: {}, skips: {} });
 });
 
 test('undo reverses targeted event impacts', () => {

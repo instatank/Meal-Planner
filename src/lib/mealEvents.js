@@ -1,15 +1,31 @@
 import { normalizePreferences } from './plannerGenerator.js';
 import { flattenMealDatabase, scoreMealMetadataSimilarity } from './mealDataLayer.js';
 
+/**
+ * Weights for the event types that move preferences.
+ *
+ * `customAvoid` (1.5), `editAvoid` (0.4) and `editAccept` (0.6) used to sit
+ * here and are deliberately gone. All three read `originalMealName` /
+ * `updatedMealName`, fields no producer wrote, so `customAvoid` never fired at
+ * all and the two `edit` weights had no event type to fire on. Rather than
+ * rewire them at the field that did exist — which for a `custom` event would
+ * have penalised the meal the user had just chosen to eat — the events are now
+ * recorded in full and interpreted by nothing. The weights come back when
+ * there is enough captured data to validate what they should mean.
+ *
+ * See docs/CONSISTENCY_AUDIT.md finding #6.
+ */
 export const EVENT_WEIGHTS = {
   confirmAccept: 2,
-  swapAvoidFirst: 1.2,
-  editAvoid: 0.4,
-  editAccept: 0.6,
-  customAvoid: 1.5
+  swapAvoidFirst: 1.2
 };
 
-const IMPACTFUL_EVENT_TYPES = new Set(['confirm', 'swap', 'edit', 'custom', 'legacy_import']);
+/**
+ * Event types that reach the preference derivation below. `custom`, `edit` and
+ * `skip` are recorded but deliberately absent: they carry no weight, so
+ * including them here would only add a branch that does nothing.
+ */
+const IMPACTFUL_EVENT_TYPES = new Set(['confirm', 'swap', 'legacy_import']);
 
 const round2 = (value) => Number(Number(value).toFixed(2));
 
@@ -95,13 +111,6 @@ export const derivePreferencesFromEvents = (events = []) => {
         addDelta(normalized.avoids, event.fromMealName, EVENT_WEIGHTS.swapAvoidFirst);
         break;
       }
-      case 'edit':
-        addDelta(normalized.avoids, event.originalMealName, EVENT_WEIGHTS.editAvoid);
-        addDelta(normalized.accepts, event.updatedMealName, EVENT_WEIGHTS.editAccept);
-        break;
-      case 'custom':
-        addDelta(normalized.avoids, event.originalMealName, EVENT_WEIGHTS.customAvoid);
-        break;
       default:
         break;
     }
