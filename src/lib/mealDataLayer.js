@@ -194,6 +194,65 @@ export const derivePrimaryIngredient = (meal = {}) => {
   return best;
 };
 
+// ─── Carb type (rubric R4) ──────────────────────────────────────────────────
+//
+// `carb_type` answers one question: what starch *form* is this meal built on —
+// a flatbread/pasta, a rice-style grain, or neither. It exists for R4 of
+// docs/QUALITY_RUBRIC.md ("one flatbread/pasta meal per day").
+//
+// It is classified per ingredient, here, and materialised onto every
+// lunch/dinner meal by `buildMeal`. It is never inferred from the dish name:
+// a name-based rule cannot tell "Paneer cutlets" (panko coating, no base)
+// from a pasta dish, and would have to be re-guessed on every scoring run.
+//
+// Only carb *bases* are listed. An ingredient absent from this table
+// contributes nothing — that is what keeps 15g of besan batter and 15g of
+// panko crumb from turning a cutlet-and-dal plate into a bread meal.
+
+/** Carb-base ingredients, by the starch form a person would perceive. */
+export const CARB_BASE_BY_INGREDIENT = Object.freeze({
+  // Flatbreads and breads
+  jowar_roti: 'flatbread_pasta',
+  whole_wheat_toast: 'flatbread_pasta',
+  aloo_paratha: 'flatbread_pasta',
+  plain_paratha: 'flatbread_pasta',
+  // Pasta and noodles — form, not the flour they are made from, which is why
+  // rice noodles sit here and not under `rice`.
+  chickpea_pasta: 'flatbread_pasta',
+  millet_pasta_dry: 'flatbread_pasta',
+  spaghetti_aglio_olio: 'flatbread_pasta',
+  egg_noodles: 'flatbread_pasta',
+  rice_noodles: 'flatbread_pasta',
+  soba_noodles: 'flatbread_pasta',
+  // Rice and rice-style grain bases
+  cooked_rice: 'rice',
+  garlic_rice: 'rice',
+  poha: 'rice',
+  quinoa_cooked: 'rice'
+});
+
+const CARB_TYPE_NONE = 'none';
+
+/**
+ * The starch form a lunch/dinner meal is built on.
+ *
+ * Flatbread/pasta wins over rice when a meal carries both, because R4 is
+ * about the flatbread/pasta load: a plate with roti on it is a roti meal
+ * whatever else is beside it. Ties within a form are irrelevant — the field
+ * records the form, not which grain.
+ */
+export const deriveCarbType = (meal = {}) => {
+  let sawRice = false;
+
+  for (const part of meal.parts || []) {
+    const form = CARB_BASE_BY_INGREDIENT[part.ingredientId];
+    if (form === 'flatbread_pasta') return 'flatbread_pasta';
+    if (form === 'rice') sawRice = true;
+  }
+
+  return sawRice ? 'rice' : CARB_TYPE_NONE;
+};
+
 export const inferCarbLevel = (meal = {}) => {
   const carbs = asNumber(meal.macros?.c);
   if (!Number.isFinite(carbs)) return 'medium';

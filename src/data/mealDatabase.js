@@ -1,5 +1,6 @@
 import {
   computeMacros,
+  deriveCarbType,
   deriveMealTags,
   derivePrimaryIngredient,
   enrichMealForDataLayer
@@ -2154,6 +2155,10 @@ export { handAuthoredTags };
  * Compute macros from `parts[]`, derive the three computed tags from those
  * macros, then layer the subjective hand-authored tags on top. Order matters:
  * macros first, because the derivations read them.
+ *
+ * `carb_type` is derived here too, but only for lunch/dinner: it exists for
+ * rubric R4, which exempts breakfast, so carrying it on breakfast and snack
+ * meals would be a field nothing reads.
  */
 const buildMeal = (meal, mealType) => {
   const withMacros = { ...meal, ...computeMacros(meal.parts) };
@@ -2161,6 +2166,7 @@ const buildMeal = (meal, mealType) => {
     {
       ...withMacros,
       ...deriveMealTags(withMacros),
+      ...(mealType === 'lunch_dinner' ? { carb_type: deriveCarbType(withMacros) } : {}),
       primary_ingredient: derivePrimaryIngredient(withMacros),
       ...(handAuthoredTags[meal.canonical_name] || {})
     },

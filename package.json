@@ -12,6 +12,7 @@
     "test:events": "node --test tests/mealEvents.preferences.test.js",
     "test:logic": "node --test tests/*.test.js",
     "audit:generation": "node scripts/auditGeneration.mjs",
+    "score": "node scripts/scorePlan.mjs",
     "export:rejections": "node scripts/exportRejections.mjs"
   },
   "dependencies": {

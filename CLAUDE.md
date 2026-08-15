@@ -125,6 +125,7 @@ npm run build            # production build
 npm run test:logic       # all tests (148, all green)
 npm run test:planner     # planner regression only
 npm run audit:generation # enumerate combinations + score a week against the acceptance criteria
+npm run score -- <plan.json>  # score a week against docs/QUALITY_RUBRIC.md (ship at 85+)
 npm run db:pack          # regenerate database packs under database/ + exports/
 ```
 
@@ -141,6 +142,8 @@ Deploy happens on `git push origin main` (Vercel auto-deploys). Feature branches
 | `scripts/consolePaste.snippet.js` | Pre-generated latest snippet (checked in). | — |
 | `scripts/buildDatabasePack.mjs` | Regenerate derived meal-database artifacts. | — |
 | `scripts/auditGeneration.mjs` | Enumerate all legal day combinations and score a generated week against the Phase 1 acceptance criteria. | — |
+| `scripts/scorePlan.mjs` | Score a week against the quality rubric (R1–R4). Accepts a rejection record, a `mealPlans` map, or `{ days: [...] }`. | — |
+| `scripts/exportRejections.mjs` | Dump rejected weeks from Firestore to `docs/rejections/`. **Needed before the rubric can be calibrated.** | Firebase Admin service account JSON. |
 | `scripts/exportDatabase.mjs` / `exportMealsToXlsx.mjs` | Export to CSV / XLSX. | — |
 
 When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`, unless you specifically need admin-SDK writes. The paste helper now uses **current** timestamps — never resurrect the +1-year trick.
@@ -191,6 +194,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 | `docs/PHASE2_HANDOVER.md` | §1–§8 the original brief. **§9 what Phase 2 measured** — including the quadratic-runtime finding (§9.6) and the protein-floor measurement left for the founder (§9.7). **§10 the 2026-08-03 research batch**, the profiled runtime breakdown (§10.4) and the three-tier optimizer fix (§10.5). |
 | `docs/PHASE1_HANDOVER.md` | Shipped 2026-08-02. §9 records what the generation-engine rebuild measured — read it before changing any threshold. |
 | `docs/EVAL_AND_ROADMAP.md` | The original audit. §3 is now historical (that code is deleted); §4 onward is still live. |
+| `docs/QUALITY_RUBRIC.md` | **The four scored rules (R1–R4)** layered on top of the `rules.js` hard gates. Implemented in `src/lib/planScorer.js`. **Not yet calibrated** — the calibration in its §Calibration needs `docs/rejections/` and the founder's ideal week, neither of which is in the repo. |
 | `docs/CONSISTENCY_AUDIT.md` | **Every fact with more than one home**, and every concept inferred by pattern-matching where structured data exists — 14 findings ranked by blast radius, each with file:line, current values, and the location that should become authoritative. Findings 1, 2, 5 and 6 are fixed and marked as such; the rest are open. |
 
 ---
@@ -211,6 +215,7 @@ src/
     rules.js             SINGLE SOURCE OF TRUTH for every threshold (3 tiers)
     planOptimizer.js     Day enumeration + week beam search + shortlists
     planValidator.js     Post-generation validation + deterministic repair
+    planScorer.js        Quality rubric R1-R4 (docs/QUALITY_RUBRIC.md) — scores, never gates
     planService.js       Client wrapper for /api/generate-plan — weekly gen (Claude)
     omniboxService.js    Client wrapper for /api/generate-plan — Omnibox intent parsing (Claude)
     plannerGenerator.js  Single-day generator (facade over planOptimizer)
