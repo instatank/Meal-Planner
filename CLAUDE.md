@@ -1,7 +1,7 @@
 # Meal Planner Co-Pilot — Claude Context
 
 Handover doc for AI assistants (and humans) resuming work on this repo.
-Last updated to reflect the current state after the sync-overwrite hardening and the Vercel/Claude proxy migration.
+Last updated after the consistency audit (`docs/CONSISTENCY_AUDIT.md`) and the first four fixes from it — goal routing, the protein target, cuisine, and meal-event capture.
 
 ---
 
@@ -49,17 +49,19 @@ LocalStorage-first with Firestore as the shared source of truth. Each key has a 
 
 **Aim daily, judge weekly.** Every day is *targeted* at the daily protein goal, but a week is accepted or rejected on weekly performance. Up to 2 of 7 days may fall out of band, and those flex days are allowed to be genuinely low — there is no meaningful per-day protein floor beyond a 50g sanity check. What keeps the week sound is the **weekly protein floor** (85% of nominal), which forces the other five days to compensate.
 
-Rules live in **`src/lib/rules.js` and nowhere else**, split into three tiers:
+Rules live in **`src/lib/rules.js` and nowhere else**, split into three tiers.
+
+**The daily protein target is `high_protein` 120g / `standard` 100g**, declared once in `GOAL_DEFINITIONS` and resolved only through `getRules`. It used to have seven homes — the adapter carried a `Math.max(…, 132)` ratchet, a flat `standard = 80`, and a `Math.min(…, DAILY_PROTEIN_MAX)` ceiling, and App.jsx passed a literal `120` — so `standard` planned at 80g against a declared 100g, and an explicit target could only ever resolve to 132. All of that is gone; every derived figure (band, weekly floor, nominal) moves with the one declaration.
 
 | Tier | Meaning | Examples |
 | --- | --- | --- |
-| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, weekly repeat ceilings (breakfast ≤4, lunch/dinner ≤2), **anchor-ingredient cap (≤2/wk at lunch/dinner)**, **no two identical days in a week**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 785g, 50g/day sanity floor |
-| **2 — Budgeted** | Allowed to break on ≤2 of 7 days | daily protein band (119–145g), carb cap (130g), calorie bounds (1600–2200), **cuisine balance — exactly one Indian across lunch+dinner** |
+| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, weekly repeat ceilings (breakfast ≤4, lunch/dinner ≤2), **anchor-ingredient cap (≤2/wk at lunch/dinner)**, **no two identical days in a week**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 85% of nominal (**714g** at the 120g target), 50g/day sanity floor |
+| **2 — Budgeted** | Allowed to break on ≤2 of 7 days | daily protein band (**108–132g**), carb cap (130g), calorie bounds (1600–2200), **cuisine balance — exactly one Indian across lunch+dinner** |
 | **3 — Scored** | Never rejects; only ranks | variety, cuisine diversity, protein-family diversity, fibre, dinner calorie tapering, user preferences, anti-greedy |
 
 **The anchor-ingredient cap** counts the ingredient a meal is *about* (highest protein contributor, derived from `parts[]` by `derivePrimaryIngredient`), not the meal name. Name-based caps let `Rajma chawal + raita` and `Rajma + paneer bowl` each appear twice — four rajma dinners in a week, every one legal.
 
-Budgets **pro-rate** for partial-week regenerations: a 4-day remainder gets 1 flex day and a 449g floor, not the full week's allowance.
+Budgets **pro-rate** for partial-week regenerations: a 4-day remainder gets 1 flex day and a 408g floor, not the full week's allowance.
 
 `getRules` throws `UnsupportedGoalError` for goals onboarding declares but nobody built (`low_carb`, `two_meals`, `vegetarian`). It no longer silently becomes `high_protein` — that is how a vegetarian used to get a week of chicken.
 
@@ -104,8 +106,8 @@ Rebuild downstream artifacts with `npm run db:pack` (needs `npm install` — it 
 | --- | --- | --- |
 | **Claude structured output** | Prefill (`"[":`) is not a reliable way to force JSON. Use `tool_use` with `tool_choice: {type: 'tool', name}`. | See `buildSubmitPlanTool` in `src/lib/planService.js` and `tool` handling in `api/generate-plan.js`. |
 | **Vercel timeouts** | `api/generate-plan.js` declares `maxDuration: 60`. Hobby plan caps at 10s regardless — upgrade to Pro or the regen will 504. | The proxy runs at `effort: 'low'` to stay inside the cap. Lower it further before reaching for a smaller model. |
-| **Optimizer enumeration is quadratic** | `breakfasts × lunchDinner²`, run **client-side before** the Anthropic call. Post-Phase-3 at 97 meals (72,930 candidates): **~630ms warm, median of 5** (~870ms in the cold single-shot audit) — down from ~2,000ms. Growth headroom exists again, but the shape is still quadratic. | Tier 1 (waste removal, byte-identical output) shipped and re-verified at 97 meals. The largest remaining cost is the full sort in `selectWeek`; removing it means restructuring `trimCandidatePool` (Tier 2, changes candidate visibility) — worth it only well past 200 meals. See `docs/PHASE3_REPORT.md` §4.1. |
-| **`buildPromotedCustomMeal` fabricates macros** | Still assigns `{p: 24, c: 42, f: 14}` to every user-added lunch/dinner. Those invented numbers clear the 20g floor and flow into an optimizer that now trusts its inputs completely. | Now the *only* unmeasured path into a fully measured catalog — the gap widened in Phase 2, it did not close. Fix it or keep it disabled. |
+| **Optimizer enumeration is quadratic** | `breakfasts × lunchDinner²`, run **client-side before** the Anthropic call. **Current, at 110 meals: ~1.0–1.25s cold in `audit:generation`, over 99,900 (`high_protein`) to 111,000 (`standard`) candidates.** The ~630ms figure quoted below was measured at 97 meals and no longer describes this catalog. Growth headroom is shrinking again, and the shape is still quadratic. | Tier 1 (waste removal, byte-identical output) shipped and re-verified at 97 meals. The largest remaining cost is the full sort in `selectWeek`; removing it means restructuring `trimCandidatePool` (Tier 2, changes candidate visibility) — worth it only well past 200 meals. See `docs/PHASE3_REPORT.md` §4.1. |
+| **`buildPromotedCustomMeal` fabricates macros** | Still assigns `{p: 24, c: 42, f: 14}` to every user-added lunch/dinner. Those invented numbers clear the 20g floor and would flow into an optimizer that now trusts its inputs completely. | **Currently unreachable, which is why it has never bitten.** The only thing that calls it is the promotion UI, fed by `getCustomMealCandidates`, which keys on `event.customMealText` — a field no producer writes (see `docs/CONSISTENCY_AUDIT.md` finding #6). Candidate detection is deliberately left off. **Fix the macros before switching it on.** |
 | **Sampling parameters** | Sonnet 5 returns a 400 for any non-default `temperature`/`top_p`/`top_k`. A model swap without removing them breaks the endpoint outright. | `buildAnthropicRequest` in `api/generate-plan.js` strips them defensively, so a stale cached client bundle degrades instead of breaking. |
 | **Thinking shares `max_tokens`** | Adaptive thinking is on by default on Sonnet 5 and counts against `max_tokens`. A budget sized for the response alone truncates mid-answer. | `DEFAULT_MAX_TOKENS` is 8192 for a response that is only a few enum picks. |
 | **Sonnet 5 tokenizer** | ~30% more tokens for the same text than Sonnet 4.6, so cost baselines shift even though per-token pricing did not. | Re-baseline before reacting to the numbers. Also note prompt caching needs a 1024-token prefix; a short system prompt silently will not cache. |
@@ -120,7 +122,7 @@ Rebuild downstream artifacts with `npm run db:pack` (needs `npm install` — it 
 npm install
 npm run dev              # local dev (no serverless functions — use `vercel dev` for those)
 npm run build            # production build
-npm run test:logic       # all tests (125, all green)
+npm run test:logic       # all tests (148, all green)
 npm run test:planner     # planner regression only
 npm run audit:generation # enumerate combinations + score a week against the acceptance criteria
 npm run db:pack          # regenerate database packs under database/ + exports/
@@ -158,11 +160,19 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 
 ---
 
+- **Consistency audit + findings 1, 2, 5, 6 — shipped.** `docs/CONSISTENCY_AUDIT.md` catalogues 14 facts with more than one home, ranked by blast radius; six already disagreed in production. Four are fixed:
+  - **#1 goal routing.** `App.jsx`'s per-day wrapper accepted a `goalOverride` and never forwarded it, so `getRulesForProfile(undefined)` resolved **every** backfilled day — and the whole "regenerate on goal change" path — to `high_protein`. A `standard` user got a 20g per-meal floor and a 130g carb cap. `onboardingProfile.js` now takes its ids from `rules.js` `GOAL` instead of declaring a parallel enum (`two_meals_day` → canonical `two_meals`, legacy spelling still accepted and canonicalized on read), and the adapter normalizes before comparing.
+  - **#2 protein target.** Seven homes → one. See the rule-model section above. **`high_protein` moved 132 → 120g** by founder decision; band, nominal and weekly floor moved with it.
+  - **#5 cuisine.** Was declared twice inside `mealDatabase.js` — inline on 77 base meals (`western`) and again in `handAuthoredTags` (`Continental`), the latter silently winning, 29 disagreeing on value. Inline keys deleted and the map lowercased. This **revived the "Indian" quick action**, which compared `m.cuisine === 'indian'` against capitalised values and matched 0 of 42 meals.
+  - **#6 meal-event capture.** `custom` events recorded `mealName` while the consumer read `originalMealName`, so the avoid signal never fired and `preferences.edits` was permanently empty. Now `previousMealName` is captured, `edit` events have a real producer (`selectOrderOutOption`), and the three weights that consumed them (`customAvoid`, `editAvoid`, `editAccept`) are **deleted rather than rewired** — recorded, uninterpreted, pending enough data to validate what they should mean. `confirm` (2) and `swap` (1.2) are untouched.
+
+  Findings **3, 4, 7–14 remain open**, including two that still disagree in production: two independent red-meat classifiers (#3) and name-based fibre scoring that contradicts measured grams on 14 meat meals (#4).
+
 ## Next Priorities (updated)
 
 0. **Confirm the five Phase 2 decisions.** `docs/PHASE2_HANDOVER.md` §4 asked the founder five product questions before the work; they were not answered, so Phase 2 proceeded on stated assumptions (meals authored for review, additive only, fibre in grams now, unimplemented goals left throwing, protein floor unchanged). §9.7 and §9.8 record what to confirm — including the measurement for raising the weekly protein floor.
-1. **Fix or disable `buildPromotedCustomMeal`.** See Known Gotchas. It is now the only path feeding invented macros into a measured catalog.
-2. **Next meal batch.** The optimizer is unblocked (Tier 1 shipped, ~630ms at 97 meals) — the queued meal ingestion can now proceed against a fast optimizer. Tier 2/3 of `docs/PHASE3_HANDOVER.md` §4 stay parked until the catalog is well past 200 meals.
+1. **Fix `buildPromotedCustomMeal` before re-enabling promotion.** See Known Gotchas. It is the only path feeding invented macros into a measured catalog, and it is currently unreachable because candidate detection is off (audit finding #6). Fix the macros first, then switch detection on — not the other way round.
+2. **Next meal batch.** The optimizer is unblocked (Tier 1 shipped; ~1.0–1.25s at 110 meals) — the queued meal ingestion can now proceed against a fast optimizer. Tier 2/3 of `docs/PHASE3_HANDOVER.md` §4 stay parked until the catalog is well past 200 meals.
 3. **Switch timestamps to Firestore `serverTimestamp()`.** The current heal-on-read logic is defensive but brittle. Using server-assigned timestamps makes client-clock poisoning impossible and lets us delete the `isCorruptTs` / heal branches.
 4. **IF (Intermittent Fasting) mode.** `two_meals` is declared in onboarding and reconciled in `rules.js`, but has no ruleset — `getRules` throws for it by design. Give it real Tier-1/2/3 definitions and surface it so users can opt into 16/8 or 18/6 without overriding meals manually.
 5. **Vegetarian goal.** Now cheap: Phase 2 added 2 vegetarian breakfasts and several vegetarian lunch/dinner dishes that sit inside the budgets. Still throws by design.
@@ -181,6 +191,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 | `docs/PHASE2_HANDOVER.md` | §1–§8 the original brief. **§9 what Phase 2 measured** — including the quadratic-runtime finding (§9.6) and the protein-floor measurement left for the founder (§9.7). **§10 the 2026-08-03 research batch**, the profiled runtime breakdown (§10.4) and the three-tier optimizer fix (§10.5). |
 | `docs/PHASE1_HANDOVER.md` | Shipped 2026-08-02. §9 records what the generation-engine rebuild measured — read it before changing any threshold. |
 | `docs/EVAL_AND_ROADMAP.md` | The original audit. §3 is now historical (that code is deleted); §4 onward is still live. |
+| `docs/CONSISTENCY_AUDIT.md` | **Every fact with more than one home**, and every concept inferred by pattern-matching where structured data exists — 14 findings ranked by blast radius, each with file:line, current values, and the location that should become authoritative. Findings 1, 2, 5 and 6 are fixed and marked as such; the rest are open. |
 
 ---
 

@@ -1,6 +1,18 @@
 # Consistency Audit — facts with more than one home
 
-Read-only audit, 2026-08-13. Nothing in this pass was changed or fixed.
+Read-only audit, 2026-08-13. Nothing was changed in the audit pass itself.
+
+> **Status, 2026-08-15.** Findings **1, 2, 5 and 6 are fixed** and shipped; each
+> is marked ✅ below with what changed. Findings **3, 4 and 7–14 remain open**,
+> including two that still disagree in production: the two independent red-meat
+> classifiers (#3) and name-based fibre scoring that contradicts measured grams
+> on 14 meat meals (#4). Measurements throughout this document were taken
+> *before* the fixes and are left as recorded, so the reasoning stays auditable.
+>
+> One fix carried a deliberate behaviour change on top of the deduplication:
+> **`high_protein`'s daily protein target moved 132g → 120g** by founder
+> decision, so the band (now 108–132g), weekly nominal (840g) and weekly floor
+> (714g) moved with it.
 
 **Method.** Every claim below was checked against the running code, not read off
 comments. Where a divergence could be counted, it was counted by executing the
@@ -16,26 +28,32 @@ different from what they asked for, when the copies drift. Findings 1–6 alread
 disagree in production. Findings 7–14 agree today and are ranked on what breaks
 when someone edits one copy.
 
-| # | Concept | Homes | Agree today? |
-| --- | --- | --- | --- |
-| 1 | Which goal the user chose | 4 | **No** — one path discards it |
-| 2 | Daily protein target | 7 | **No** — 80 vs 100 for `standard` |
-| 3 | Protein family / red meat | 3 classifiers | **No** — 2 meals |
-| 4 | Fibre | 4 | **No** — 14 meat meals mis-scored |
-| 5 | Cuisine | 2 + 2 casings | **No** — 29 meals, 1 dead feature |
-| 6 | Which meal an event refers to | 5 field names | **No** — 3 signals dropped |
-| 7 | Rules stated to the model | prompt + validator | Partial |
-| 8 | "Heavy" / "carb-heavy" meal | 2 each | **No** — 3 and 9 meals |
-| 9 | Thresholds outside `rules.js` | ~20 | Agree (by luck) |
-| 10 | Slot list | 6 | Agree |
-| 11 | Week length | 6 | Agree |
-| 12 | History lookback window | 3 | **No** — 7 / 10 / 14 days |
-| 13 | One egg | 2 | **No** — 38% kcal apart |
-| 14 | The catalog itself | 4 artifacts | **No** — one is 72 meals stale |
+| # | Concept | Homes | Agreed at audit time? | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Which goal the user chose | 4 | **No** — one path discards it | ✅ fixed |
+| 2 | Daily protein target | 7 | **No** — 80 vs 100 for `standard` | ✅ fixed |
+| 3 | Protein family / red meat | 3 classifiers | **No** — 2 meals | open |
+| 4 | Fibre | 4 | **No** — 14 meat meals mis-scored | open |
+| 5 | Cuisine | 2 + 2 casings | **No** — 29 meals, 1 dead feature | ✅ fixed |
+| 6 | Which meal an event refers to | 5 field names | **No** — 3 signals dropped | ✅ fixed |
+| 7 | Rules stated to the model | prompt + validator | Partial | open |
+| 8 | "Heavy" / "carb-heavy" meal | 2 each | **No** — 3 and 9 meals | open |
+| 9 | Thresholds outside `rules.js` | ~20 | Agree (by luck) | open |
+| 10 | Slot list | 6 | Agree | open |
+| 11 | Week length | 6 | Agree | open |
+| 12 | History lookback window | 3 | **No** — 7 / 10 / 14 days | open |
+| 13 | One egg | 2 | **No** — 38% kcal apart | open |
+| 14 | The catalog itself | 4 artifacts | **No** — one is 72 meals stale | open |
 
 ---
 
 ## 1. Which goal the user chose
+
+> ✅ **Fixed.** `App.jsx` forwards `goal: goalOverride` into the shared day
+> generator; `onboardingProfile.js` takes its ids from `rules.js` `GOAL` instead
+> of declaring a parallel enum (legacy `two_meals_day` still accepted and
+> canonicalized on read); the adapter normalizes before comparing. Guarded by
+> `tests/onboarding.goalRouting.test.js`.
 
 Highest blast radius in the codebase: an entire goal is planned under the wrong
 rulebook on one of the two generation paths, and the parameter that would fix it
@@ -102,6 +120,13 @@ should forward `goal: goalOverride`.
 ---
 
 ## 2. Daily protein target
+
+> ✅ **Fixed.** `rules.js` is the sole declaration: `high_protein` **120g**
+> (moved from 132 by founder decision), `standard` 100g. The adapter's ratchet,
+> flat `standard = 80` and `Math.min` ceiling are deleted, and App.jsx's two
+> `120` literals are gone. `ingredients.js`'s unread `daily_protein_target_g:
+> 130` was deliberately left — it is a seventh home but is read by nothing.
+> Guarded by `tests/protein.target.source.test.js`.
 
 Seven homes. The `high_protein` figure agrees at 132 only because three
 independently-derived numbers happen to be equal; the `standard` figure does not
@@ -277,6 +302,12 @@ prompt is told `has_fibre: false` for the same meal.
 
 ## 5. Cuisine — two homes inside one file, and two casings
 
+> ✅ **Fixed.** All 77 shadowed inline `"cuisine"` keys removed and
+> `handAuthoredTags` lowercased, making the map canonical at source. Verified
+> casing-only: the resolved cuisine for all 110 meals is byte-identical before
+> and after. This revived the dead "Indian" quick action without touching
+> App.jsx. Guarded by `tests/cuisine.source.test.js`.
+
 **Copies**
 
 | Location | What it holds |
@@ -327,6 +358,16 @@ source). Fix `App.jsx:1310`.
 ---
 
 ## 6. Which meal an event refers to — five field names, three dead signals
+
+> ✅ **Fixed, at data-capture scope only.** `previousMealName` is captured on all
+> four custom-event sites; `selectOrderOutOption` now emits the `edit` event that
+> never had a producer; `customAvoid`, `editAvoid` and `editAccept` are **deleted
+> rather than rewired** — pointing them at the field that existed would have
+> penalised the meal the user just chose. `custom`, `edit` and `skip` are now
+> recorded in full and interpreted by nothing, pending enough data to validate an
+> interpretation. `confirm` (2) and `swap` (1.2) untouched. Candidate detection
+> and `buildPromotedCustomMeal` remain deliberately off. Guarded by
+> `tests/mealEvents.capture.test.js`.
 
 The user's own actions are recorded under one vocabulary and read under
 another. Three of the five preference signals never fire.
