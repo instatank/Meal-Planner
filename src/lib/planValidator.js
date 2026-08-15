@@ -14,11 +14,17 @@
  * Callers must not persist a week that comes back invalid.
  */
 
-import { anchorFamilyMaxPerWeek, requiredCompliantDays, weeklyProteinFloor } from './rules.js';
+import {
+  anchorFamilyMaxPerWeek,
+  eggBreakfastsFloor,
+  requiredCompliantDays,
+  weeklyProteinFloor
+} from './rules.js';
 import {
   CORE_SLOTS,
   annotateDay,
   getMealName,
+  getMealCuisine,
   getMealProtein,
   isRedMeat,
   selectWeek,
@@ -134,6 +140,24 @@ const collectDayViolations = ({ day, rules, preferences }) => {
     }
   }
 
+  // R3 — Indian lunch + non-Indian dinner, the only free pattern. Hard here as
+  // well as at enumeration: the optimizer guarantees it per day, but Phase 2
+  // hands the model flat per-slot shortlists that have thrown that structure
+  // away, so nothing between there and storage would catch a recombination
+  // that pairs a continental lunch with an Indian dinner.
+  const lunchCuisine = getMealCuisine(day.lunch);
+  const dinnerCuisine = getMealCuisine(day.dinner);
+  if (day.lunch && day.dinner && !(lunchCuisine === rules.hard.lunchCuisine && dinnerCuisine !== rules.hard.lunchCuisine)) {
+    found.push(violation({
+      code: 'cuisine_direction_wrong',
+      scope: 'day',
+      dateKey,
+      actual: `${lunchCuisine || '?'}/${dinnerCuisine || '?'}`,
+      limit: `${rules.hard.lunchCuisine}/non-${rules.hard.lunchCuisine}`,
+      message: `${dateKey} is ${lunchCuisine || '?'} lunch + ${dinnerCuisine || '?'} dinner; needs ${rules.hard.lunchCuisine} lunch + non-${rules.hard.lunchCuisine} dinner`
+    }));
+  }
+
   const protein = day.totals?.protein ?? meals.reduce((sum, meal) => sum + getMealProtein(meal), 0);
   if (protein < rules.hard.dailyProteinSanityFloor) {
     found.push(violation({
@@ -149,44 +173,62 @@ const collectDayViolations = ({ day, rules, preferences }) => {
   return found;
 };
 
-const collectWeekViolations = ({ days, rules, lockedDays, summary }) => {
+const collectWeekViolations = ({ days, rules, lockedDays, summary, pinnedDish = null }) => {
   const found = [];
   const dayCount = days.length;
 
-  // Weekly repetition ceilings, counted against the week being generated plus
-  // any locked days inside the same week.
-  const breakfastUse = {};
-  const lunchDinnerUse = {};
+  // R1 — every dish at most once a week, one optional pinned dish up to 3.
+  // One counter across all three slots, not one per slot: a dish eaten at
+  // lunch on Monday and at dinner on Thursday is a repeat to the person
+  // eating it, which the old split breakfast/lunch-dinner ceilings could not
+  // express. See docs/QUALITY_RUBRIC.md R1.
+  const dishUse = {};
+  let eggBreakfasts = 0;
   const tally = (day) => {
-    const breakfastName = getMealName(day?.breakfast);
-    if (breakfastName) breakfastUse[breakfastName] = (breakfastUse[breakfastName] || 0) + 1;
-    for (const slot of ['lunch', 'dinner']) {
+    for (const slot of CORE_SLOTS) {
       const name = getMealName(day?.[slot]);
-      if (name) lunchDinnerUse[name] = (lunchDinnerUse[name] || 0) + 1;
+      if (name) dishUse[name] = (dishUse[name] || 0) + 1;
+    }
+    if (day?.breakfast && rules.hard.eggAnchorIngredients.includes(day.breakfast.primary_ingredient)) {
+      eggBreakfasts += 1;
     }
   };
   days.forEach(tally);
   Object.values(lockedDays || {}).forEach(tally);
 
-  for (const [name, count] of Object.entries(breakfastUse)) {
-    if (count > rules.hard.maxBreakfastRepeatsPerWeek) {
+  for (const [name, count] of Object.entries(dishUse)) {
+    const isPinned = pinnedDish && name === pinnedDish;
+    const limit = isPinned ? rules.hard.pinnedDishMaxPerWeek : rules.hard.maxDishRepeatsPerWeek;
+    if (count > limit) {
       found.push(violation({
-        code: 'breakfast_repeat_exceeded',
+        code: 'dish_repeat_exceeded',
         actual: count,
-        limit: rules.hard.maxBreakfastRepeatsPerWeek,
-        message: `${name} is used ${count} times at breakfast (max ${rules.hard.maxBreakfastRepeatsPerWeek})`
+        limit,
+        message: `${name} is used ${count} times this week (max ${limit}${isPinned ? ', pinned' : ''})`
       }));
     }
   }
-  for (const [name, count] of Object.entries(lunchDinnerUse)) {
-    if (count > rules.hard.maxLunchDinnerRepeatsPerWeek) {
-      found.push(violation({
-        code: 'lunch_dinner_repeat_exceeded',
-        actual: count,
-        limit: rules.hard.maxLunchDinnerRepeatsPerWeek,
-        message: `${name} is used ${count} times at lunch/dinner (max ${rules.hard.maxLunchDinnerRepeatsPerWeek})`
-      }));
-    }
+
+  // R2 — egg-anchored breakfasts, a floor as well as a ceiling. The floor
+  // pro-rates for partial runs exactly as the Tier-2 budgets do.
+  // Pro-rated on `dayCount` (the days under validation), matching how the
+  // weekly protein floor and the Tier-2 budgets below already scale.
+  const eggFloor = eggBreakfastsFloor(dayCount, rules);
+  if (eggBreakfasts < eggFloor) {
+    found.push(violation({
+      code: 'egg_breakfasts_below_floor',
+      actual: eggBreakfasts,
+      limit: eggFloor,
+      message: `${eggBreakfasts} egg-anchored breakfasts across ${dayCount} days (min ${eggFloor})`
+    }));
+  }
+  if (eggBreakfasts > rules.hard.eggBreakfastsMax) {
+    found.push(violation({
+      code: 'egg_breakfasts_above_ceiling',
+      actual: eggBreakfasts,
+      limit: rules.hard.eggBreakfastsMax,
+      message: `${eggBreakfasts} egg-anchored breakfasts (max ${rules.hard.eggBreakfastsMax})`
+    }));
   }
 
   // annotateDay computes each day's order-independent dish set and its
@@ -296,13 +338,13 @@ const collectWeekViolations = ({ days, rules, lockedDays, summary }) => {
  *             hardViolations: Array, budgetViolations: Array,
  *             invalidDateKeys: string[] }}
  */
-export const validateWeek = ({ days = [], rules, preferences = {}, lockedDays = {} }) => {
+export const validateWeek = ({ days = [], rules, preferences = {}, lockedDays = {}, pinnedDish = null }) => {
   const annotated = days.map((day) => (day.totals ? day : { ...annotateDay(day, rules), dateKey: day.dateKey }));
   const summary = summariseWeek(annotated, rules);
 
   const violations = [
     ...annotated.flatMap((day) => collectDayViolations({ day, rules, preferences })),
-    ...collectWeekViolations({ days: annotated, rules, lockedDays, summary })
+    ...collectWeekViolations({ days: annotated, rules, lockedDays, summary, pinnedDish })
   ];
 
   const hardViolations = violations.filter((v) => v.tier === TIER.HARD);

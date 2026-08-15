@@ -95,22 +95,32 @@ test('AC7: the generated week passes the validator outright', () => {
   assert.equal(result.valid, true, formatViolations(result.violations));
 });
 
-test('the three highest-protein dishes are reachable at dinner again', () => {
+test('the three highest-protein dishes are still reachable, none excluded by weight', () => {
   // The old hard taper barred every `Heavy` meal from dinner, removing the
   // catalog's 61g, 56g and 46g dishes from the goal that needs them most.
+  // R3 has since made the slot depend on cuisine rather than weight: the two
+  // chicken-curry dishes are Indian, so they are now lunch-only — not because
+  // they are heavy, which is what this test exists to check, but because
+  // every dinner must be non-Indian. The salmon dish is continental and so
+  // still reaches dinner.
   const { dayCandidates } = generate();
-  const heavyDinners = new Set(
+  const heavyAt = (slot) => new Set(
     dayCandidates
-      .filter((day) => String(day.dinner.meal_weight) === 'Heavy')
-      .map((day) => day.dinner.canonical_name)
+      .filter((day) => String(day[slot].meal_weight) === 'Heavy')
+      .map((day) => day[slot].canonical_name)
   );
+  const heavyLunches = heavyAt('lunch');
+  const heavyDinners = heavyAt('dinner');
 
-  assert.ok(heavyDinners.has('Chicken curry + jowar roti + dal'), '61g dish must be reachable at dinner');
-  assert.ok(heavyDinners.has('Chicken curry + jowar roti'), '56g dish must be reachable at dinner');
+  assert.ok(heavyLunches.has('Chicken curry + jowar roti + dal'), '61g dish must be reachable at lunch');
+  assert.ok(heavyLunches.has('Chicken curry + jowar roti'), '56g dish must be reachable at lunch');
   assert.ok(
     heavyDinners.has('Grilled salmon fillet + sauteed veg + spaghetti aglio e olio'),
     '46g dish must be reachable at dinner'
   );
+
+  // The point of the original test: weight alone excludes nothing from dinner.
+  assert.ok(heavyDinners.size > 0, 'Heavy dishes must still reach dinner');
 });
 
 test('tapering still shapes the result: dinner is rarely the biggest meal of the day', () => {

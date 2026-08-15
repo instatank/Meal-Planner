@@ -14,7 +14,7 @@ import { getRules } from '../src/lib/rules.js';
 
 const DATES = ['2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09'];
 
-const meal = ({ name, p, c = 20, f = 10, cal, cuisine = 'continental', weight = 'Medium', family = 'vegetarian', fibre = true }) => ({
+const meal = ({ name, p, c = 20, f = 10, cal, cuisine = 'continental', weight = 'Medium', family = 'vegetarian', fibre = true, primaryIngredient = null }) => ({
   name,
   canonical_name: name,
   protein: p,
@@ -23,25 +23,43 @@ const meal = ({ name, p, c = 20, f = 10, cal, cuisine = 'continental', weight = 
   cuisine,
   meal_weight: weight,
   has_fibre: fibre,
-  tags: { protein_family: family }
+  tags: { protein_family: family },
+  primary_ingredient: primaryIngredient
 });
 
+/**
+ * Sized to satisfy the rubric, not just the macro budgets: R1 needs 21
+ * distinct dishes in a week, R2 needs at least 3 egg-anchored breakfasts and
+ * at least 3 that are not, and R3 needs 7 distinct Indian lunches and 7
+ * distinct non-Indian dinners. The previous 4+8 fixture predates all three
+ * and could not produce a legal week at all.
+ */
 const catalog = () => ({
   breakfast: [
-    meal({ name: 'B1', p: 40, c: 30, cal: 520 }),
-    meal({ name: 'B2', p: 38, c: 30, cal: 510, cuisine: 'indian' }),
-    meal({ name: 'B3', p: 36, c: 28, cal: 500, cuisine: 'asian' }),
-    meal({ name: 'B4', p: 34, c: 28, cal: 495 })
+    meal({ name: 'BE1', p: 40, c: 30, cal: 520, primaryIngredient: 'egg_whole' }),
+    meal({ name: 'BE2', p: 39, c: 30, cal: 515, primaryIngredient: 'egg_whole' }),
+    meal({ name: 'BE3', p: 38, c: 29, cal: 510, primaryIngredient: 'egg_white' }),
+    meal({ name: 'B4', p: 38, c: 30, cal: 510, cuisine: 'indian' }),
+    meal({ name: 'B5', p: 37, c: 29, cal: 505, cuisine: 'asian' }),
+    meal({ name: 'B6', p: 36, c: 28, cal: 500 }),
+    meal({ name: 'B7', p: 35, c: 28, cal: 495 }),
+    meal({ name: 'B8', p: 34, c: 28, cal: 490 })
   ],
   lunchDinner: [
-    meal({ name: 'L1', p: 48, c: 35, cal: 600, family: 'chicken' }),
-    meal({ name: 'L2', p: 47, c: 35, cal: 590, cuisine: 'indian', family: 'fish' }),
-    meal({ name: 'L3', p: 46, c: 34, cal: 585, cuisine: 'asian' }),
-    meal({ name: 'L4', p: 45, c: 34, cal: 580, family: 'chicken' }),
-    meal({ name: 'L5', p: 44, c: 33, cal: 575, cuisine: 'indian' }),
-    meal({ name: 'L6', p: 43, c: 33, cal: 570, cuisine: 'asian', family: 'fish' }),
-    meal({ name: 'L7', p: 42, c: 32, cal: 565 }),
-    meal({ name: 'L8', p: 41, c: 32, cal: 560, cuisine: 'indian' })
+    meal({ name: 'LI1', p: 48, c: 35, cal: 600, cuisine: 'indian', family: 'chicken' }),
+    meal({ name: 'LI2', p: 47, c: 35, cal: 595, cuisine: 'indian', family: 'fish' }),
+    meal({ name: 'LI3', p: 46, c: 34, cal: 590, cuisine: 'indian' }),
+    meal({ name: 'LI4', p: 45, c: 34, cal: 585, cuisine: 'indian' }),
+    meal({ name: 'LI5', p: 44, c: 33, cal: 580, cuisine: 'indian', family: 'chicken' }),
+    meal({ name: 'LI6', p: 43, c: 33, cal: 575, cuisine: 'indian' }),
+    meal({ name: 'LI7', p: 42, c: 32, cal: 570, cuisine: 'indian' }),
+    meal({ name: 'DN1', p: 48, c: 35, cal: 600, family: 'chicken' }),
+    meal({ name: 'DN2', p: 47, c: 35, cal: 595, cuisine: 'asian', family: 'fish' }),
+    meal({ name: 'DN3', p: 46, c: 34, cal: 590, cuisine: 'asian' }),
+    meal({ name: 'DN4', p: 45, c: 34, cal: 585 }),
+    meal({ name: 'DN5', p: 44, c: 33, cal: 580, family: 'chicken' }),
+    meal({ name: 'DN6', p: 43, c: 33, cal: 575, cuisine: 'asian' }),
+    meal({ name: 'DN7', p: 42, c: 32, cal: 570 })
   ],
   snack: []
 });
@@ -96,52 +114,105 @@ test('a day under the 50g sanity floor is a Tier-1 violation, but a 70g day is n
   const database = catalog();
   const days = validWeek(database, ruleset);
 
-  const tiny = { name: 'Tiny', canonical_name: 'Tiny', protein: 10, cal: 120, macros: { p: 10, c: 5, f: 3 }, cuisine: 'x', tags: { protein_family: 'vegetarian' } };
+  const tiny = { name: 'Tiny', canonical_name: 'Tiny', protein: 10, cal: 120, macros: { p: 10, c: 5, f: 3 }, cuisine: 'indian', tags: { protein_family: 'vegetarian' } };
   const belowFloor = [...days];
-  belowFloor[0] = { dateKey: days[0].dateKey, breakfast: tiny, lunch: tiny, dinner: tiny };
+  belowFloor[0] = {
+    dateKey: days[0].dateKey,
+    breakfast: tiny,
+    lunch: tiny,
+    dinner: { ...tiny, name: 'Tiny D', canonical_name: 'Tiny D', cuisine: 'continental' }
+  };
   assert.ok(
     validateWeek({ days: belowFloor, rules: ruleset }).violations.some((v) => v.code === 'day_below_sanity_floor')
   );
 
   // 70g: off-band but comfortably over the sanity floor. A pass, not a bug.
-  const flex = { name: 'Flex', canonical_name: 'Flex', protein: 24, cal: 300, macros: { p: 24, c: 10, f: 8 }, cuisine: 'x', tags: { protein_family: 'vegetarian' } };
+  // R3-legal on purpose: this test is about the sanity floor, so the day must
+  // not trip any other hard rule and muddy the assertion below.
+  const flex = { name: 'Flex', canonical_name: 'Flex', protein: 24, cal: 300, macros: { p: 24, c: 10, f: 8 }, cuisine: 'indian', tags: { protein_family: 'vegetarian' } };
   const flexDay = [...days];
   flexDay[0] = {
     dateKey: days[0].dateKey,
     breakfast: { ...flex, name: 'Flex B', canonical_name: 'Flex B', protein: 22 },
     lunch: { ...flex, name: 'Flex L', canonical_name: 'Flex L' },
-    dinner: { ...flex, name: 'Flex D', canonical_name: 'Flex D' }
+    dinner: { ...flex, name: 'Flex D', canonical_name: 'Flex D', cuisine: 'continental' }
   };
   const result = validateWeek({ days: flexDay, rules: ruleset });
   assert.ok(!result.violations.some((v) => v.code === 'day_below_sanity_floor'));
   assert.ok(!result.hardViolations.some((v) => v.dateKey === days[0].dateKey));
 });
 
-test('weekly repetition ceilings are validated against the generated week plus locked days', () => {
+test('R1 is validated against the generated week plus locked days', () => {
   const ruleset = rules();
   const database = catalog();
   const days = validWeek(database, ruleset);
 
-  // Force L1 into three lunch slots — one over the ceiling of 2.
-  for (const index of [0, 1, 2]) {
+  // Force one Indian dish into two lunch slots — one over R1's ceiling of 1.
+  for (const index of [0, 1]) {
     days[index] = { ...days[index], lunch: database.lunchDinner[0], totals: undefined };
   }
   const result = validateWeek({ days, rules: ruleset });
-  const found = result.violations.find((v) => v.code === 'lunch_dinner_repeat_exceeded');
+  const found = result.violations.find((v) => v.code === 'dish_repeat_exceeded');
   assert.ok(found, formatViolations(result.violations));
-  assert.equal(found.limit, 2);
+  assert.equal(found.limit, 1);
 
-  // A locked day pushes an otherwise-legal week over the same ceiling.
+  // A locked day pushes an otherwise-legal week over the same ceiling: every
+  // dish in a clean week is already used once, so re-using any of them costs.
   const clean = validWeek(database, ruleset);
-  const usedTwice = clean.map((day) => day.mealNames[1]).find(
-    (name, _i, all) => all.filter((n) => n === name).length === 2
-  );
-  if (usedTwice) {
-    const locked = { '2026-08-02': { breakfast: database.breakfast[0], lunch: database.lunchDinner.find((m) => m.name === usedTwice), dinner: database.lunchDinner[7] } };
-    const lockedResult = validateWeek({ days: clean, rules: ruleset, lockedDays: locked });
-    assert.ok(lockedResult.violations.some((v) => v.code === 'lunch_dinner_repeat_exceeded'));
-  }
+  const locked = {
+    '2026-08-02': {
+      breakfast: database.breakfast[0],
+      lunch: clean[0].lunch,
+      dinner: clean[0].dinner
+    }
+  };
+  const lockedResult = validateWeek({ days: clean, rules: ruleset, lockedDays: locked });
+  assert.ok(lockedResult.violations.some((v) => v.code === 'dish_repeat_exceeded'));
 });
+
+test('R1 lets the pinned dish through at its higher allowance', () => {
+  const ruleset = rules();
+  const database = catalog();
+  const days = validWeek(database, ruleset);
+
+  // Same forced repeat as above, but declared as the pin.
+  for (const index of [0, 1]) {
+    days[index] = { ...days[index], lunch: database.lunchDinner[0], totals: undefined };
+  }
+  const pinned = database.lunchDinner[0].name;
+  const result = validateWeek({ days, rules: ruleset, pinnedDish: pinned });
+  assert.ok(
+    !result.violations.some((v) => v.code === 'dish_repeat_exceeded' && v.message.startsWith(pinned)),
+    formatViolations(result.violations)
+  );
+});
+
+test('R2 and R3 are hard gates, so a Phase-2 recombination cannot slip past', () => {
+  const ruleset = rules();
+  const database = catalog();
+
+  // R3: an Indian dinner is a day-level violation whatever else is right.
+  const wrongWay = validWeek(database, ruleset);
+  wrongWay[0] = { ...wrongWay[0], dinner: database.lunchDinner[1], totals: undefined };
+  assert.ok(
+    validateWeek({ days: wrongWay, rules: ruleset }).violations
+      .some((v) => v.code === 'cuisine_direction_wrong'),
+    'an Indian dinner must be caught'
+  );
+
+  // R2: swap every egg breakfast out and the week falls under the floor.
+  const noEggs = validWeek(database, ruleset).map((day) => ({
+    ...day,
+    breakfast: database.breakfast[7],
+    totals: undefined
+  }));
+  assert.ok(
+    validateWeek({ days: noEggs, rules: ruleset }).violations
+      .some((v) => v.code === 'egg_breakfasts_below_floor'),
+    'a week with no egg breakfasts must be caught'
+  );
+});
+
 
 test('the red-meat cap and the weekly protein floor are validated', () => {
   const ruleset = rules();
@@ -211,15 +282,15 @@ test('meal names resolve by canonical name, and a near-miss is reported not swal
   const database = catalog();
   const { days, violations } = resolveWeek({
     days: [
-      { dateKey: '2026-08-03', breakfast: 'B1', lunch: 'L1', dinner: 'L2' },
-      { dateKey: '2026-08-04', breakfast: 'B2', lunch: 'Chicken Curry (invented)', dinner: 'L3' }
+      { dateKey: '2026-08-03', breakfast: 'BE1', lunch: 'LI1', dinner: 'DN1' },
+      { dateKey: '2026-08-04', breakfast: 'BE2', lunch: 'Chicken Curry (invented)', dinner: 'DN2' }
     ],
     mealDatabase: database,
     rules: ruleset
   });
 
-  assert.equal(days[0].breakfast.name, 'B1');
-  assert.equal(days[0].lunch.name, 'L1');
+  assert.equal(days[0].breakfast.name, 'BE1');
+  assert.equal(days[0].lunch.name, 'LI1');
   assert.equal(violations.length, 1);
   assert.equal(violations[0].code, 'unresolved_meal');
   assert.equal(violations[0].slot, 'lunch');
@@ -291,16 +362,18 @@ test('repair rebuilds the whole week when only weekly budgets are blown', () => 
 test('repair reports catalog infeasibility rather than writing a bad week quietly', () => {
   const ruleset = rules();
   // A catalog that physically cannot reach the weekly protein floor.
+  // R3-legal (an Indian lunch pool and a non-Indian dinner pool) so the week
+  // fails for the reason under test — protein — and not for want of a day.
   const thin = {
-    breakfast: [meal({ name: 'B', p: 20, c: 10, cal: 200 })],
+    breakfast: [meal({ name: 'B', p: 20, c: 10, cal: 200, primaryIngredient: 'egg_whole' })],
     lunchDinner: [
-      meal({ name: 'L1', p: 20, c: 10, cal: 240 }),
-      meal({ name: 'L2', p: 20, c: 10, cal: 240 }),
-      meal({ name: 'L3', p: 20, c: 10, cal: 240 }),
-      meal({ name: 'L4', p: 20, c: 10, cal: 240 }),
-      meal({ name: 'L5', p: 20, c: 10, cal: 240 }),
-      meal({ name: 'L6', p: 20, c: 10, cal: 240 }),
-      meal({ name: 'L7', p: 20, c: 10, cal: 240 })
+      meal({ name: 'LI1', p: 20, c: 10, cal: 240, cuisine: 'indian' }),
+      meal({ name: 'LI2', p: 20, c: 10, cal: 240, cuisine: 'indian' }),
+      meal({ name: 'LI3', p: 20, c: 10, cal: 240, cuisine: 'indian' }),
+      meal({ name: 'DN1', p: 20, c: 10, cal: 240 }),
+      meal({ name: 'DN2', p: 20, c: 10, cal: 240 }),
+      meal({ name: 'DN3', p: 20, c: 10, cal: 240 }),
+      meal({ name: 'DN4', p: 20, c: 10, cal: 240 })
     ],
     snack: []
   };

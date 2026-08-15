@@ -197,6 +197,33 @@ export const anchorFamilyMaxPerWeek = (family, rules) => {
 const WEEK_DAYS = 7;
 const MAX_MISS_DAYS_PER_WEEK = 2;
 
+// ─── The quality rubric (docs/QUALITY_RUBRIC.md) ────────────────────────────
+//
+// R1–R3 are enforced during generation (planOptimizer), re-checked as hard
+// gates after it (planValidator), and scored after the fact (planScorer). Three
+// consumers, so the numbers live here — the one place this repo keeps
+// thresholds — rather than being restated in each. `planScorer.RUBRIC` reads
+// them from here for exactly that reason; its *penalties* (−15/−10/−5) stay
+// with the scorer, since nothing else has any use for them.
+//
+// These are goal-independent: the rubric describes what a good week looks like
+// to this user, not what a protein target implies. Each goal spreads them into
+// its own `hard` block so consumers keep reading `rules.hard.*` uniformly.
+
+export const RUBRIC_LIMITS = Object.freeze({
+  // R1 — every dish at most once a week, except one optional pinned dish.
+  maxDishRepeatsPerWeek: 1,
+  pinnedDishMaxPerWeek: 3,
+  // R2 — egg-anchored breakfasts, a floor as well as a ceiling.
+  eggBreakfastsMin: 3,
+  eggBreakfastsMax: 4,
+  // Anchor ingredients that make a breakfast "an egg breakfast". Matches on
+  // the anchor, not the name, so `egg_noodles` at dinner can never count.
+  eggAnchorIngredients: Object.freeze(['egg_whole', 'egg_white', 'egg_yolk']),
+  // R3 — the only free pattern is Indian lunch + non-Indian dinner.
+  lunchCuisine: 'indian'
+});
+
 const GOAL_DEFINITIONS = {
   [GOAL.HIGH_PROTEIN]: {
     label: 'High protein',
@@ -205,8 +232,10 @@ const GOAL_DEFINITIONS = {
       minMealProtein: 20,
       dailyProteinSanityFloor: 50,
       maxSameMealPerDay: 1,
-      maxBreakfastRepeatsPerWeek: 4,
-      maxLunchDinnerRepeatsPerWeek: 2,
+      // R1 replaces the old per-slot repeat caps (breakfast 4, lunch/dinner 2).
+      // Those were what let a week carry four different rajma dinners and two
+      // identical lunches while breaking no rule.
+      ...RUBRIC_LIMITS,
       // Counts the *anchor ingredient*, not the meal name. Name-based repeat
       // caps let `Rajma chawal + raita` and `Rajma + paneer bowl` each appear
       // twice — four rajma dinners in one week, all individually legal.
@@ -243,6 +272,12 @@ const GOAL_DEFINITIONS = {
       // share of the day's calories we would like dinner to stay under.
       dinnerCalorieShareTarget: 0.40,
       dinnerTaperPenalty: 14,
+      // R4 — lunch and dinner both flatbread/pasta. Scored, never a gate: it
+      // genuinely conflicts with the macro budgets (18 of 28 Indian lunches
+      // are flatbread), so a hard rule here would trade a -5 for an
+      // out-of-band day. Weighted just above the taper so the beam gives it up
+      // only when a budget is at stake.
+      bothFlatbreadPastaPenalty: 16,
       distinctMealBonus: 6,
       repeatUsePenalty: 5,
       lunchDinnerCuisineClashPenalty: 3,
@@ -263,8 +298,7 @@ const GOAL_DEFINITIONS = {
       minMealProtein: 12,
       dailyProteinSanityFloor: 40,
       maxSameMealPerDay: 1,
-      maxBreakfastRepeatsPerWeek: 3,
-      maxLunchDinnerRepeatsPerWeek: 2,
+      ...RUBRIC_LIMITS,
       maxSamePrimaryIngredientPerWeek: 2,
       anchorFamilyMaxPerWeek: buildAnchorFamilyCaps(4),
       redMeatMealsPerWeek: 4,
@@ -287,6 +321,7 @@ const GOAL_DEFINITIONS = {
       calorieOutOfBoundsPenalty: 0.02,
       dinnerCalorieShareTarget: 0.40,
       dinnerTaperPenalty: 8,
+      bothFlatbreadPastaPenalty: 16,
       // `standard`'s stated priority is maximum catalog coverage.
       distinctMealBonus: 10,
       repeatUsePenalty: 8,
@@ -360,6 +395,22 @@ export const requiredCompliantDays = (dayCount, rules) => {
 };
 
 /** The weekly protein floor in grams for a run of `dayCount` days. */
+/**
+ * R2's floor, pro-rated for partial-week runs exactly as `allowedMissDays`
+ * pro-rates the Tier-2 budgets. A 4-day remainder is owed 1 egg breakfast, not
+ * the full week's 3 — asking 3 of 4 days would be a stricter rule than the one
+ * a whole week is judged by.
+ *
+ * The *ceiling* is deliberately not pro-rated: `seedWeekState` counts the egg
+ * breakfasts already sitting in locked days, so it is genuinely a weekly
+ * count and stays at `eggBreakfastsMax`.
+ */
+export const eggBreakfastsFloor = (dayCount, rules) => {
+  const days = Math.max(0, Math.floor(asFiniteNumber(dayCount, 0)));
+  const perWeek = asFiniteNumber(rules?.hard?.eggBreakfastsMin, RUBRIC_LIMITS.eggBreakfastsMin);
+  return Math.floor((days * perWeek) / WEEK_DAYS);
+};
+
 export const weeklyProteinFloor = (dayCount, rules) => {
   const days = Math.max(0, Math.floor(asFiniteNumber(dayCount, 0)));
   const target = asFiniteNumber(rules?.dailyProteinTarget, 0);

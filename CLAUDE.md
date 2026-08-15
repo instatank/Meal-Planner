@@ -55,9 +55,47 @@ Rules live in **`src/lib/rules.js` and nowhere else**, split into three tiers.
 
 | Tier | Meaning | Examples |
 | --- | --- | --- |
-| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, weekly repeat ceilings (breakfast ≤4, lunch/dinner ≤2), **anchor-ingredient cap (≤2/wk at lunch/dinner)**, **no two identical days in a week**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 85% of nominal (**714g** at the 120g target), 50g/day sanity floor |
-| **2 — Budgeted** | Allowed to break on ≤2 of 7 days | daily protein band (**108–132g**), carb cap (130g), calorie bounds (1600–2200), **cuisine balance — exactly one Indian across lunch+dinner** |
-| **3 — Scored** | Never rejects; only ranks | variety, cuisine diversity, protein-family diversity, fibre, dinner calorie tapering, user preferences, anti-greedy |
+| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, **R1 — every dish at most once a week (one optional pinned dish up to 3)**, **R2 — 3–4 egg-anchored breakfasts**, **R3 — Indian lunch + non-Indian dinner, directional**, **anchor-ingredient cap (≤2/wk at lunch/dinner)**, **no two identical days in a week**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 85% of nominal (**714g** at the 120g target), 50g/day sanity floor |
+| **2 — Budgeted** | Allowed to break on ≤2 of 7 days | daily protein band (**108–132g**), carb cap (130g), calorie bounds (1600–2200) |
+| **3 — Scored** | Never rejects; only ranks | **R4 — lunch and dinner both flatbread/pasta**, variety, cuisine diversity, protein-family diversity, fibre, dinner calorie tapering, user preferences, anti-greedy |
+
+### The quality rubric is enforced, not just scored
+
+`docs/QUALITY_RUBRIC.md` R1–R3 are **hard rules inside the optimizer**, applied
+where each is cheapest to enforce:
+
+- **R1** (no dish repeats, one optional pin up to 3) is a week-level counter in
+  `canPlaceDay`. One counter across all three slots, not one per slot — a dish
+  at lunch on Monday and at dinner on Thursday is a repeat. It **replaced** the
+  old per-slot ceilings (breakfast ≤4, lunch/dinner ≤2), which is why a week is
+  now 21 distinct dishes.
+- **R2** (3–4 egg-anchored breakfasts) needs both a ceiling and a floor. The
+  ceiling prunes in `canPlaceDay`; the floor cannot, because a partial week
+  being short on eggs is not yet a violation — so the beam carries a look-ahead
+  in the same shape as the weekly protein floor, and `eggBreakfastsFloor`
+  pro-rates it for partial runs.
+- **R3** (Indian lunch + non-Indian dinner) is applied at **enumeration**,
+  because it is a property of a single day. Nothing illegal is ever built,
+  scored or shortlisted, and the candidate pool drops ~76% (99,900 → 23,688),
+  which more than pays for R1/R2's extra bookkeeping — the optimizer got
+  *faster*, ~1.0–1.25s → ~780ms.
+- **R4** (lunch and dinner both flatbread/pasta) is **scored, never gated**, by
+  founder instruction and because it genuinely conflicts with the macro
+  budgets: 18 of the 28 Indian lunches R3 forces are flatbread, so gating it
+  would regularly trade a −5 for an out-of-band day.
+
+All three hard rules are **re-checked in `planValidator.js`**. That is not
+belt-and-braces: Phase 2 hands the model flat per-slot shortlists that have
+thrown the week structure away, so without the validator check a recombination
+could pair a continental lunch with an Indian dinner and nothing downstream
+would notice.
+
+If the search runs out of candidates it returns a `bestEffort` week flagged
+`feasible: false` and `constraintsRelaxed`, carrying a `diagnostics` block
+naming the pool that ran dry (distinct Indian lunches, non-Indian dinners, egg
+breakfasts). That path can emit a week breaking R1–R3 — it exists so the
+validator has something to report on — so **never persist a week without
+running `validateWeek` first**.
 
 **The anchor-ingredient cap** counts the ingredient a meal is *about* (highest protein contributor, derived from `parts[]` by `derivePrimaryIngredient`), not the meal name. Name-based caps let `Rajma chawal + raita` and `Rajma + paneer bowl` each appear twice — four rajma dinners in a week, every one legal.
 

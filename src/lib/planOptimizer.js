@@ -27,6 +27,7 @@ import {
   PROTEIN_BALANCE_MAX_GAP,
   anchorFamilyMaxPerWeek,
   anchorFamilyOf,
+  eggBreakfastsFloor,
   requiredCompliantDays,
   weeklyProteinFloor
 } from './rules.js';
@@ -245,6 +246,12 @@ export const satisfiesDayHardConstraints = (day, { rules, preferences = {} }) =>
  *
  * Exhaustive by design. For the 41-meal catalog this is a few thousand
  * combinations and takes single-digit milliseconds.
+ *
+ * R3 (Indian lunch + non-Indian dinner) is applied here rather than in the
+ * week search, because it is a property of a single day: enforcing it at
+ * enumeration means no illegal day is ever built, scored or shortlisted, and
+ * it cuts the pool by ~76% (99,900 → 23,688 at the current catalog), which
+ * pays for the rest of the rubric's extra week-level bookkeeping.
  */
 /**
  * The "no meal twice in a day" cap, for the three names of one day.
@@ -272,7 +279,7 @@ export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {} })
   // left that genuinely varies per combination is the same-meal cap and the
   // protein sanity floor, checked inline below. The rejected combinations no
   // longer allocate a day object on their way to being discarded.
-  const { maxSameMealPerDay, dailyProteinSanityFloor } = rules.hard;
+  const { maxSameMealPerDay, dailyProteinSanityFloor, lunchCuisine } = rules.hard;
   const lunchDinnerFacts = lunchDinners.map(mealFacts);
   const days = [];
 
@@ -286,8 +293,13 @@ export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {} })
       const pairFat = b.fat + l.fat;
       const pairCalories = b.calories + l.calories;
 
+      // R3 is a property of the lunch alone at this level, so a non-Indian
+      // lunch kills the whole dinner loop rather than each dinner in turn.
+      if (l.cuisine !== lunchCuisine) continue;
+
       for (let dinnerIndex = 0; dinnerIndex < lunchDinners.length; dinnerIndex += 1) {
         const d = lunchDinnerFacts[dinnerIndex];
+        if (d.cuisine === lunchCuisine) continue;
         if (!withinSameMealCap(b.name, l.name, d.name, maxSameMealPerDay)) continue;
 
         const protein = pairProtein + d.protein;
@@ -346,11 +358,14 @@ export const annotateDay = (day, rules, totals = null) => {
     proteinInBand: resolvedTotals.protein >= dailyProteinMin && resolvedTotals.protein <= dailyProteinMax,
     underCarbCap: resolvedTotals.carbs <= dailyCarbCap,
     inCalorieBounds: resolvedTotals.calories >= dailyCalorieMin && resolvedTotals.calories <= dailyCalorieMax,
-    // Exactly one of lunch/dinner Indian. Two Indian meals in a day reads as
-    // repetitive in an Indian household; two international ones read as a day
-    // with no home cooking. Budgeted rather than hard, so ~5 days of 7 balance.
-    cuisineBalanced:
-      [lunch.cuisine, dinner.cuisine].filter((c) => c === 'indian').length === 1
+    // R2 — does this day's breakfast spend one of the week's 3–4 egg slots?
+    // Computed here so the beam reads a flag rather than re-deriving the
+    // anchor for every (node, candidate) pair.
+    isEggBreakfast: rules.hard.eggAnchorIngredients.includes(breakfast.primaryIngredient),
+    // R4 — both lunch and dinner built on flatbread/pasta. Scored in
+    // `scoreDayStandalone`, reported here so a caller can count the days.
+    bothFlatbreadPasta:
+      day.lunch?.carb_type === 'flatbread_pasta' && day.dinner?.carb_type === 'flatbread_pasta'
   };
 };
 
@@ -394,6 +409,14 @@ export const scoreDayStandalone = (day, { rules, preferences = {} }) => {
     if (dinnerShare > w.dinnerCalorieShareTarget) {
       score -= (dinnerShare - w.dinnerCalorieShareTarget) * w.dinnerTaperPenalty * 10;
     }
+  }
+
+  // R4 — lunch and dinner both flatbread/pasta. Scored, not gated, on purpose:
+  // 18 of the 28 Indian lunches R3 forces are flatbread, so gating this would
+  // regularly leave no legal day at all. As a penalty the beam avoids it
+  // wherever the macro budgets leave room and eats the -5 where they do not.
+  if (day.lunch?.carb_type === 'flatbread_pasta' && day.dinner?.carb_type === 'flatbread_pasta') {
+    score -= w.bothFlatbreadPastaPenalty;
   }
 
   // One pass over the day's three meals, accumulating every count the rest of
@@ -530,11 +553,19 @@ const CANDIDATES_PER_BUDGET_CLASS = 150;
 const BUDGETS = [
   { flag: 'proteinInBand', counter: 'inBand' },
   { flag: 'underCarbCap', counter: 'underCarb' },
-  { flag: 'inCalorieBounds', counter: 'inCalorieBounds' },
-  { flag: 'cuisineBalanced', counter: 'cuisineBalanced' }
+  { flag: 'inCalorieBounds', counter: 'inCalorieBounds' }
 ];
 
-const DEFAULT_MAX_CANDIDATES = (2 ** BUDGETS.length) * CANDIDATES_PER_BUDGET_CLASS;
+// Cuisine balance used to be a fourth budget here. R3 replaced it: it is now a
+// hard per-day rule applied at enumeration, so every candidate satisfies it by
+// construction and a budget counter for it would only ever read 7 of 7.
+//
+// Dropping it would have halved the pool (2^4 → 2^3 classes), which is the
+// wrong direction now that R1 needs 21 *distinct* dishes in a week. The class
+// count is held at its previous value so the beam keeps the same breadth to
+// draw distinct days from.
+const CANDIDATE_BUDGET_CLASSES = 2 ** (BUDGETS.length + 1);
+const DEFAULT_MAX_CANDIDATES = CANDIDATE_BUDGET_CLASSES * CANDIDATES_PER_BUDGET_CLASS;
 
 /**
  * Reduce the candidate pool to `maxCandidates`, keeping the best of each
@@ -543,10 +574,9 @@ const DEFAULT_MAX_CANDIDATES = (2 ** BUDGETS.length) * CANDIDATES_PER_BUDGET_CLA
 const trimCandidatePool = (sortedCandidates, maxCandidates) => {
   if (sortedCandidates.length <= maxCandidates) return sortedCandidates;
 
-  // One class per combination of the BUDGETS flags — 2^4 now that cuisine
-  // balance is budgeted. Keeping the divisor in step with BUDGETS.length
-  // matters: strata the trim does not know about get squeezed out, which is
-  // exactly how a rare-but-required day disappears before the search sees it.
+  // One class per combination of the BUDGETS flags. Strata the trim does not
+  // know about get squeezed out, which is exactly how a rare-but-required day
+  // disappears before the search ever sees it.
   const perClass = Math.ceil(maxCandidates / (2 ** BUDGETS.length));
   const classCounts = new Map();
   const kept = [];
@@ -570,10 +600,20 @@ const trimCandidatePool = (sortedCandidates, maxCandidates) => {
   return kept.slice(0, maxCandidates);
 };
 
-const usageCap = (slot, rules) =>
-  slot === 'breakfast' ? rules.hard.maxBreakfastRepeatsPerWeek : rules.hard.maxLunchDinnerRepeatsPerWeek;
+/**
+ * R1 — how many times this dish may appear in the week.
+ *
+ * One counter for the whole week, not one per slot: the rubric says "every
+ * dish appears at most once per week, applies to all three slots", so a dish
+ * eaten at lunch on Monday and at dinner on Thursday is a repeat. The old
+ * split namespaces (breakfast 4, lunch/dinner 2) could not express that.
+ */
+const dishCap = (name, rules, pinnedDish) =>
+  (pinnedDish && name === pinnedDish ? rules.hard.pinnedDishMaxPerWeek : rules.hard.maxDishRepeatsPerWeek);
 
-const cloneUsage = (usage) => ({ breakfast: { ...usage.breakfast }, lunchDinner: { ...usage.lunchDinner } });
+/** Is this breakfast anchored on an egg, for R2? */
+const isEggBreakfast = (meal, rules) =>
+  rules.hard.eggAnchorIngredients.includes(mealFacts(meal).primaryIngredient);
 
 /**
  * Seed the week-level counters from days that are already fixed — locked days
@@ -581,17 +621,18 @@ const cloneUsage = (usage) => ({ breakfast: { ...usage.breakfast }, lunchDinner:
  * against the week being produced, which the old filter never did.
  */
 const seedWeekState = (lockedDays, rules) => {
-  const usage = { breakfast: {}, lunchDinner: {} };
+  const usage = {};
   const families = {};
   let redMeat = 0;
+  let eggBreakfasts = 0;
   for (const day of Object.values(lockedDays || {})) {
     if (!day) continue;
-    const breakfastName = getMealName(day.breakfast);
-    if (breakfastName) usage.breakfast[breakfastName] = (usage.breakfast[breakfastName] || 0) + 1;
-    for (const slot of ['lunch', 'dinner']) {
+    // R1 counts one dish across every slot, so locked days seed a single map.
+    for (const slot of CORE_SLOTS) {
       const name = getMealName(day[slot]);
-      if (name) usage.lunchDinner[name] = (usage.lunchDinner[name] || 0) + 1;
+      if (name) usage[name] = (usage[name] || 0) + 1;
     }
+    if (day.breakfast && isEggBreakfast(day.breakfast, rules)) eggBreakfasts += 1;
     // Anchor-family cap counts all three slots — a chicken breakfast spends
     // the same poultry budget a chicken lunch or dinner would.
     for (const slot of CORE_SLOTS) {
@@ -606,19 +647,23 @@ const seedWeekState = (lockedDays, rules) => {
     const dishNames = CORE_SLOTS.map((slot) => getMealName(day[slot])).filter(Boolean);
     if (dishNames.length) dayKeys.add([...dishNames].sort().join('|'));
   }
-  return { usage, families, redMeat, dayKeys, cuisines: new Set(), distinct: new Set() };
+  return { usage, families, redMeat, eggBreakfasts, dayKeys, cuisines: new Set(), distinct: new Set() };
 };
 
-const canPlaceDay = (state, candidate, rules) => {
-  const breakfastName = candidate.mealNames[0];
-  if ((state.usage.breakfast[breakfastName] || 0) + 1 > usageCap('breakfast', rules)) return false;
+const canPlaceDay = (state, candidate, rules, pinnedDish = null) => {
+  // R1 — one week-wide counter per dish. Counted within the candidate day too,
+  // so a day that would place the same dish in two slots spends two of its
+  // allowance rather than one.
+  const pending = {};
+  for (const name of candidate.mealNames) {
+    if (!name) continue;
+    pending[name] = (pending[name] || 0) + 1;
+    if ((state.usage[name] || 0) + pending[name] > dishCap(name, rules, pinnedDish)) return false;
+  }
 
-  const lunchName = candidate.mealNames[1];
-  const dinnerName = candidate.mealNames[2];
-  const cap = usageCap('lunch', rules);
-  if ((state.usage.lunchDinner[lunchName] || 0) + 1 > cap) return false;
-  const dinnerUsed = (state.usage.lunchDinner[dinnerName] || 0) + (dinnerName === lunchName ? 1 : 0);
-  if (dinnerUsed + 1 > cap) return false;
+  // R2 ceiling. The floor cannot be checked here — a partial week is allowed
+  // to be short on eggs — so the beam does that with a look-ahead instead.
+  if (candidate.isEggBreakfast && state.eggBreakfasts + 1 > rules.hard.eggBreakfastsMax) return false;
 
   // Anchor-ingredient-family cap. Counted within the candidate day too, so a
   // day that puts the same family at breakfast, lunch and dinner spends three
@@ -642,10 +687,9 @@ const canPlaceDay = (state, candidate, rules) => {
 };
 
 const applyDay = (state, candidate) => {
-  const usage = cloneUsage(state.usage);
-  usage.breakfast[candidate.mealNames[0]] = (usage.breakfast[candidate.mealNames[0]] || 0) + 1;
-  for (const name of [candidate.mealNames[1], candidate.mealNames[2]]) {
-    usage.lunchDinner[name] = (usage.lunchDinner[name] || 0) + 1;
+  const usage = { ...state.usage };
+  for (const name of candidate.mealNames) {
+    if (name) usage[name] = (usage[name] || 0) + 1;
   }
   const distinct = new Set(state.distinct);
   for (const name of candidate.mealNames) distinct.add(name);
@@ -665,6 +709,7 @@ const applyDay = (state, candidate) => {
     families,
     dayKeys,
     redMeat: state.redMeat + candidate.redMeatCount,
+    eggBreakfasts: state.eggBreakfasts + (candidate.isEggBreakfast ? 1 : 0),
     protein: state.protein + candidate.totals.protein,
     inBand: state.inBand + (candidate.proteinInBand ? 1 : 0),
     underCarb: state.underCarb + (candidate.underCarbCap ? 1 : 0),
@@ -686,6 +731,7 @@ export const selectWeek = ({
   historyMap = {},
   preferences = {},
   lockedDays = {},
+  pinnedDish = null,
   beamWidth = DEFAULT_BEAM_WIDTH,
   maxCandidates = DEFAULT_MAX_CANDIDATES,
   dayCandidates = null,
@@ -707,6 +753,7 @@ export const selectWeek = ({
   const maxDayProtein = pool.reduce((max, day) => Math.max(max, day.totals.protein), 0);
   const proteinFloor = weeklyProteinFloor(dayCount, rules);
   const requiredCompliant = requiredCompliantDays(dayCount, rules);
+  const eggBreakfastsMin = eggBreakfastsFloor(dayCount, rules);
 
   const seed = seedWeekState(lockedDays, rules);
   let beam = [{
@@ -716,8 +763,7 @@ export const selectWeek = ({
       protein: 0,
       inBand: 0,
       underCarb: 0,
-      inCalorieBounds: 0,
-      cuisineBalanced: 0
+      inCalorieBounds: 0
     },
     score: 0
   }];
@@ -737,7 +783,7 @@ export const selectWeek = ({
     for (const node of beam) {
       for (let candidateIndex = 0; candidateIndex < pool.length; candidateIndex += 1) {
         const candidate = pool[candidateIndex];
-        if (!canPlaceDay(node.state, candidate, rules)) continue;
+        if (!canPlaceDay(node.state, candidate, rules, pinnedDish)) continue;
 
         // Tier-2 budgets, enforced by look-ahead rather than after the fact.
         // A branch dies the moment the days it has left can no longer supply
@@ -762,16 +808,24 @@ export const selectWeek = ({
         const proteinSoFar = node.state.protein + candidate.totals.protein;
         if (proteinSoFar + remainingAfter * maxDayProtein < proteinFloor) continue;
 
+        // R2 floor look-ahead, the same shape. The ceiling is enforced in
+        // `canPlaceDay`; the floor cannot be, because a partial week being
+        // short on eggs is not yet a violation. What *is* a violation is a
+        // branch with fewer days left than eggs still owed.
+        const eggsSoFar = node.state.eggBreakfasts + (candidate.isEggBreakfast ? 1 : 0);
+        if (eggsSoFar + remainingAfter < eggBreakfastsMin) continue;
+
         // Score before expanding state: cloning the usage maps for every
         // (node, candidate) pair is by far the most expensive step, so only
         // the survivors of the beam cut pay for it.
         let newDistinct = 0;
         let repeatPenalty = 0;
-        for (let slotIndex = 0; slotIndex < candidate.mealNames.length; slotIndex += 1) {
-          const name = candidate.mealNames[slotIndex];
+        for (const name of candidate.mealNames) {
           if (!node.state.distinct.has(name)) newDistinct += 1;
-          const bucket = slotIndex === 0 ? 'breakfast' : 'lunchDinner';
-          repeatPenalty += (node.state.usage[bucket][name] || 0) * rules.scored.repeatUsePenalty;
+          // R1 caps every unpinned dish at one use, so this now only ever
+          // fires on the pinned dish — it ranks *where* the pin lands rather
+          // than whether a dish may repeat at all.
+          repeatPenalty += (node.state.usage[name] || 0) * rules.scored.repeatUsePenalty;
         }
         let newCuisines = 0;
         for (const cuisine of candidate.cuisines) {
@@ -792,10 +846,23 @@ export const selectWeek = ({
     }
 
     if (next.length === 0) {
-      // No branch survives the budgets. Fall back to the best-effort week so
-      // the caller gets something the validator can report on, rather than
-      // nothing at all.
-      return bestEffortWeek({ scored, targetDateKeys, rules, lockedDays });
+      // No branch survives. Fall back to the best-effort week so the caller
+      // gets something the validator can report on, rather than nothing at
+      // all — but carry the diagnosis of what ran out, because under the
+      // rubric this is no longer only a budget failure: R1 needs 21 distinct
+      // dishes and R3 splits the lunch/dinner catalog into two pools that
+      // cannot cover for each other.
+      return bestEffortWeek({
+        scored,
+        targetDateKeys,
+        rules,
+        lockedDays,
+        pinnedDish,
+        diagnostics: {
+          exhaustedOnDayIndex: dayIndex,
+          ...rubricFeasibility({ candidates: pool, mealDatabase, rules, preferences })
+        }
+      });
     }
 
     next.sort((a, b) => b.score - a.score);
@@ -806,9 +873,13 @@ export const selectWeek = ({
     }));
   }
 
-  // Prefer a finished week that also clears the weekly protein floor.
-  const clearing = beam.filter((node) => node.state.protein >= proteinFloor);
-  const winner = (clearing.length > 0 ? clearing : beam)[0];
+  // Prefer a finished week that clears both weekly floors. The beam is sorted
+  // by score, so the first survivor of each filter is the best one.
+  const clearingBoth = beam.filter(
+    (node) => node.state.protein >= proteinFloor && node.state.eggBreakfasts >= eggBreakfastsMin
+  );
+  const clearingProtein = beam.filter((node) => node.state.protein >= proteinFloor);
+  const winner = (clearingBoth[0] || clearingProtein[0] || beam[0]);
   const days = winner.days.map(({ dateKey, candidate }) => ({ dateKey, ...candidate }));
   const summary = summariseWeek(days, rules);
 
@@ -832,22 +903,75 @@ export const isWeekWithinBudgets = (summary) =>
  * Greedy fallback used when the beam prunes itself empty. Respects Tier 1 but
  * knowingly gives up on the Tier-2 budgets; the validator reports what broke.
  */
-const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays }) => {
+/**
+ * Why the search ran out of candidates, in terms a person can act on.
+ *
+ * Computed only on the failure path, so its cost never touches a normal run.
+ * Each count is the size of the pool the *next* rule has to work with, so the
+ * line where the number collapses is the rule that made the week impossible.
+ */
+export const rubricFeasibility = ({ candidates, mealDatabase, rules, preferences = {} }) => {
+  const breakfasts = getMealsForSlot(mealDatabase, 'breakfast')
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
+  const lunchDinners = getMealsForSlot(mealDatabase, 'lunch')
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
+
+  return {
+    // R1 needs 3 distinct dishes per day, all distinct across the week.
+    distinctBreakfasts: breakfasts.length,
+    distinctEggBreakfasts: breakfasts.filter((meal) =>
+      rules.hard.eggAnchorIngredients.includes(mealFacts(meal).primaryIngredient)).length,
+    distinctNonEggBreakfasts: breakfasts.filter((meal) =>
+      !rules.hard.eggAnchorIngredients.includes(mealFacts(meal).primaryIngredient)).length,
+    // R3 splits the lunch/dinner catalog into two pools that cannot substitute
+    // for each other: every lunch comes from one, every dinner from the other.
+    distinctIndianLunches: lunchDinners.filter((meal) => mealFacts(meal).cuisine === rules.hard.lunchCuisine).length,
+    distinctNonIndianDinners: lunchDinners.filter((meal) => mealFacts(meal).cuisine !== rules.hard.lunchCuisine).length,
+    dayCandidatesAfterR3: candidates.length,
+    dayCandidatesInBudget: candidates.filter(
+      (day) => day.proteinInBand && day.underCarbCap && day.inCalorieBounds).length
+  };
+};
+
+/**
+ * The last-resort week, used when no branch of the beam survives.
+ *
+ * This is the one path that can emit a week breaking R1–R3: when nothing is
+ * placeable it takes the best-scoring candidate regardless. That is deliberate
+ * — the caller needs *something* the validator can report on — but it must
+ * never be mistaken for a legal week, so it is flagged `bestEffort` and
+ * `feasible: false`, and carries the diagnosis of what ran out. Callers write
+ * a week only after `validateWeek`, which fails it on the same rules.
+ */
+const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays, pinnedDish = null, diagnostics = null }) => {
   const state = {
     ...seedWeekState(lockedDays, rules),
-    protein: 0, inBand: 0, underCarb: 0, inCalorieBounds: 0, cuisineBalanced: 0
+    protein: 0, inBand: 0, underCarb: 0, inCalorieBounds: 0, eggBreakfasts: 0
   };
   const days = [];
   let current = state;
+  let constraintsRelaxed = false;
 
   for (const dateKey of targetDateKeys) {
-    const pick = scored.find((candidate) => canPlaceDay(current, candidate, rules)) || scored[0];
+    const placeable = scored.find((candidate) => canPlaceDay(current, candidate, rules, pinnedDish));
+    if (!placeable) constraintsRelaxed = true;
+    const pick = placeable || scored[0];
     days.push({ dateKey, ...pick });
     current = applyDay(current, pick);
   }
 
   const summary = summariseWeek(days, rules);
-  return { days, candidateCount: scored.length, feasible: false, summary, bestEffort: true };
+  return {
+    days,
+    candidateCount: scored.length,
+    feasible: false,
+    summary,
+    bestEffort: true,
+    // True when at least one day had no legal placement at all, so this week
+    // is known to break a hard rule rather than merely a budget.
+    constraintsRelaxed,
+    diagnostics
+  };
 };
 
 /** Roll a set of generated days up into the figures the acceptance criteria use. */
@@ -867,7 +991,16 @@ export const summariseWeek = (days = [], rules) => {
     daysProteinInBand: days.filter((day) => day.proteinInBand).length,
     daysUnderCarbCap: days.filter((day) => day.underCarbCap).length,
     daysInCalorieBounds: days.filter((day) => day.inCalorieBounds).length,
-    daysCuisineBalanced: days.filter((day) => day.cuisineBalanced).length,
+    // R3 holds by construction (enumeration filters it), so this counts what
+    // reached the week rather than what was allowed to.
+    daysR3Compliant: days.filter(
+      (day) => mealFacts(day.lunch).cuisine === rules.hard.lunchCuisine
+        && mealFacts(day.dinner).cuisine !== rules.hard.lunchCuisine
+    ).length,
+    daysBothFlatbreadPasta: days.filter((day) => day.bothFlatbreadPasta).length,
+    eggBreakfasts: days.filter((day) => day.isEggBreakfast).length,
+    eggBreakfastsFloor: eggBreakfastsFloor(days.length, rules),
+    eggBreakfastsMax: rules.hard.eggBreakfastsMax,
     requiredCompliantDays: requiredCompliantDays(dayCount, rules),
     redMeatMeals: days.reduce((sum, day) => sum + (day.redMeatCount || 0), 0),
     distinctMeals: distinct.size
@@ -981,6 +1114,9 @@ export const buildWeekPlan = ({
   historyMap = {},
   preferences = {},
   lockedDays = {},
+  // R1's optional pin. Threaded from the caller rather than read out of
+  // `preferences`, so a dish is only ever pinned deliberately.
+  pinnedDish = null,
   beamWidth = DEFAULT_BEAM_WIDTH,
   shortlistPerSlot = DEFAULT_SHORTLIST_PER_SLOT
 }) => {
@@ -994,6 +1130,7 @@ export const buildWeekPlan = ({
     historyMap,
     preferences,
     lockedDays,
+    pinnedDish,
     beamWidth,
     dayCandidates,
     scoredCandidates

@@ -15,9 +15,17 @@
 
 import { mealDatabase as defaultMealDatabase } from '../data/mealDatabase.js';
 import { resolveWeek, validateWeek } from './planValidator.js';
-import { getRules } from './rules.js';
+import { RUBRIC_LIMITS, getRules } from './rules.js';
 
-/** Every number the rubric specifies, in one place. */
+/**
+ * Every number the rubric specifies.
+ *
+ * The *limits* come from `rules.js` — the optimizer enforces the same ones
+ * during generation and the validator gates on them, so a second declaration
+ * here is exactly the shape of drift the consistency audit catalogued. The
+ * *penalties* are scorer-only and live here, because nothing else has any use
+ * for them.
+ */
 export const RUBRIC = Object.freeze({
   version: 'v1',
   startingScore: 100,
@@ -25,13 +33,13 @@ export const RUBRIC = Object.freeze({
 
   // R1 — no dish repeats
   repeatPenalty: 15,
-  pinnedAllowance: 3,
-  unpinnedAllowance: 1,
+  pinnedAllowance: RUBRIC_LIMITS.pinnedDishMaxPerWeek,
+  unpinnedAllowance: RUBRIC_LIMITS.maxDishRepeatsPerWeek,
 
   // R2 — eggs 3–4 breakfasts a week
   eggPenalty: 10,
-  minEggBreakfasts: 3,
-  maxEggBreakfasts: 4,
+  minEggBreakfasts: RUBRIC_LIMITS.eggBreakfastsMin,
+  maxEggBreakfasts: RUBRIC_LIMITS.eggBreakfastsMax,
 
   // R3 — Indian lunch, international dinner
   cuisinePenalty: 5,
@@ -45,7 +53,7 @@ export const RUBRIC = Object.freeze({
  * highest-protein-contributor notion the anchor-ingredient cap uses, not a
  * name match. `egg_noodles` is deliberately absent: it is a noodle.
  */
-const EGG_ANCHOR_INGREDIENTS = new Set(['egg_whole', 'egg_white', 'egg_yolk']);
+const EGG_ANCHOR_INGREDIENTS = new Set(RUBRIC_LIMITS.eggAnchorIngredients);
 
 const CORE_SLOTS = ['breakfast', 'lunch', 'dinner'];
 
@@ -225,7 +233,7 @@ export const scoreR2 = (days) => {
 // Only the first pattern scores zero, so this is asymmetric by design — it
 // replaces the engine's symmetric "exactly one Indian across lunch+dinner".
 
-const isIndian = (meal) => lower(meal?.cuisine) === 'indian';
+const isIndian = (meal) => lower(meal?.cuisine) === RUBRIC_LIMITS.lunchCuisine;
 
 export const scoreR3 = (days) => {
   const violations = [];

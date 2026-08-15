@@ -146,9 +146,34 @@ const criteria = [
     detail: `${summary.daysInCalorieBounds} of ${dayCount}`
   },
   {
-    label: `>= ${required} of ${dayCount} days one Indian + one international at lunch/dinner`,
-    pass: summary.daysCuisineBalanced >= required,
-    detail: `${summary.daysCuisineBalanced} of ${dayCount}`
+    // R3 replaced the old symmetric "exactly one Indian across lunch+dinner"
+    // budget with a directional hard rule, so this is now all-or-nothing
+    // rather than 5 of 7.
+    label: `all ${dayCount} days Indian lunch + non-Indian dinner (R3)`,
+    pass: summary.daysR3Compliant === dayCount,
+    detail: `${summary.daysR3Compliant} of ${dayCount}`
+  },
+  {
+    label: `${rules.hard.eggBreakfastsMin}-${rules.hard.eggBreakfastsMax} egg-anchored breakfasts (R2)`,
+    pass: summary.eggBreakfasts >= summary.eggBreakfastsFloor
+      && summary.eggBreakfasts <= summary.eggBreakfastsMax,
+    detail: `${summary.eggBreakfasts} of ${dayCount}`
+  },
+  {
+    label: 'every dish distinct across the week, bar the pin (R1)',
+    pass: (() => {
+      const names = plan.days.flatMap((day) => day.mealNames);
+      return new Set(names).size === names.length;
+    })(),
+    detail: (() => {
+      const names = plan.days.flatMap((day) => day.mealNames);
+      return `${new Set(names).size} distinct of ${names.length}`;
+    })()
+  },
+  {
+    label: 'no day doubles up on flatbread/pasta (R4, scored not gated)',
+    pass: true,
+    detail: `${summary.daysBothFlatbreadPasta} of ${dayCount} days`
   },
   {
     label: 'no anchor-ingredient family (breakfast + lunch + dinner) over its weekly cap',

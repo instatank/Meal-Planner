@@ -31,23 +31,47 @@ const meal = ({ name, p, c = 20, f = 10, cal, cuisine = 'continental', weight = 
 /**
  * A catalog with enough headroom that a compliant week is easy to find, so the
  * tests below isolate the accounting rather than the catalog's limitations.
+ *
+ * "Roomy" has a stricter meaning since the rubric landed. R1 needs 21 distinct
+ * dishes in a week and R3 needs every lunch Indian and every dinner not, so a
+ * week now needs at least 7 distinct Indian lunches, 7 distinct non-Indian
+ * dinners and 7 distinct breakfasts — 3 of which must be egg-anchored for R2.
+ * The old 4-breakfast / 8-lunch fixture could not satisfy that and made every
+ * test using it fail for want of candidates rather than for the reason it was
+ * testing.
+ *
+ * Breakfasts carry no `primaryIngredient` unless they are meant to be egg
+ * ones, so they spend no anchor-family budget and leave the family-cap tests
+ * to set up their own.
  */
 const roomyCatalog = () => ({
   breakfast: [
-    meal({ name: 'B1', p: 40, c: 30, cal: 520 }),
-    meal({ name: 'B2', p: 38, c: 30, cal: 510, cuisine: 'indian' }),
-    meal({ name: 'B3', p: 36, c: 28, cal: 500, cuisine: 'asian' }),
-    meal({ name: 'B4', p: 34, c: 28, cal: 495 })
+    meal({ name: 'BE1', p: 40, c: 30, cal: 520, primaryIngredient: 'egg_whole' }),
+    meal({ name: 'BE2', p: 39, c: 30, cal: 515, primaryIngredient: 'egg_whole' }),
+    meal({ name: 'BE3', p: 38, c: 29, cal: 510, primaryIngredient: 'egg_white' }),
+    meal({ name: 'B4', p: 38, c: 30, cal: 510, cuisine: 'indian' }),
+    meal({ name: 'B5', p: 37, c: 29, cal: 505, cuisine: 'asian' }),
+    meal({ name: 'B6', p: 36, c: 28, cal: 500 }),
+    meal({ name: 'B7', p: 35, c: 28, cal: 495 }),
+    meal({ name: 'B8', p: 34, c: 28, cal: 490 })
   ],
   lunchDinner: [
-    meal({ name: 'L1', p: 48, c: 35, cal: 600, family: 'chicken' }),
-    meal({ name: 'L2', p: 47, c: 35, cal: 590, cuisine: 'indian', family: 'fish' }),
-    meal({ name: 'L3', p: 46, c: 34, cal: 585, cuisine: 'asian' }),
-    meal({ name: 'L4', p: 45, c: 34, cal: 580, family: 'chicken' }),
-    meal({ name: 'L5', p: 44, c: 33, cal: 575, cuisine: 'indian' }),
-    meal({ name: 'L6', p: 43, c: 33, cal: 570, cuisine: 'asian', family: 'fish' }),
-    meal({ name: 'L7', p: 42, c: 32, cal: 565 }),
-    meal({ name: 'L8', p: 41, c: 32, cal: 560, cuisine: 'indian' })
+    // Seven Indian dishes — the lunch pool R3 draws from.
+    meal({ name: 'LI1', p: 48, c: 35, cal: 600, cuisine: 'indian', family: 'chicken' }),
+    meal({ name: 'LI2', p: 47, c: 35, cal: 595, cuisine: 'indian', family: 'fish' }),
+    meal({ name: 'LI3', p: 46, c: 34, cal: 590, cuisine: 'indian' }),
+    meal({ name: 'LI4', p: 45, c: 34, cal: 585, cuisine: 'indian' }),
+    meal({ name: 'LI5', p: 44, c: 33, cal: 580, cuisine: 'indian', family: 'chicken' }),
+    meal({ name: 'LI6', p: 43, c: 33, cal: 575, cuisine: 'indian' }),
+    meal({ name: 'LI7', p: 42, c: 32, cal: 570, cuisine: 'indian' }),
+    // Seven that are not — the dinner pool.
+    meal({ name: 'DN1', p: 48, c: 35, cal: 600, family: 'chicken' }),
+    meal({ name: 'DN2', p: 47, c: 35, cal: 595, cuisine: 'asian', family: 'fish' }),
+    meal({ name: 'DN3', p: 46, c: 34, cal: 590, cuisine: 'asian' }),
+    meal({ name: 'DN4', p: 45, c: 34, cal: 585 }),
+    meal({ name: 'DN5', p: 44, c: 33, cal: 580, family: 'chicken' }),
+    meal({ name: 'DN6', p: 43, c: 33, cal: 575, cuisine: 'asian' }),
+    meal({ name: 'DN7', p: 42, c: 32, cal: 570 })
   ],
   snack: []
 });
@@ -87,20 +111,23 @@ test('enumeration never places the same meal twice in one day', () => {
 
 test('enumeration excludes meals whose avoid score passes the exclusion threshold', () => {
   const rules = rulesFor();
-  const preferences = { avoids: { L1: 3.5, L2: 3 } };
+  const preferences = { avoids: { LI1: 3.5, LI2: 3 } };
   const days = enumerateFeasibleDays({ mealDatabase: roomyCatalog(), rules, preferences });
 
-  assert.ok(days.every((day) => !day.mealNames.includes('L1')), 'avoid score 3.5 is above the threshold');
-  assert.ok(days.some((day) => day.mealNames.includes('L2')), 'avoid score of exactly 3 is not above it');
+  assert.ok(days.every((day) => !day.mealNames.includes('LI1')), 'avoid score 3.5 is above the threshold');
+  assert.ok(days.some((day) => day.mealNames.includes('LI2')), 'avoid score of exactly 3 is not above it');
 });
 
 test('enumeration enforces the 50g per-day sanity floor', () => {
   const rules = rulesFor({ hard: { minMealProtein: 10 } });
+  // R3 admits only Indian-lunch + non-Indian-dinner days, so the fixture needs
+  // at least one of each for any day to be enumerable at all.
   const database = {
     breakfast: [meal({ name: 'Tiny B', p: 12, c: 5, cal: 120 })],
     lunchDinner: [
-      meal({ name: 'Tiny L', p: 12, c: 5, cal: 130 }),
+      meal({ name: 'Tiny L', p: 12, c: 5, cal: 130, cuisine: 'indian' }),
       meal({ name: 'Tiny D', p: 13, c: 5, cal: 140 }),
+      meal({ name: 'Big L', p: 40, c: 20, cal: 480, cuisine: 'indian' }),
       meal({ name: 'Big D', p: 40, c: 20, cal: 480 })
     ],
     snack: []
@@ -110,12 +137,15 @@ test('enumeration enforces the 50g per-day sanity floor', () => {
 
   assert.ok(days.length > 0);
   assert.ok(days.every((day) => day.totals.protein >= 50), 'no day below the sanity floor survives');
-  assert.ok(days.every((day) => day.mealNames.includes('Big D')), 'only combinations carrying the big meal clear 50g');
+  assert.ok(
+    days.every((day) => day.mealNames.includes('Big L') || day.mealNames.includes('Big D')),
+    'only combinations carrying a big meal clear 50g'
+  );
 });
 
 // ─── Weekly Tier 1, counted against the week being generated ────────────────
 
-test('weekly repetition ceilings are counted against the generated week', () => {
+test('R1: no dish repeats anywhere in the generated week', () => {
   const rules = rulesFor();
   const { days } = selectWeek({
     mealDatabase: roomyCatalog(),
@@ -127,51 +157,109 @@ test('weekly repetition ceilings are counted against the generated week', () => 
 
   assert.equal(days.length, 7);
 
-  const breakfastUse = {};
-  const lunchDinnerUse = {};
+  // One counter across all three slots — the rubric's R1 is not per-slot, so
+  // a dish at lunch on one day and at dinner on another is still a repeat.
+  const use = {};
   for (const day of days) {
-    breakfastUse[day.mealNames[0]] = (breakfastUse[day.mealNames[0]] || 0) + 1;
-    for (const name of [day.mealNames[1], day.mealNames[2]]) {
-      lunchDinnerUse[name] = (lunchDinnerUse[name] || 0) + 1;
-    }
+    for (const name of day.mealNames) use[name] = (use[name] || 0) + 1;
   }
-
-  for (const [name, count] of Object.entries(breakfastUse)) {
-    assert.ok(count <= rules.hard.maxBreakfastRepeatsPerWeek, `${name} used ${count} times at breakfast`);
+  for (const [name, count] of Object.entries(use)) {
+    assert.ok(count <= rules.hard.maxDishRepeatsPerWeek, `${name} used ${count} times this week`);
   }
-  for (const [name, count] of Object.entries(lunchDinnerUse)) {
-    assert.ok(count <= rules.hard.maxLunchDinnerRepeatsPerWeek, `${name} used ${count} times at lunch/dinner`);
-  }
+  assert.equal(Object.keys(use).length, 21, 'a 7-day week is 21 distinct dishes');
 });
 
-test('a locked day in the same week counts against the repetition ceilings', () => {
-  // Only two lunch/dinner meals exist and the cap is 2 uses each, so the four
-  // slots the locked days already occupy leave exactly two free.
+test('R1: the pinned dish may appear up to its allowance, nothing else may', () => {
   const rules = rulesFor();
-  const database = {
-    breakfast: [meal({ name: 'B1', p: 40, c: 30, cal: 520 })],
-    lunchDinner: [
-      meal({ name: 'L1', p: 48, c: 35, cal: 600 }),
-      meal({ name: 'L2', p: 47, c: 35, cal: 590 })
-    ],
-    snack: []
-  };
-  const locked = {
-    '2026-08-01': { breakfast: database.breakfast[0], lunch: database.lunchDinner[0], dinner: database.lunchDinner[1] }
-  };
+  // Five breakfasts for seven days, so the week is only fillable if the pin
+  // genuinely buys extra uses. The pin has to be a *non-egg* breakfast: R2
+  // caps the week at 4 egg breakfasts, so pinning an egg one to 3 would leave
+  // at most 1 further egg slot and no way to fill the remaining days.
+  const database = roomyCatalog();
+  database.breakfast = [
+    database.breakfast[0], // BE1 egg
+    database.breakfast[1], // BE2 egg
+    database.breakfast[2], // BE3 egg
+    database.breakfast[3], // B4  non-egg
+    database.breakfast[4]  // B5  non-egg
+  ];
 
   const { days } = selectWeek({
     mealDatabase: database,
     rules,
-    targetDateKeys: ['2026-08-03'],
+    targetDateKeys: DATES,
+    historyMap: {},
     preferences: {},
-    lockedDays: locked
+    pinnedDish: 'B4'
   });
 
-  // One use of each remains, so the single generated day is still placeable.
-  assert.equal(days.length, 1);
+  assert.equal(days.length, 7);
+  const use = {};
+  for (const day of days) {
+    for (const name of day.mealNames) use[name] = (use[name] || 0) + 1;
+  }
+  for (const [name, count] of Object.entries(use)) {
+    const limit = name === 'B4' ? rules.hard.pinnedDishMaxPerWeek : rules.hard.maxDishRepeatsPerWeek;
+    assert.ok(count <= limit, `${name} used ${count} times (limit ${limit})`);
+  }
+});
 
-  const twoDays = selectWeek({
+test('R2: the generated week carries 3-4 egg-anchored breakfasts', () => {
+  const rules = rulesFor();
+  const { days } = selectWeek({
+    mealDatabase: roomyCatalog(),
+    rules,
+    targetDateKeys: DATES,
+    historyMap: {},
+    preferences: {}
+  });
+
+  const eggs = days.filter((day) => day.isEggBreakfast).length;
+  assert.ok(eggs >= rules.hard.eggBreakfastsMin, `${eggs} egg breakfasts, below the floor`);
+  assert.ok(eggs <= rules.hard.eggBreakfastsMax, `${eggs} egg breakfasts, above the ceiling`);
+});
+
+test('R3: every generated day is Indian lunch + non-Indian dinner', () => {
+  const rules = rulesFor();
+  const { days } = selectWeek({
+    mealDatabase: roomyCatalog(),
+    rules,
+    targetDateKeys: DATES,
+    historyMap: {},
+    preferences: {}
+  });
+
+  assert.equal(days.length, 7);
+  for (const day of days) {
+    assert.equal(day.lunch.cuisine, 'indian', `${day.dateKey} lunch is not Indian`);
+    assert.notEqual(day.dinner.cuisine, 'indian', `${day.dateKey} dinner is Indian`);
+  }
+});
+
+test('R3 is enforced at enumeration, so no illegal day is ever built', () => {
+  const rules = rulesFor();
+  const days = enumerateFeasibleDays({ mealDatabase: roomyCatalog(), rules, preferences: {} });
+
+  assert.ok(days.length > 0);
+  for (const day of days) {
+    assert.equal(day.lunch.cuisine, 'indian');
+    assert.notEqual(day.dinner.cuisine, 'indian');
+  }
+});
+
+test('a locked day in the same week counts against R1', () => {
+  const rules = rulesFor();
+  const database = roomyCatalog();
+  // Lock a day that spends three of the dishes; under R1 none may come back.
+  const locked = {
+    '2026-08-01': {
+      breakfast: database.breakfast[0],
+      lunch: database.lunchDinner[0],
+      dinner: database.lunchDinner[7]
+    }
+  };
+
+  const { days } = selectWeek({
     mealDatabase: database,
     rules,
     targetDateKeys: ['2026-08-03', '2026-08-04'],
@@ -179,41 +267,12 @@ test('a locked day in the same week counts against the repetition ceilings', () 
     lockedDays: locked
   });
 
-  // The second day has no legal placement left, so the search falls back
-  // rather than quietly exceeding the ceiling.
-  assert.equal(twoDays.feasible, false);
-});
-
-test('the red-meat cap is counted across the generated week, not just history', () => {
-  const rules = rulesFor();
-  const database = {
-    breakfast: [
-      meal({ name: 'B1', p: 40, c: 30, cal: 520 }),
-      meal({ name: 'B2', p: 38, c: 30, cal: 515, cuisine: 'indian' })
-    ],
-    lunchDinner: [
-      meal({ name: 'Steak', p: 50, c: 30, cal: 600, family: 'red_meat' }),
-      meal({ name: 'Pork', p: 49, c: 30, cal: 595, family: 'red_meat', cuisine: 'indian' }),
-      meal({ name: 'Lamb', p: 48, c: 30, cal: 590, family: 'red_meat', cuisine: 'asian' }),
-      meal({ name: 'Chicken', p: 47, c: 30, cal: 585, family: 'chicken' }),
-      meal({ name: 'Fish', p: 46, c: 30, cal: 580, family: 'fish', cuisine: 'asian' }),
-      meal({ name: 'Paneer', p: 45, c: 30, cal: 575, cuisine: 'indian' })
-    ],
-    snack: []
-  };
-
-  const { days, summary } = selectWeek({
-    mealDatabase: database,
-    rules,
-    targetDateKeys: DATES,
-    preferences: {}
-  });
-
-  assert.equal(days.length, 7);
-  assert.ok(
-    summary.redMeatMeals <= rules.hard.redMeatMealsPerWeek,
-    `red meat meals: ${summary.redMeatMeals}`
-  );
+  const lockedNames = ['BE1', 'LI1', 'DN1'];
+  for (const day of days) {
+    for (const name of day.mealNames) {
+      assert.ok(!lockedNames.includes(name), `${name} was already used by a locked day`);
+    }
+  }
 });
 
 test('the anchor cap counts by ingredient family, not by raw ingredient id', () => {
@@ -539,4 +598,82 @@ test('shortlist selection breaks ties exactly as a stable descending sort would'
       `bounded selection diverged from the stable sort (size ${size}, limit ${limit})`
     );
   }
+});
+
+// ─── R4 — scored, never gated ───────────────────────────────────────────────
+
+test('R4: the optimizer avoids doubling up on flatbread/pasta when it can', () => {
+  const rules = rulesFor();
+  const database = roomyCatalog();
+  // Every Indian lunch is flatbread, so R4 turns entirely on the dinner.
+  // The dinner pool has to be *bigger* than the 7 slots for this to test a
+  // preference at all: R1 forces all 7 dinners to be distinct, so a pool of
+  // exactly 7 leaves no choice and any flatbread dinner in it is unavoidable.
+  // Ten dinners — 7 rice, 3 flatbread — means avoiding R4 is possible, and
+  // only a scored preference would actually do it.
+  database.lunchDinner = [
+    ...database.lunchDinner.map((m) => ({
+      ...m,
+      carb_type: m.name.startsWith('LI') ? 'flatbread_pasta' : 'rice'
+    })),
+    meal({ name: 'DN8', p: 46, c: 34, cal: 590, cuisine: 'asian' }),
+    meal({ name: 'DN9', p: 45, c: 34, cal: 585 }),
+    meal({ name: 'DN10', p: 44, c: 33, cal: 580, cuisine: 'asian' })
+  ].map((m) => (['DN8', 'DN9', 'DN10'].includes(m.name) ? { ...m, carb_type: 'flatbread_pasta' } : m));
+
+  const { days } = selectWeek({
+    mealDatabase: database,
+    rules,
+    targetDateKeys: DATES,
+    historyMap: {},
+    preferences: {}
+  });
+
+  const doubled = days.filter((day) => day.bothFlatbreadPasta).length;
+  assert.equal(doubled, 0, 'seven rice dinners were available for seven days');
+});
+
+test('R4 is a preference, not a gate: a week is still produced when every day must double up', () => {
+  const rules = rulesFor();
+  const database = roomyCatalog();
+  // Nothing but flatbread/pasta exists, so every day breaks R4. A gate here
+  // would return no week at all; a preference still returns a full one.
+  database.lunchDinner = database.lunchDinner.map((m) => ({ ...m, carb_type: 'flatbread_pasta' }));
+
+  const result = selectWeek({
+    mealDatabase: database,
+    rules,
+    targetDateKeys: DATES,
+    historyMap: {},
+    preferences: {}
+  });
+
+  assert.equal(result.days.length, 7);
+  assert.ok(!result.bestEffort, 'the week is legal, just carrying R4 penalties');
+  assert.equal(result.days.filter((day) => day.bothFlatbreadPasta).length, 7);
+});
+
+// ─── Infeasibility is reported, never silently relaxed ──────────────────────
+
+test('an infeasible catalog reports which pool ran out rather than passing off a bad week', () => {
+  const rules = rulesFor();
+  // Only two Indian dishes exist, so R1 + R3 together cannot fill 7 lunches.
+  const database = roomyCatalog();
+  database.lunchDinner = database.lunchDinner.filter(
+    (m) => !m.name.startsWith('LI') || ['LI1', 'LI2'].includes(m.name)
+  );
+
+  const result = selectWeek({
+    mealDatabase: database,
+    rules,
+    targetDateKeys: DATES,
+    historyMap: {},
+    preferences: {}
+  });
+
+  assert.equal(result.feasible, false, 'an impossible week must not be reported feasible');
+  assert.ok(result.bestEffort, 'the fallback must identify itself');
+  assert.ok(result.constraintsRelaxed, 'a day with no legal placement must say so');
+  assert.equal(result.diagnostics.distinctIndianLunches, 2, 'the diagnosis names the pool that ran out');
+  assert.ok(result.diagnostics.distinctNonIndianDinners >= 7);
 });
