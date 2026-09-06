@@ -334,6 +334,25 @@ export const resolveMealTiers = ({
   return { tiers, sources, stats, confirms, demotionEnabled };
 };
 
+/**
+ * Meals the user has said they want often.
+ *
+ * These get a *floor* in the week search, not just a raised ceiling. A ceiling
+ * alone is not enough: `Scrambled eggs + toast` is 23g of protein and 284 kcal,
+ * the second-lightest breakfast in the catalog, so against a 120g target and a
+ * 1600 kcal floor the optimizer avoids it — and marking it a staple produced a
+ * week containing it *zero* times. That is the wrong answer to "I eat this
+ * often". A human planner would schedule it and make the day up at lunch, and
+ * a floor is what makes the search do that.
+ *
+ * Only `staple` earns a floor. `regular` means "happy to see it most weeks",
+ * which is permission rather than a request.
+ */
+export const stapleNames = (tiers = {}) =>
+  Object.entries(tiers)
+    .filter(([, tier]) => tier === TIER.STAPLE)
+    .map(([name]) => name);
+
 /** The tier assigned to `mealName`, defaulting when the table says nothing. */
 export const tierOf = (mealName, tiers = {}) => {
   const direct = tiers?.[mealName];

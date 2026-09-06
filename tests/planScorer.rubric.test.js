@@ -11,6 +11,7 @@ import {
   scoreR4,
   resolvePlan
 } from '../src/lib/planScorer.js';
+import { RUBRIC_LIMITS } from '../src/lib/rules.js';
 
 // ─── Fixture catalog ────────────────────────────────────────────────────────
 //
@@ -78,8 +79,14 @@ test('the rubric constants are the ones the doc specifies', () => {
   assert.equal(RUBRIC.repeatPenalty, 15);
   assert.equal(RUBRIC.pinnedAllowance, 3);
   assert.equal(RUBRIC.eggPenalty, 10);
-  assert.equal(RUBRIC.minEggBreakfasts, 3);
-  assert.equal(RUBRIC.maxEggBreakfasts, 4);
+  // Read from rules.js rather than restated here. The scorer, the optimizer
+  // and the validator all take R2's bounds from `RUBRIC_LIMITS`, and the point
+  // of that is that moving the ceiling (4 -> 5, by founder decision) moves
+  // every consumer at once. A literal here would turn that property into a
+  // test failure instead of proving it.
+  assert.equal(RUBRIC.minEggBreakfasts, RUBRIC_LIMITS.eggBreakfastsMin);
+  assert.equal(RUBRIC.maxEggBreakfasts, RUBRIC_LIMITS.eggBreakfastsMax);
+  assert.ok(RUBRIC.maxEggBreakfasts > RUBRIC.minEggBreakfasts, 'R2 is a range, not a point');
   assert.equal(RUBRIC.cuisinePenalty, 5);
   assert.equal(RUBRIC.carbPenalty, 5);
 });
@@ -186,15 +193,22 @@ test('R2: too few egg breakfasts costs 10 — it is a floor as well as a ceiling
   const result = scoreR2(days(week(triples)));
   assert.equal(result.eggBreakfasts, 1);
   assert.equal(result.penalty, 10);
-  assert.match(result.violations[0], /1 egg breakfast this week, below the 3–4 range \(-10\)/);
+  assert.match(
+    result.violations[0],
+    new RegExp(`1 egg breakfast this week, below the ${RUBRIC.minEggBreakfasts}–${RUBRIC.maxEggBreakfasts} range \\(-10\\)`)
+  );
 });
 
 test('R2: too many egg breakfasts costs 10, flat — not per day over', () => {
   const triples = Array.from({ length: 7 }, () => ['Eggs', 'Indian roti plate', 'Conti salad']);
   const result = scoreR2(days(week(triples)));
   assert.equal(result.eggBreakfasts, 7);
+  assert.ok(result.eggBreakfasts > RUBRIC.maxEggBreakfasts, 'fixture must actually exceed the ceiling');
   assert.equal(result.penalty, 10);
-  assert.match(result.violations[0], /above the 3–4 range/);
+  assert.match(
+    result.violations[0],
+    new RegExp(`above the ${RUBRIC.minEggBreakfasts}–${RUBRIC.maxEggBreakfasts} range`)
+  );
 });
 
 test('R2: counts breakfasts anchored on egg, whatever the dish is called', () => {

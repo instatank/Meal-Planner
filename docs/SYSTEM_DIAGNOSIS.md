@@ -330,7 +330,7 @@ batch on.
 These are decisions, not defects. Each carries the measurement so the call can
 be made on numbers.
 
-### 5.1 R3 is the tightest constraint in the system — consider making it budgeted
+### 5.1 R3 — DECIDED, and shipped as a budget
 
 R3 (Indian lunch + non-Indian dinner) is currently hard on **all 7 days**.
 
@@ -353,13 +353,70 @@ Consequences worth weighing:
   score rather than a rule — the two constraints genuinely conflict.
 - It removes **84% of the candidate space** before anything is scored.
 
-**Recommendation:** move R3 to Tier 2 at 5 of 7 days, the same "aim daily,
-judge weekly" shape everything else uses. You would keep the pattern you
-actually want most days and buy back two days a week of variety, a far larger
-lunch pool, and the option of making R4 a real rule. **I have not made this
-change** — it is a rule you stated explicitly, and loosening a stated rule is
-your call, not mine. It is a one-line change to `rules.js` plus moving the
-enumeration filter into the budget list; say the word.
+**Founder decision: loosen it.** R3 is now a Tier-2 budget judged 5 of 7, the
+same "aim daily, judge weekly" shape everything else uses. What that actually
+bought, measured:
+
+| | R3 hard (7 of 7) | R3 budgeted (5 of 7) |
+| --- | --- | --- |
+| enumerated day candidates | 16,326 | **61,794** (3.8x) |
+| a breakfast marked `staple` | beam exhausted; tiers stepped down | **honoured outright** |
+| R3 days in the generated week | 7 of 7 | 7 of 7 |
+| optimizer runtime | 537ms | 1131ms |
+
+Two things worth being straight about.
+
+**The generated week is still 7 of 7 R3-compliant.** Loosening the rule did not
+change the default output, because compliant days genuinely score best. What it
+bought is *headroom*, not variety-by-default: the week can now break the pattern
+on up to two days when something better is available — a favourite that happens
+to be a non-Indian lunch, or a tight week where the alternative was failing.
+That headroom is exactly what fixed the staple problem below.
+
+**It cost ~600ms of client-side compute.** Enumerating 3.8x the candidates is
+inherently more work. Two optimizations recovered part of it — the beam's
+per-day expansion is now a bounded top-K selection instead of collecting every
+survivor and sorting (the largest single cost, ~1150ms of a ~1500ms
+generation), and the per-slot shortlists that the retired Phase 2 needed are no
+longer built. The remainder is real and accepted: it is client-side work
+sitting in front of an API call with a 90-second timeout.
+
+### 5.1b The egg ceiling — DECIDED, 4 to 5
+
+Founder: *"I eat scrambled eggs or a boiled egg sandwich pretty often; I don't
+mind an egg breakfast 4 or 5 days a week."*
+
+R2's ceiling moved 4 -> 5, and the `egg` anchor-family cap 4 -> 6 so that the
+stated ceiling is the one that actually binds rather than the family cap
+binding one earlier. The **floor stays at 3** — permission to eat more eggs is
+not a requirement to, and the tier system raises the count on its own once the
+egg breakfasts actually eaten are confirmed often enough to earn `staple`.
+
+This surfaced a real gap. Raising a ceiling is not enough to make a favourite
+appear: `Scrambled eggs + toast` is 23g of protein and 284 kcal — the
+second-lightest breakfast in the catalog — so against a 120g target and a 1600
+kcal floor the optimizer avoids it, and marking it a `staple` produced a week
+containing it **zero times**. A tier had a ceiling and no floor.
+
+`staplePressurePenalty` fixes that, in the same shape as the existing Tier-2
+budget pressure: leaving a staple unplaced costs more the fewer days remain,
+and the final week selection prefers a week that placed them all. A human
+planner schedules the light breakfast and makes the day up at lunch; the search
+now does the same. Measured across three simultaneous staples including that
+one: every staple placed at least once, week valid, no tier stepped down.
+
+### 5.1c A pre-existing failure these changes did not cause
+
+`npm run audit:generation -- --goal standard` fails two criteria: only **2 of 7
+days** land inside the `standard` goal's 1800-2400 kcal band, and the validator
+reports the resulting budget violation. This is not a regression — it fails
+identically on the commit before any of this work (verified by stashing). Only
+**12.2%** of legal days reach that goal's 1800 kcal floor, against 53.8% for
+`high_protein`'s 1600.
+
+`standard` is not the goal in use, so it is recorded rather than fixed. It is a
+catalog problem, not a rules problem: the fix is calorie-denser meals, not a
+threshold change.
 
 ### 5.2 Breakfast is the binding slot, not the catalog as a whole
 
@@ -369,11 +426,16 @@ best breakfast in the catalog:             44g protein
 lunch/dinner clearing the floor:           75 of 75
 ```
 
-18 legal breakfasts for 7 slots, under R2 (3–4 must be egg-anchored) and the
-`egg` family cap of 4. That is the tightest pool in the system and the reason
-breakfasts feel repetitive. **The next meal batch should be almost entirely
-breakfasts** — high-protein, non-egg. That single change buys more perceived
-variety than any further rule work.
+18 legal breakfasts for 7 slots. The R2 ceiling and the `egg` family cap were
+part of what made it bind, and raising both (§5.1b) relieved some of it — a
+breakfast staple no longer forces the tier system to step down.
+
+The pool itself is unchanged, though, and it is still the tightest in the
+system. **The next meal batch should be almost entirely breakfasts.** With the
+egg ceiling at 5 the useful shape has shifted: non-egg breakfasts are what add
+genuinely new days, since the egg ones now have room but still number only 8
+distinct dishes. That single change buys more perceived variety than any
+further rule work.
 
 ### 5.3 Two known-bad items from the previous audit are still open
 
@@ -400,8 +462,9 @@ the next question is which *measurement* is absent, not which rule.
 ## 6. Reproducing all of this
 
 ```
-npm run test:logic        # 221 tests
-npm run audit:generation  # enumerates and validates; exits non-zero on failure
+npm run test:logic                        # 228 tests
+npm run audit:generation                  # high_protein: all criteria pass
+npm run audit:generation -- --goal standard   # fails on calories; see §5.1c
 ```
 
 The audit now also reports R5 compliance, week-level ingredient leaning, and

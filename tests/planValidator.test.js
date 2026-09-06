@@ -187,18 +187,9 @@ test('R1 lets the pinned dish through at its higher allowance', () => {
   );
 });
 
-test('R2 and R3 are hard gates, so a Phase-2 recombination cannot slip past', () => {
+test('R2 is a hard gate, so a Phase-2 recombination cannot slip past', () => {
   const ruleset = rules();
   const database = catalog();
-
-  // R3: an Indian dinner is a day-level violation whatever else is right.
-  const wrongWay = validWeek(database, ruleset);
-  wrongWay[0] = { ...wrongWay[0], dinner: database.lunchDinner[1], totals: undefined };
-  assert.ok(
-    validateWeek({ days: wrongWay, rules: ruleset }).violations
-      .some((v) => v.code === 'cuisine_direction_wrong'),
-    'an Indian dinner must be caught'
-  );
 
   // R2: swap every egg breakfast out and the week falls under the floor.
   const noEggs = validWeek(database, ruleset).map((day) => ({
@@ -211,6 +202,39 @@ test('R2 and R3 are hard gates, so a Phase-2 recombination cannot slip past', ()
       .some((v) => v.code === 'egg_breakfasts_below_floor'),
     'a week with no egg breakfasts must be caught'
   );
+});
+
+test('R3 is budgeted: two wrong-way days are allowed, a third is not', () => {
+  // R3 used to be a Tier-1, day-scoped violation — one Indian dinner anywhere
+  // made the week invalid. By founder decision it is now judged 5 of 7, the
+  // same shape as the protein band and the carb cap.
+  const ruleset = rules();
+  const database = catalog();
+  const indianDinner = database.lunchDinner[1];
+  assert.equal(indianDinner.cuisine, 'indian', 'fixture assumption');
+
+  const breakDays = (count) => {
+    const days = validWeek(database, ruleset);
+    for (let i = 0; i < count; i += 1) days[i] = { ...days[i], dinner: indianDinner, totals: undefined };
+    return days;
+  };
+
+  const twoWrong = validateWeek({ days: breakDays(2), rules: ruleset });
+  assert.ok(
+    !twoWrong.violations.some((v) => v.code === 'cuisine_direction_budget_exceeded'),
+    formatViolations(twoWrong.violations)
+  );
+  assert.ok(
+    !twoWrong.violations.some((v) => v.code === 'cuisine_direction_wrong'),
+    'R3 must no longer produce a day-scoped hard violation'
+  );
+
+  const threeWrong = validateWeek({ days: breakDays(3), rules: ruleset });
+  const budget = threeWrong.violations.find((v) => v.code === 'cuisine_direction_budget_exceeded');
+  assert.ok(budget, formatViolations(threeWrong.violations));
+  assert.equal(budget.tier, TIER.BUDGETED);
+  assert.equal(budget.actual, 4);
+  assert.equal(budget.limit, 5);
 });
 
 
@@ -246,17 +270,21 @@ test('the red-meat cap and the weekly protein floor are validated', () => {
 
 test('Tier-2 budgets only fire once more than 2 of 7 days miss', () => {
   const ruleset = getRules('high_protein', { dailyProteinTarget: 132 });
+  // Lunch Indian, dinner not — R3-compliant, so this test isolates the protein
+  // budget rather than also tripping the cuisine-direction budget that R3
+  // became. (The fixture used to be the other way round, which was invisible
+  // while R3 was checked per day and this test only looked at week scope.)
   const strong = (dateKey) => ({
     dateKey,
     breakfast: meal({ name: 'B1', p: 37, c: 30, cal: 600 }),
-    lunch: meal({ name: 'L1', p: 48, c: 35, cal: 620, family: 'chicken' }),
-    dinner: meal({ name: 'L2', p: 47, c: 35, cal: 620, family: 'fish', cuisine: 'indian' })
+    lunch: meal({ name: 'L1', p: 48, c: 35, cal: 620, family: 'chicken', cuisine: 'indian' }),
+    dinner: meal({ name: 'L2', p: 47, c: 35, cal: 620, family: 'fish' })
   });
   const flex = (dateKey) => ({
     dateKey,
     breakfast: meal({ name: 'B4', p: 22, c: 10, cal: 200 }),
-    lunch: meal({ name: 'L7', p: 24, c: 10, cal: 260 }),
-    dinner: meal({ name: 'L8', p: 24, c: 10, cal: 260, cuisine: 'indian' })
+    lunch: meal({ name: 'L7', p: 24, c: 10, cal: 260, cuisine: 'indian' }),
+    dinner: meal({ name: 'L8', p: 24, c: 10, cal: 260 })
   });
 
   // 5 strong + 2 flex — exactly at budget, and the weekly floor still holds.

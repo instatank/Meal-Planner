@@ -10,7 +10,7 @@ import {
   mealFacts
 } from '../src/lib/planOptimizer.js';
 import { validateWeek } from '../src/lib/planValidator.js';
-import { TIER, resolveMealTiers } from '../src/lib/mealTiers.js';
+import { TIER, resolveMealTiers, softenTiers } from '../src/lib/mealTiers.js';
 import { deriveSignatureIngredients } from '../src/lib/mealDataLayer.js';
 import { buildSelectWeekTool } from '../src/lib/planService.js';
 
@@ -188,21 +188,63 @@ test('the selection tool constrains the model to the offered week ids', () => {
 
 // ─── Degradation rather than failure ────────────────────────────────────────
 
-test('a tier that cannot be honoured is stepped down, never allowed to fail', () => {
-  // Breakfast is the binding slot — 18 legal options, of which R2 and the
-  // `egg` family cap already spend several — so asking for three of the seven
-  // breakfasts to be one dish exhausts the beam. Before the degradation
-  // ladder that produced a `bestEffort` week with duplicate days and three
-  // anchor-family violations. A preference must never make a week invalid.
+test('a breakfast staple is now honoured outright, with no stepping down', () => {
+  // This used to require the degradation ladder. Breakfast is the binding slot
+  // and R3 (hard on all 7 days) plus an egg ceiling of 4 left the beam no room,
+  // so asking for a breakfast staple produced a stepped-down week. Loosening R3
+  // to a 5-of-7 budget and raising the egg ceiling to 5 — both founder
+  // decisions — gave it the headroom, and the staple floor makes sure the
+  // search actually spends it.
   const tiers = { 'Anda bhurji + toast': TIER.STAPLE };
   const week = plan({ tiers });
 
-  assert.ok(week.tiersRelaxedFrom, 'the search should report that it had to ease off');
-  assert.equal(
-    validateWeek({ days: week.days, rules, preferences: {}, tiers: week.tiersUsed }).valid,
-    true
-  );
-  assert.ok(week.alternatives.length > 0, 'and still offer Phase 2 a real choice');
+  assert.equal(week.tiersRelaxedFrom, undefined, 'no stepping down should be needed any more');
+  assert.equal(validateWeek({ days: week.days, rules, preferences: {}, tiers }).valid, true);
+  assert.ok(uses(week, 'Anda bhurji + toast') >= 1);
+});
+
+test('a staple is never silently dropped, even a light one the macros fight', () => {
+  // `Scrambled eggs + toast` is 23g of protein and 284 kcal — the second
+  // lightest breakfast in the catalog — so against a 120g target and a 1600
+  // kcal floor the optimizer avoids it. With only a raised ceiling and no
+  // floor it appeared *zero* times, which is the wrong answer to "I eat this
+  // often". A human planner schedules it and makes the day up at lunch.
+  const light = 'Scrambled eggs + toast';
+  const tiers = {
+    [light]: TIER.STAPLE,
+    'Boiled eggs + ham sandwich': TIER.STAPLE,
+    'Paneer tikka + jowar roti + salad': TIER.STAPLE
+  };
+  const week = plan({ tiers });
+
+  for (const name of Object.keys(tiers)) {
+    assert.ok(uses(week, name) >= 1, `${name} was marked a staple and never appeared`);
+  }
+  assert.equal(validateWeek({ days: week.days, rules, preferences: {}, tiers: week.tiersUsed || tiers }).valid, true);
+});
+
+test('the degradation ladder still exists for tiers that genuinely cannot fit', () => {
+  // The ladder is the safety net, not the normal path. Verified on the tier
+  // table directly so the test does not depend on finding a catalog state that
+  // happens to be infeasible today.
+  const staples = { A: TIER.STAPLE, B: TIER.REGULAR, C: TIER.OCCASIONAL };
+  const once = softenTiers(staples);
+  assert.deepEqual(once, { A: TIER.REGULAR, B: TIER.OCCASIONAL, C: TIER.OCCASIONAL });
+
+  const twice = softenTiers(once);
+  assert.deepEqual(twice, { A: TIER.OCCASIONAL, B: TIER.OCCASIONAL, C: TIER.OCCASIONAL });
+
+  assert.equal(softenTiers(twice), null, 'nothing left to soften ends the ladder');
+  assert.equal(softenTiers({ X: TIER.EXCLUDED }), null, 'an exclusion is a decision, not a preference to ease');
+});
+
+test('R3 is budgeted now, so the week may break the cuisine direction twice', () => {
+  const week = plan();
+  const compliant = week.days.filter((day) => day.cuisineDirectionOk).length;
+  const required = week.days.length - 2;
+
+  assert.ok(compliant >= required, `only ${compliant} of ${week.days.length} days follow R3`);
+  assert.equal(validateWeek({ days: week.days, rules, preferences: {} }).valid, true);
 });
 
 test('every tier configuration yields a valid week and real alternatives', () => {

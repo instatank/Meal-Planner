@@ -236,14 +236,33 @@ test('R3: every generated day is Indian lunch + non-Indian dinner', () => {
   }
 });
 
-test('R3 is enforced at enumeration, so no illegal day is ever built', () => {
+test('R3 is a per-day verdict now, not a precondition for the day existing', () => {
+  // R3 used to be gated at enumeration, so every candidate satisfied it by
+  // construction. That made 47 meals dinner-only and 28 lunch-only
+  // permanently and removed 84% of the candidate space (see
+  // docs/SYSTEM_DIAGNOSIS.md §5.1). By founder decision it is now a Tier-2
+  // budget: days that break it exist, are scored, and are allowed on up to
+  // 2 of 7 days.
   const rules = rulesFor();
   const days = enumerateFeasibleDays({ mealDatabase: roomyCatalog(), rules, preferences: {} });
 
   assert.ok(days.length > 0);
-  for (const day of days) {
-    assert.equal(day.lunch.cuisine, 'indian');
-    assert.notEqual(day.dinner.cuisine, 'indian');
+
+  const compliant = days.filter((day) => day.cuisineDirectionOk);
+  const nonCompliant = days.filter((day) => !day.cuisineDirectionOk);
+
+  assert.ok(compliant.length > 0, 'compliant days must still be enumerated');
+  assert.ok(nonCompliant.length > 0, 'and so must the ones the budget now permits');
+
+  // The verdict must say exactly what R3 says.
+  for (const day of compliant) {
+    assert.equal(day.lunch.cuisine, rules.hard.lunchCuisine);
+    assert.notEqual(day.dinner.cuisine, rules.hard.lunchCuisine);
+  }
+  for (const day of nonCompliant) {
+    assert.ok(
+      day.lunch.cuisine !== rules.hard.lunchCuisine || day.dinner.cuisine === rules.hard.lunchCuisine
+    );
   }
 });
 
@@ -502,14 +521,18 @@ test('week selection is deterministic for fixed input', () => {
   for (let i = 0; i < 10; i += 1) assert.deepEqual(run(), first);
 });
 
-test('shortlists lead with the deterministic pick and stay inside the legal set', () => {
+test('shortlists, when asked for, lead with the deterministic pick and stay legal', () => {
   const rules = rulesFor();
   const database = roomyCatalog();
   const result = buildWeekPlan({
     mealDatabase: database,
     rules,
     targetDateKeys: DATES,
-    preferences: {}
+    preferences: {},
+    // Shortlists are off by default now: Phase 2 chooses between complete
+    // weeks and never reads them, so building them was ~300ms spent on an
+    // object nothing consumed. They are still produced on request.
+    withShortlists: true
   });
 
   const legalBreakfasts = new Set(database.breakfast.map((m) => m.name));

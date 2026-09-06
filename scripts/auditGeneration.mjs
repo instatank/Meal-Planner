@@ -146,11 +146,12 @@ const criteria = [
     detail: `${summary.daysInCalorieBounds} of ${dayCount}`
   },
   {
-    // R3 replaced the old symmetric "exactly one Indian across lunch+dinner"
-    // budget with a directional hard rule, so this is now all-or-nothing
-    // rather than 5 of 7.
-    label: `all ${dayCount} days Indian lunch + non-Indian dinner (R3)`,
-    pass: summary.daysR3Compliant === dayCount,
+    // R3 has moved twice. It was a symmetric "exactly one Indian across
+    // lunch+dinner" budget, then a directional hard rule on all 7 days, and is
+    // now a directional Tier-2 budget judged 5 of 7 — founder decision, after
+    // measuring what the hard version cost (docs/SYSTEM_DIAGNOSIS.md §5.1).
+    label: `>= ${required} of ${dayCount} days ${rules.hard.lunchCuisine} lunch + non-${rules.hard.lunchCuisine} dinner (R3)`,
+    pass: summary.daysR3Compliant >= required,
     detail: `${summary.daysR3Compliant} of ${dayCount}`
   },
   {

@@ -28,7 +28,18 @@ test('high_protein ruleset matches the settled Phase 1 thresholds', () => {
   assert.equal(rules.hard.maxDishRepeatsPerWeek, 1);
   assert.equal(rules.hard.pinnedDishMaxPerWeek, 3);
   assert.equal(rules.hard.eggBreakfastsMin, 3);
-  assert.equal(rules.hard.eggBreakfastsMax, 4);
+  // 4 -> 5 by founder decision: "I eat scrambled eggs or a boiled egg sandwich
+  // pretty often; I don't mind an egg breakfast 4 or 5 days a week." Breakfast
+  // is the binding slot and 8 of the 18 legal breakfasts are egg-anchored, so
+  // the old ceiling was a real part of what made it bind. The floor stays at 3
+  // — permission is not a requirement.
+  assert.equal(rules.hard.eggBreakfastsMax, 5);
+  // The egg family cap must sit above the R2 ceiling, or it binds first and
+  // the stated ceiling is not the one in force.
+  assert.ok(
+    rules.hard.anchorFamilyMaxPerWeek.egg > rules.hard.eggBreakfastsMax,
+    'the egg family cap must leave the R2 ceiling as the binding limit'
+  );
   assert.equal(rules.hard.lunchCuisine, 'indian');
   assert.equal(rules.hard.redMeatMealsPerWeek, 3);
   assert.equal(rules.hard.avoidScoreExclusiveMax, 3);

@@ -142,23 +142,10 @@ const collectDayViolations = ({ day, rules, preferences }) => {
     }
   }
 
-  // R3 — Indian lunch + non-Indian dinner, the only free pattern. Hard here as
-  // well as at enumeration: the optimizer guarantees it per day, but Phase 2
-  // hands the model flat per-slot shortlists that have thrown that structure
-  // away, so nothing between there and storage would catch a recombination
-  // that pairs a continental lunch with an Indian dinner.
-  const lunchCuisine = getMealCuisine(day.lunch);
-  const dinnerCuisine = getMealCuisine(day.dinner);
-  if (day.lunch && day.dinner && !(lunchCuisine === rules.hard.lunchCuisine && dinnerCuisine !== rules.hard.lunchCuisine)) {
-    found.push(violation({
-      code: 'cuisine_direction_wrong',
-      scope: 'day',
-      dateKey,
-      actual: `${lunchCuisine || '?'}/${dinnerCuisine || '?'}`,
-      limit: `${rules.hard.lunchCuisine}/non-${rules.hard.lunchCuisine}`,
-      message: `${dateKey} is ${lunchCuisine || '?'} lunch + ${dinnerCuisine || '?'} dinner; needs ${rules.hard.lunchCuisine} lunch + non-${rules.hard.lunchCuisine} dinner`
-    }));
-  }
+  // R3 is deliberately absent from this function. It was a Tier-1, day-scoped
+  // violation; it is now a Tier-2 budget counted across the week in
+  // `collectWeekViolations`, because a single day breaking the cuisine
+  // direction is no longer a defect — two of them a week are allowed.
 
   // R5 — no signature ingredient twice in the same day. Hard here as well as
   // at enumeration, for the same reason R3 is: Phase 2 hands the model flat
@@ -341,7 +328,16 @@ const collectWeekViolations = ({ days, rules, lockedDays, summary, pinnedDish = 
     { code: 'protein_band_budget_exceeded', actual: summary.daysProteinInBand, label: 'in the protein band' },
     { code: 'carb_cap_budget_exceeded', actual: summary.daysUnderCarbCap, label: 'under the carb cap' },
     { code: 'calorie_bounds_budget_exceeded', actual: summary.daysInCalorieBounds, label: 'within calorie bounds' },
-    { code: 'cuisine_balance_budget_exceeded', actual: summary.daysCuisineBalanced, label: 'balanced one Indian / one international at lunch and dinner' }
+    // R3, now a budget. This slot previously read `summary.daysCuisineBalanced`
+    // — a field `summariseWeek` stopped computing when R3 replaced the old
+    // cuisine-balance rule — so `actual` was `undefined`, `undefined < required`
+    // is false, and the check silently never fired. It is now wired to the
+    // figure the summary actually produces.
+    {
+      code: 'cuisine_direction_budget_exceeded',
+      actual: summary.daysR3Compliant,
+      label: `${rules.hard.lunchCuisine} lunch + non-${rules.hard.lunchCuisine} dinner (R3)`
+    }
   ];
   for (const budget of budgets) {
     if (budget.actual < required) {

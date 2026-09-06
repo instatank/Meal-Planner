@@ -176,7 +176,12 @@ const buildAnchorFamilyCaps = (redMeatMealsPerWeek) => ({
   legume_staple: DEFAULT_ANCHOR_FAMILY_CAP,
   avocado: DEFAULT_ANCHOR_FAMILY_CAP,
   poultry: 5,
-  egg: 4,
+  // 6, not 5, so the R2 ceiling of 5 egg breakfasts is what actually binds
+  // rather than this cap silently binding one earlier. The extra slot leaves
+  // room for one of the three egg-carrying lunch/dinner meals in the catalog
+  // (egg curry, oyakodon, tuna Nicoise) on a day with a non-egg breakfast —
+  // R5 already forbids pairing one with an egg breakfast on the same day.
+  egg: 6,
   red_meat: redMeatMealsPerWeek
 });
 
@@ -215,12 +220,34 @@ export const RUBRIC_LIMITS = Object.freeze({
   maxDishRepeatsPerWeek: 1,
   pinnedDishMaxPerWeek: 3,
   // R2 — egg-anchored breakfasts, a floor as well as a ceiling.
+  //
+  // The ceiling moved 4 -> 5 by founder decision ("I eat scrambled eggs or a
+  // boiled egg sandwich pretty often; I don't mind an egg breakfast 4 or 5
+  // days a week"). Breakfast is the binding slot — 18 legal options for 7
+  // slots — and 8 of them are egg-anchored, so the ceiling was a real part of
+  // what made it bind.
+  //
+  // The floor stays at 3. Permission to eat more eggs is not a requirement to,
+  // and the tier system raises the count on its own once the egg breakfasts
+  // he actually eats are confirmed often enough to earn `staple`.
   eggBreakfastsMin: 3,
-  eggBreakfastsMax: 4,
+  eggBreakfastsMax: 5,
   // Anchor ingredients that make a breakfast "an egg breakfast". Matches on
   // the anchor, not the name, so `egg_noodles` at dinner can never count.
   eggAnchorIngredients: Object.freeze(['egg_whole', 'egg_white', 'egg_yolk']),
-  // R3 — the only free pattern is Indian lunch + non-Indian dinner.
+  // R3 — the cuisine direction: Indian lunch + non-Indian dinner.
+  //
+  // This names the cuisine; it does not say the rule is hard. R3 was a Tier-1
+  // gate applied at enumeration on all 7 days, and the measured cost of that
+  // was severe (docs/SYSTEM_DIAGNOSIS.md §5.1): 47 meals became dinner-only
+  // and 28 lunch-only *permanently*, the 7 Indian lunches had to come from a
+  // 28-meal pool that is 64% flatbread — the `jowar_roti` leaning, and the
+  // reason R4 could only ever be scored — and 84% of the candidate space was
+  // removed before anything was scored.
+  //
+  // Founder decision: it is now Tier 2, judged 5 of 7 like every other budget.
+  // The pattern still holds most days; the two flex days buy back the variety
+  // and make cross-slot use of a meal possible at all.
   lunchCuisine: 'indian',
   // R5 — no signature ingredient twice in the same day.
   //
@@ -279,6 +306,11 @@ const GOAL_DEFINITIONS = {
       // remaining days run out of room to make it back. Without this the beam
       // fills with high-variety branches that are already doomed.
       budgetPressurePenalty: 45,
+      // The same shape, for meals the user marked `staple`. A raised ceiling
+      // alone did not bring a light-but-loved breakfast back into the week —
+      // it appeared zero times — because the macro budgets push against it.
+      // This makes leaving a staple unplaced cost more as the days run out.
+      staplePressurePenalty: 30,
       carbOverCapPenalty: 0.35,
       calorieOutOfBoundsPenalty: 0.02,
       // Dinner tapering is a preference, not an exclusion. Expressed as the
@@ -344,6 +376,11 @@ const GOAL_DEFINITIONS = {
       proteinProximity: 0.6,
       outOfBandPenalty: 8,
       budgetPressurePenalty: 45,
+      // The same shape, for meals the user marked `staple`. A raised ceiling
+      // alone did not bring a light-but-loved breakfast back into the week —
+      // it appeared zero times — because the macro budgets push against it.
+      // This makes leaving a staple unplaced cost more as the days run out.
+      staplePressurePenalty: 30,
       carbOverCapPenalty: 0,
       calorieOutOfBoundsPenalty: 0.02,
       dinnerCalorieShareTarget: 0.40,

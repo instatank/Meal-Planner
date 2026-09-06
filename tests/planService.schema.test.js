@@ -97,7 +97,10 @@ test('the optimizer shortlists drop straight into the schema builder', async () 
 
   const rules = getRules('high_protein');
   const targetDateKeys = ['2026-08-03', '2026-08-04', '2026-08-05'];
-  const plan = buildWeekPlan({ mealDatabase, rules, targetDateKeys, preferences: {} });
+  // `withShortlists` is opt-in now — Phase 2 chooses between complete weeks
+  // and never reads them. This test covers the retired shortlist-assembly
+  // path, which is kept working but is no longer what the app calls.
+  const plan = buildWeekPlan({ mealDatabase, rules, targetDateKeys, preferences: {}, withShortlists: true });
   const tool = buildSubmitPlanTool(plan.shortlists, targetDateKeys);
 
   const catalogNames = new Set([

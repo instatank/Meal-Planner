@@ -19,7 +19,12 @@
  * Deterministic and seedable: same inputs always give the same week.
  */
 
-import { maxPerWeek as tierMaxPerWeek, softenTiers, tierScoreBonus } from './mealTiers.js';
+import {
+  maxPerWeek as tierMaxPerWeek,
+  softenTiers,
+  stapleNames,
+  tierScoreBonus
+} from './mealTiers.js';
 import {
   CARB_HEAVY_THRESHOLD,
   FAT_HEAVY_THRESHOLD,
@@ -362,16 +367,16 @@ export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {}, t
       const pairFat = b.fat + l.fat;
       const pairCalories = b.calories + l.calories;
 
-      // R3 is a property of the lunch alone at this level, so a non-Indian
-      // lunch kills the whole dinner loop rather than each dinner in turn.
-      if (l.cuisine !== lunchCuisine) continue;
+      // R3 is no longer gated here. It was: a non-Indian lunch killed the
+      // whole dinner loop, which is why the pool was 84% smaller and why no
+      // meal could ever appear in both slots. It is now a Tier-2 budget,
+      // counted per day in `annotateDay` and judged 5-of-7 across the week.
       // R5, breakfast/lunch half. Hoisted here so a colliding pair skips every
       // dinner at once instead of being rejected 75 times over.
       if (pairwiseSignatureCheck && signatureOverlap(b, l)) continue;
 
       for (let dinnerIndex = 0; dinnerIndex < lunchDinners.length; dinnerIndex += 1) {
         const d = lunchDinnerFacts[dinnerIndex];
-        if (d.cuisine === lunchCuisine) continue;
         if (!withinSameMealCap(b.name, l.name, d.name, maxSameMealPerDay)) continue;
         if (pairwiseSignatureCheck && (signatureOverlap(b, d) || signatureOverlap(l, d))) continue;
 
@@ -441,6 +446,13 @@ export const annotateDay = (day, rules, totals = null) => {
     // Computed here so the beam reads a flag rather than re-deriving the
     // anchor for every (node, candidate) pair.
     isEggBreakfast: rules.hard.eggAnchorIngredients.includes(breakfast.primaryIngredient),
+    // R3 — Indian lunch + non-Indian dinner. A Tier-2 verdict now, in the
+    // same shape as `proteinInBand` and friends, rather than a precondition
+    // for the day existing at all.
+    cuisineDirectionOk:
+      Boolean(day.breakfast && day.lunch && day.dinner) &&
+      lunch.cuisine === rules.hard.lunchCuisine &&
+      dinner.cuisine !== rules.hard.lunchCuisine,
     // R4 — both lunch and dinner built on flatbread/pasta. Scored in
     // `scoreDayStandalone`, reported here so a caller can count the days.
     bothFlatbreadPasta:
@@ -661,23 +673,45 @@ const DEFAULT_ALTERNATIVE_WEEKS = 6;
 // of distinct days to choose from — it produced weeks with two *identical* days
 // and 14 distinct meals. 150 per class restores that headroom: measured 20
 // distinct meals and no duplicate day on both goals.
+// 150 x 16 classes = 2400 working candidates.
+//
+// Measured cost/quality curve after R3 became a budget (110 meals, 61,794
+// enumerated days, median of 5):
+//
+//   2400 -> 1131ms   all three staples placed, one of them twice
+//   1600 ->  929ms   all three placed
+//   1200 ->  628ms   all three placed  <- the floor
+//    960 ->  546ms   tiers had to be relaxed; one staple dropped to zero
+//    800 ->  573ms   same failure
+//
+// The cliff is between 1200 and 960, and it shows up as the tier system
+// silently giving up on a meal the user asked for. 2400 is kept because the
+// extra ~500ms is client-side work sitting in front of an API call with a 90s
+// timeout, and it buys the best staple satisfaction. Anyone tuning this for
+// speed should not go below 1200.
 const CANDIDATES_PER_BUDGET_CLASS = 150;
 
 const BUDGETS = [
   { flag: 'proteinInBand', counter: 'inBand' },
   { flag: 'underCarbCap', counter: 'underCarb' },
-  { flag: 'inCalorieBounds', counter: 'inCalorieBounds' }
+  { flag: 'inCalorieBounds', counter: 'inCalorieBounds' },
+  // R3. It was a fourth budget once, then became a hard per-day gate, and is
+  // now a budget again — this time as the cuisine *direction* (Indian lunch,
+  // non-Indian dinner) rather than the looser "cuisine balance" it used to be.
+  { flag: 'cuisineDirectionOk', counter: 'cuisineDirection' }
 ];
 
-// Cuisine balance used to be a fourth budget here. R3 replaced it: it is now a
-// hard per-day rule applied at enumeration, so every candidate satisfies it by
-// construction and a budget counter for it would only ever read 7 of 7.
+// The beam's working set, sized in budget-compliance classes.
 //
-// Dropping it would have halved the pool (2^4 → 2^3 classes), which is the
-// wrong direction now that R1 needs 21 *distinct* dishes in a week. The class
-// count is held at its previous value so the beam keeps the same breadth to
-// draw distinct days from.
-const CANDIDATE_BUDGET_CLASSES = 2 ** (BUDGETS.length + 1);
+// Held at 16 rather than `2 ** (BUDGETS.length + 1)`, which is what it
+// evaluated to when there were three budgets. Adding R3 as a fourth would have
+// doubled it to 32, and because the beam does `beamWidth x pool x days` work,
+// doubling the pool doubled the search: measured 537ms -> 3176ms, well past
+// what the Vercel proxy's budget can absorb. 16 classes x 150 keeps the
+// working set exactly where it was while `trimCandidatePool` still stratifies
+// across all four budgets, so the rare-but-needed day is no likelier to be
+// trimmed away than before.
+const CANDIDATE_BUDGET_CLASSES = 16;
 const DEFAULT_MAX_CANDIDATES = CANDIDATE_BUDGET_CLASSES * CANDIDATES_PER_BUDGET_CLASS;
 
 /**
@@ -857,8 +891,39 @@ const applyDay = (state, candidate) => {
     protein: state.protein + candidate.totals.protein,
     inBand: state.inBand + (candidate.proteinInBand ? 1 : 0),
     underCarb: state.underCarb + (candidate.underCarbCap ? 1 : 0),
-    inCalorieBounds: state.inCalorieBounds + (candidate.inCalorieBounds ? 1 : 0)
+    inCalorieBounds: state.inCalorieBounds + (candidate.inCalorieBounds ? 1 : 0),
+    cuisineDirection: state.cuisineDirection + (candidate.cuisineDirectionOk ? 1 : 0)
   };
+};
+
+/**
+ * Keep the `limit` highest-scoring entries, in the order a stable descending
+ * sort followed by a slice would have produced.
+ *
+ * The beam used to push every surviving (node, candidate) pair into an array
+ * and sort the whole thing once per day, then throw away all but `beamWidth`.
+ * With R3 moved from a hard gate to a budget the candidate pool became far
+ * more varied, so many more pairs survive `canPlaceDay` and that array grew to
+ * tens of thousands per day — measured as the single largest cost in the
+ * search (~1150ms of a ~1500ms generation; the full candidate sort it was
+ * previously blamed on is only 50ms).
+ *
+ * Stability falls out of the strict `>` test, exactly as in `topByBaseScore`:
+ * an entry only displaces the worst kept one when it scores strictly higher,
+ * so among equal scores the earliest-seen survives — which is what V8's stable
+ * sort did.
+ */
+const keepTopScoring = (kept, entry, limit) => {
+  if (kept.length === limit && !(entry.score > kept[limit - 1].score)) return;
+  let low = 0;
+  let high = kept.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (kept[mid].score < entry.score) high = mid;
+    else low = mid + 1;
+  }
+  kept.splice(low, 0, entry);
+  if (kept.length > limit) kept.pop();
 };
 
 /**
@@ -913,6 +978,13 @@ export const selectWeek = (params) => {
   const requiredCompliant = requiredCompliantDays(dayCount, rules);
   const eggBreakfastsMin = eggBreakfastsFloor(dayCount, rules);
 
+  // Staples that actually exist in the pool. A staple the rules exclude for
+  // some other reason must not doom every branch — it simply cannot be placed.
+  const placeableNames = new Set();
+  for (const candidate of pool) for (const name of candidate.mealNames) placeableNames.add(name);
+  const requiredStaples = tiers ? stapleNames(tiers).filter((name) => placeableNames.has(name)) : [];
+  const staplePressurePenalty = Number(rules.scored.staplePressurePenalty ?? 0);
+
   const seed = seedWeekState(lockedDays, rules);
   let beam = [{
     days: [],
@@ -921,7 +993,8 @@ export const selectWeek = (params) => {
       protein: 0,
       inBand: 0,
       underCarb: 0,
-      inCalorieBounds: 0
+      inCalorieBounds: 0,
+      cuisineDirection: 0
     },
     score: 0
   }];
@@ -929,6 +1002,8 @@ export const selectWeek = (params) => {
   for (let dayIndex = 0; dayIndex < dayCount; dayIndex += 1) {
     const dateKey = targetDateKeys[dayIndex];
     const remainingAfter = dayCount - dayIndex - 1;
+    // Bounded to `beamWidth` as it is built, rather than collected in full and
+    // sorted afterwards. See `keepTopScoring`.
     const next = [];
 
     // The tie-breaker depends only on the date and the candidate, not on the
@@ -972,6 +1047,25 @@ export const selectWeek = (params) => {
         // branch with fewer days left than eggs still owed.
         const eggsSoFar = node.state.eggBreakfasts + (candidate.isEggBreakfast ? 1 : 0);
         if (eggsSoFar + remainingAfter < eggBreakfastsMin) continue;
+
+        // Staple floor, in the same shape as the Tier-2 budget pressure above.
+        // A staple that has not been placed yet costs more the fewer days are
+        // left to place it in, and a branch with more unplaced staples than
+        // its remaining days could physically hold is already dead.
+        let staplePressure = 0;
+        if (requiredStaples.length) {
+          let unplaced = 0;
+          for (const name of requiredStaples) {
+            if (node.state.distinct.has(name) || candidate.mealNames.includes(name)) continue;
+            unplaced += 1;
+          }
+          // A day holds three slots, so this is the honest necessary condition
+          // rather than a guess — it prunes only branches that genuinely
+          // cannot finish.
+          if (unplaced > remainingAfter * CORE_SLOTS.length) continue;
+          const slack = Math.max(0, remainingAfter - unplaced);
+          staplePressure = unplaced * (staplePressurePenalty / (1 + slack));
+        }
 
         // Score before expanding state: cloning the usage maps for every
         // (node, candidate) pair is by far the most expensive step, so only
@@ -1039,9 +1133,10 @@ export const selectWeek = (params) => {
           - repeatPenalty
           - budgetPressure
           - monotonyDelta
+          - staplePressure
           + tieBreak;
 
-        next.push({ node, candidate, score });
+        keepTopScoring(next, { node, candidate, score }, beamWidth);
       }
     }
 
@@ -1083,8 +1178,7 @@ export const selectWeek = (params) => {
       });
     }
 
-    next.sort((a, b) => b.score - a.score);
-    beam = next.slice(0, beamWidth).map(({ node, candidate, score }) => ({
+    beam = next.map(({ node, candidate, score }) => ({
       days: [...node.days, { dateKey, candidate }],
       state: applyDay(node.state, candidate),
       score
@@ -1093,11 +1187,17 @@ export const selectWeek = (params) => {
 
   // Prefer a finished week that clears both weekly floors. The beam is sorted
   // by score, so the first survivor of each filter is the best one.
+  const placedEveryStaple = (node) => requiredStaples.every((name) => node.state.distinct.has(name));
+  const clearingAll = beam.filter(
+    (node) => node.state.protein >= proteinFloor
+      && node.state.eggBreakfasts >= eggBreakfastsMin
+      && placedEveryStaple(node)
+  );
   const clearingBoth = beam.filter(
     (node) => node.state.protein >= proteinFloor && node.state.eggBreakfasts >= eggBreakfastsMin
   );
   const clearingProtein = beam.filter((node) => node.state.protein >= proteinFloor);
-  const winner = (clearingBoth[0] || clearingProtein[0] || beam[0]);
+  const winner = (clearingAll[0] || clearingBoth[0] || clearingProtein[0] || beam[0]);
   const days = winner.days.map(({ dateKey, candidate }) => ({ dateKey, ...candidate }));
   const summary = summariseWeek(days, rules);
 
@@ -1114,7 +1214,10 @@ export const selectWeek = (params) => {
   // merely detected afterwards.
   const alternatives = [];
   const seenWeeks = new Set([winner.days.map(({ candidate }) => candidate.nameKey).join('#')]);
-  for (const node of (clearingBoth.length ? clearingBoth : clearingProtein.length ? clearingProtein : beam)) {
+  const alternativePool = clearingAll.length
+    ? clearingAll
+    : clearingBoth.length ? clearingBoth : clearingProtein.length ? clearingProtein : beam;
+  for (const node of alternativePool) {
     if (alternatives.length >= maxAlternativeWeeks) break;
     const key = node.days.map(({ candidate }) => candidate.nameKey).join('#');
     if (seenWeeks.has(key)) continue;
@@ -1371,8 +1474,17 @@ export const buildWeekPlan = ({
   // and the engine behaves exactly as it did before tiers existed.
   tiers = null,
   beamWidth = DEFAULT_BEAM_WIDTH,
+  // Was not forwarded to `selectWeek` at all, so callers tuning it were
+  // silently tuning nothing and the default was always in force.
+  maxCandidates = DEFAULT_MAX_CANDIDATES,
   maxAlternativeWeeks = DEFAULT_ALTERNATIVE_WEEKS,
-  shortlistPerSlot = DEFAULT_SHORTLIST_PER_SLOT
+  shortlistPerSlot = DEFAULT_SHORTLIST_PER_SLOT,
+  // Per-slot shortlists exist only for the retired shortlist-assembly Phase 2
+  // (`generateWeeklyPlan`). The week-choice path does not read them, and
+  // building them walks the whole candidate set — measured at ~300ms of a
+  // ~1250ms generation, spent on an object nothing consumes. Off by default;
+  // pass `withShortlists: true` if you genuinely need them.
+  withShortlists = false
 }) => {
   const dayCandidates = enumerateFeasibleDays({ mealDatabase, rules, preferences, tiers });
   // Scored once, here, and shared by both consumers below.
@@ -1387,19 +1499,22 @@ export const buildWeekPlan = ({
     pinnedDish,
     tiers,
     beamWidth,
+    maxCandidates,
     maxAlternativeWeeks,
     dayCandidates,
     scoredCandidates
   });
-  const { shortlists, stats } = buildSlotShortlists({
-    weekDays: week.days,
-    dayCandidates,
-    rules,
-    preferences,
-    historyMap,
-    perSlot: shortlistPerSlot,
-    scoredCandidates
-  });
+  const { shortlists, stats } = withShortlists
+    ? buildSlotShortlists({
+      weekDays: week.days,
+      dayCandidates,
+      rules,
+      preferences,
+      historyMap,
+      perSlot: shortlistPerSlot,
+      scoredCandidates
+    })
+    : { shortlists: {}, stats: {} };
 
   return { ...week, dayCandidates, shortlists, stats };
 };
