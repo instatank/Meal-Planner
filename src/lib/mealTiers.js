@@ -364,6 +364,39 @@ export const isInCooldown = (mealName, { tiers = {}, stats = new Map(), nowMs = 
   return nowMs - lastMs < definition.cooldownWeeks * 7 * DAY_MS;
 };
 
+/**
+ * The same tier table with every repeat allowance stepped down one level.
+ *
+ * Returns `null` once nothing is left to soften — every tier is already at one
+ * use a week or fewer — which is the signal to stop retrying.
+ *
+ * The week search uses this as a degradation ladder. A tier is a *preference*,
+ * and a preference must never be the reason a week comes back invalid.
+ * Measured: marking a breakfast a `staple` exhausted the beam on the last day,
+ * because breakfast is the binding slot (18 legal options, of which R2 and the
+ * `egg` family cap spend several) and three of the seven were being spent on
+ * one dish. Rather than fail, the search asks for the favourite twice, then
+ * once, then plans without the pull at all.
+ */
+export const softenTiers = (tiers) => {
+  const STEP_DOWN = {
+    [TIER.STAPLE]: TIER.REGULAR,
+    [TIER.REGULAR]: TIER.OCCASIONAL
+  };
+  let changed = false;
+  const next = {};
+  for (const [name, tier] of Object.entries(tiers || {})) {
+    const softened = STEP_DOWN[tier];
+    if (softened) {
+      next[name] = softened;
+      changed = true;
+    } else {
+      next[name] = tier;
+    }
+  }
+  return changed ? next : null;
+};
+
 /** Normalize a user-supplied override map, dropping anything unrecognised. */
 export const normalizeTierOverrides = (raw = {}) => {
   const out = {};

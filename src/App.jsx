@@ -819,7 +819,11 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             targetDateKeys,
             historyMap,
             preferences: adjustedPrefs,
-            tiers: mealTiers
+            // The tiers the optimizer actually planned under, which may be a
+            // stepped-down version of `mealTiers` if a favourite could not be
+            // honoured in full. The validator must judge the week by the same
+            // allowances it was built with.
+            tiers: reference.tiersUsed || mealTiers
           });
           const { stats } = reference;
           console.info(`[Hybrid] Optimizer completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats, reference.summary);
@@ -854,7 +858,11 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             // The validator must use the same repeat allowances the optimizer
             // did. Without this every week containing a staple is "repaired"
             // back into a week without one.
-            tiers: mealTiers
+            // The tiers the optimizer actually planned under, which may be a
+            // stepped-down version of `mealTiers` if a favourite could not be
+            // honoured in full. The validator must judge the week by the same
+            // allowances it was built with.
+            tiers: reference.tiersUsed || mealTiers
           });
 
           if (checked.resolutionViolations.length > 0) {
@@ -880,7 +888,11 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           // Awaited deliberately — CLAUDE.md sync invariant 3. Showing success
           // before the Firestore write lands lets a fast refresh beat it.
           await saveToStorage('meal-plans', nextPlans);
-          showNotification(`✓ Successfully auto-generated plan for the week!`);
+          showNotification(
+            reference.tiersRelaxedFrom
+              ? '✓ Week generated. Your favourites appear less often than asked — the rules left no room for more.'
+              : '✓ Successfully auto-generated plan for the week!'
+          );
         } catch (error) {
           console.error("Auto-generation failed", error);
           showNotification('❌ Auto-generation failed. Please try "Regen Week" manually.');
@@ -1791,7 +1803,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         targetDateKeys,
         historyMap,
         preferences: adjustedPrefs,
-        tiers: mealTiers
+        tiers: reference.tiersUsed || mealTiers
       });
       const { stats } = reference;
       console.info(`[Hybrid] Optimizer completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats, reference.summary);
@@ -1819,7 +1831,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         preferences: adjustedPrefs,
         historyMap,
         lockedDays: buildLockedWeekDays(targetDateKeys),
-        tiers: mealTiers
+        tiers: reference.tiersUsed || mealTiers
       });
 
       if (checked.resolutionViolations.length > 0) {

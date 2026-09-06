@@ -185,3 +185,62 @@ test('the selection tool constrains the model to the offered week ids', () => {
   assert.deepEqual(tool.input_schema.required, ['week_id']);
   assert.equal(tool.input_schema.additionalProperties, false);
 });
+
+// ─── Degradation rather than failure ────────────────────────────────────────
+
+test('a tier that cannot be honoured is stepped down, never allowed to fail', () => {
+  // Breakfast is the binding slot — 18 legal options, of which R2 and the
+  // `egg` family cap already spend several — so asking for three of the seven
+  // breakfasts to be one dish exhausts the beam. Before the degradation
+  // ladder that produced a `bestEffort` week with duplicate days and three
+  // anchor-family violations. A preference must never make a week invalid.
+  const tiers = { 'Anda bhurji + toast': TIER.STAPLE };
+  const week = plan({ tiers });
+
+  assert.ok(week.tiersRelaxedFrom, 'the search should report that it had to ease off');
+  assert.equal(
+    validateWeek({ days: week.days, rules, preferences: {}, tiers: week.tiersUsed }).valid,
+    true
+  );
+  assert.ok(week.alternatives.length > 0, 'and still offer Phase 2 a real choice');
+});
+
+test('every tier configuration yields a valid week and real alternatives', () => {
+  const configurations = [
+    null,
+    { 'Paneer tikka + jowar roti + salad': TIER.STAPLE },
+    { 'Anda bhurji + toast': TIER.STAPLE },
+    { 'Paneer tikka + jowar roti + salad': TIER.STAPLE, 'Anda bhurji + toast': TIER.STAPLE },
+    {
+      'Paneer tikka + jowar roti + salad': TIER.STAPLE,
+      'Anda bhurji + toast': TIER.STAPLE,
+      'Prawn curry + rice': TIER.STAPLE,
+      'Butter chicken + jowar roti': TIER.STAPLE
+    }
+  ];
+
+  for (const tiers of configurations) {
+    const week = plan(tiers ? { tiers } : {});
+    const label = tiers ? Object.keys(tiers).join(' + ') : 'no tiers';
+    const result = validateWeek({ days: week.days, rules, preferences: {}, tiers: week.tiersUsed || tiers });
+    assert.equal(result.valid, true, `${label}: ${result.violations.map((v) => v.code).join(', ')}`);
+    assert.ok(week.alternatives.length > 0, `${label}: no alternatives offered`);
+  }
+});
+
+test('the best-effort fallback still honours the result contract', () => {
+  // It can emit a week breaking the rules by design — that is what the
+  // validator is for — but it must not hand back a shape callers cannot read.
+  const week = buildWeekPlan({
+    mealDatabase,
+    rules,
+    targetDateKeys: DATES,
+    historyMap: {},
+    preferences: {},
+    // Every meal excluded except a handful, so nothing can satisfy the week.
+    tiers: Object.fromEntries(
+      [...mealDatabase.breakfast, ...mealDatabase.lunchDinner].map((meal) => [meal.name, TIER.EXCLUDED])
+    )
+  });
+  assert.ok(Array.isArray(week.alternatives), '`alternatives` must never be undefined');
+});

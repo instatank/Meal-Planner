@@ -280,6 +280,33 @@ Fixed: history entries now carry `name` alongside `meal` (five writers), and
 `buildRecentContext` merges per *slot*, preferring a real history entry and
 falling back to the plan.
 
+### A preference must never make a week invalid
+
+Stress-testing the finished tier system found a real failure: marking a
+*breakfast* a `staple` exhausted the beam on the last day and fell through to
+`bestEffortWeek`, which returned a week with duplicate days and three
+anchor-family violations. Two causes, both now fixed:
+
+1. **The tier bonus was reaching `baseScore`,** which is what
+   `trimCandidatePool` ranks by. With +9 baked in, every budget class filled up
+   with days containing the staples and the pool lost the variety the rest of
+   the week needs. The bonus is now applied to the *placement* inside the beam,
+   which keeps the candidate pool representative while still making the search
+   reach for a favourite before it reaches for novelty.
+2. **There was no degradation path.** `softenTiers` steps every allowance down
+   one level (`staple → regular → occasional`) and the search retries, at most
+   twice, before any fallback. If a favourite cannot be honoured in full the
+   week says so (`tiersRelaxedFrom`, surfaced as a notification) rather than
+   coming back broken.
+
+Measured across five tier configurations, from none to four simultaneous
+staples: **every one now produces a valid week with 6 legal alternatives.**
+
+Note *which* slot degraded. A lunch staple is honoured twice; a breakfast
+staple has to fall back to once. That is §5.2 below showing up in practice —
+breakfast is the binding slot, and it is the constraint to spend the next meal
+batch on.
+
 ---
 
 ## 5. Recommendations — what I did not change, and why

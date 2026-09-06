@@ -19,7 +19,7 @@
  * Deterministic and seedable: same inputs always give the same week.
  */
 
-import { maxPerWeek as tierMaxPerWeek, tierScoreBonus } from './mealTiers.js';
+import { maxPerWeek as tierMaxPerWeek, softenTiers, tierScoreBonus } from './mealTiers.js';
 import {
   CARB_HEAVY_THRESHOLD,
   FAT_HEAVY_THRESHOLD,
@@ -562,15 +562,6 @@ export const scoreDayStandalone = (day, { rules, preferences = {}, tiers = null 
     score -= Math.min(Number(avoids[name] || 0), 4) * w.preferenceAvoidWeight;
   }
 
-  // Tier pull. Being *allowed* to repeat is not enough on its own: the
-  // distinct-meal bonus (+6 per unused dish) would still crowd a favourite out
-  // in favour of something never eaten. A staple carries +9 per placement, so
-  // the search reaches for it before it reaches for novelty.
-  if (tiers) {
-    const tierWeight = Number(w.tierBonusWeight ?? 1);
-    for (const meal of facts) score += tierScoreBonus(meal.name, tiers) * tierWeight;
-  }
-
   return score;
 };
 
@@ -877,7 +868,8 @@ const applyDay = (state, candidate) => {
  * satisfy a Tier-2 budget or reach the weekly protein floor, so the budgets are
  * enforced by construction rather than checked afterwards.
  */
-export const selectWeek = ({
+export const selectWeek = (params) => {
+  const {
   mealDatabase,
   rules,
   targetDateKeys = [],
@@ -893,12 +885,21 @@ export const selectWeek = ({
   maxCandidates = DEFAULT_MAX_CANDIDATES,
   dayCandidates = null,
   scoredCandidates = null
-}) => {
+  } = params;
   const dayCount = targetDateKeys.length;
   const candidates = scoredCandidates || dayCandidates || enumerateFeasibleDays({ mealDatabase, rules, preferences, tiers });
 
   if (dayCount === 0 || candidates.length === 0) {
-    return { days: [], candidateCount: candidates.length, feasible: candidates.length > 0, summary: null };
+    return {
+      days: [],
+      // Every exit from `selectWeek` returns the same shape — a caller reading
+      // `.alternatives` must never get `undefined`, whichever way the search
+      // ended.
+      alternatives: [],
+      candidateCount: candidates.length,
+      feasible: candidates.length > 0,
+      summary: null
+    };
   }
 
   // Sorting a copy leaves the caller's candidate order untouched — the
@@ -1011,9 +1012,28 @@ export const selectWeek = ({
           if (cuisine && !node.state.cuisines.has(cuisine)) newCuisines += 1;
         }
 
+        // Tier pull, applied here rather than in `scoreDayStandalone`.
+        //
+        // It must not reach `baseScore`, because `baseScore` is what
+        // `trimCandidatePool` ranks by. With a +9 staple bonus baked in, every
+        // budget class filled up with days containing the staples, the pool
+        // lost the variety the rest of the week needs, and a user with two
+        // staples got an exhausted beam and a `bestEffort` week carrying
+        // duplicate days and three anchor-family violations. Scoring the
+        // *placement* keeps the candidate pool representative while still
+        // making the search reach for a favourite before it reaches for
+        // novelty — which is the whole point, since the distinct-meal bonus
+        // (+6 per unused dish) would otherwise crowd favourites out.
+        let tierBonus = 0;
+        if (tiers) {
+          const tierWeight = Number(rules.scored.tierBonusWeight ?? 1);
+          for (const name of candidate.mealNames) tierBonus += tierScoreBonus(name, tiers) * tierWeight;
+        }
+
         const tieBreak = tieBreaks[candidateIndex];
         const score = node.score
           + candidate.baseScore
+          + tierBonus
           + newDistinct * rules.scored.distinctMealBonus
           + newCuisines * rules.scored.weekCuisineVarietyBonus
           - repeatPenalty
@@ -1026,6 +1046,23 @@ export const selectWeek = ({
     }
 
     if (next.length === 0) {
+      // A tier is a preference, and a preference must never be the reason a
+      // week comes back invalid. Before giving up, ask for the favourites less
+      // insistently: staple -> regular -> occasional, at most two extra passes.
+      // The pre-computed candidates are deliberately not reused — a softened
+      // tier can change admissibility (an `excluded` meal is filtered out of
+      // the pool entirely), so the enumeration has to run again.
+      const softened = tiers ? softenTiers(tiers) : null;
+      if (softened) {
+        return selectWeek({
+          ...params,
+          tiers: softened,
+          dayCandidates: null,
+          scoredCandidates: null,
+          tiersRelaxedFrom: params.tiersRelaxedFrom || tiers
+        });
+      }
+
       // No branch survives. Fall back to the best-effort week so the caller
       // gets something the validator can report on, rather than nothing at
       // all — but carry the diagnosis of what ran out, because under the
@@ -1091,7 +1128,11 @@ export const selectWeek = ({
     alternatives,
     candidateCount: candidates.length,
     feasible: isWeekWithinBudgets(summary),
-    summary
+    summary,
+    // Set when the tier pull had to be stepped down to find a legal week, so
+    // the caller can tell the user their favourite appears less often than
+    // they asked rather than silently delivering fewer.
+    ...(params.tiersRelaxedFrom ? { tiersRelaxedFrom: params.tiersRelaxedFrom, tiersUsed: tiers } : {})
   };
 };
 
@@ -1167,6 +1208,9 @@ const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays, pinnedDish 
   const summary = summariseWeek(days, rules);
   return {
     days,
+    // Same shape as the happy path. A caller reading `.alternatives` must not
+    // get `undefined` just because the search had to fall back here.
+    alternatives: [],
     candidateCount: scored.length,
     feasible: false,
     summary,
