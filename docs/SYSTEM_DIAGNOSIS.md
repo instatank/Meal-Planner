@@ -170,9 +170,18 @@ than to build and score.
 
 ---
 
-## 3. The AI phase could not produce a legal week — and never did
+## 3. The AI phase was being asked to do something it cannot do
 
-This is the largest finding and the one with the clearest evidence.
+This is the largest finding. **Read the caveat first, because it matters:** the
+percentages below come from *simulating* the tool schema — sampling uniformly
+from the choices it permits — not from live API calls. A real model is not a
+uniform sampler and would do better than these figures on the variety
+dimensions it was actually told about.
+
+What the simulation establishes is not "the model gets it wrong this often". It
+is the shape of the space the model was put in: what the schema allows, how
+little of that space is legal, and which rules it was given no way to satisfy.
+Those three things do not depend on which model is answering.
 
 ### What was measured
 
@@ -192,8 +201,9 @@ most common violations (400 samples):
   red_meat_cap_exceeded               54
 ```
 
-**Zero.** Not "often wrong" — arithmetically impossible to get right, for three
-compounding reasons:
+**Zero of 400.** The relevant point is not the exact rate but why the legal
+region is so small — three compounding reasons, none of which better prompting
+fixes:
 
 1. **The shortlists cannot satisfy R1.** Each day offers 8 breakfasts, and *7 of
    those 8 are the same meal on all seven days*. The union of all seven days'
@@ -220,8 +230,13 @@ final week identical to the optimizer's, AI discarded entirely:  60/60 (100%)
 fires on **day**-scoped ones. So pass 1 never ran; pass 2 rebuilt the whole week
 deterministically, every time.
 
-**The AI phase was a no-op with a bill and 90 seconds of latency attached.** It
-had no measurable effect on the output except to occasionally be discarded.
+Again, these were simulated answers. A real model would break fewer rules — but
+it only takes **one** dish repeat anywhere in 21 slots to trigger the same
+week-scope violation and the same full rebuild, and it was given neither the
+rule nor the data to avoid the anchor-family and egg-breakfast violations at
+all. The realistic reading is that the AI phase was contributing far less than
+its cost and latency suggested, and on the runs where it did differ from the
+optimizer it was more likely to be discarded than kept.
 
 ### What changed
 
@@ -239,6 +254,7 @@ by construction; all but one were being thrown away. The model now picks between
 | model's choice space | ~9.2 × 10¹⁸ weeks | 7 complete weeks |
 | of which legal | **0%** | **100%, by construction** |
 | effect of a bad answer | week discarded, rebuilt | a different *good* week |
+| what it is asked to judge | arithmetic it has no data for | how the week reads |
 | effect of an outage | generation fails | falls back to the optimizer's pick |
 
 An illegal answer is no longer detected. It is unrepresentable.
