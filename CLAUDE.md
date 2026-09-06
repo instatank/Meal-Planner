@@ -66,7 +66,7 @@ Rules live in **`src/lib/rules.js` and nowhere else**, split into three tiers.
 
 | Tier | Meaning | Examples |
 | --- | --- | --- |
-| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, **R1 — every dish at most once a week (one optional pinned dish up to 3)**, **R2 — 3–4 egg-anchored breakfasts**, **R3 — Indian lunch + non-Indian dinner, directional**, **anchor-ingredient cap (≤2/wk at lunch/dinner)**, **no two identical days in a week**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 85% of nominal (**714g** at the 120g target), 50g/day sanity floor |
+| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, **R1 — per-dish weekly allowance, set by the meal's tier (default 1)**, **R2 — 3–4 egg-anchored breakfasts**, **R3 — Indian lunch + non-Indian dinner, directional**, **R5 — no signature ingredient twice in a day**, **anchor-family cap counting every signature ingredient**, **no two identical days in a week**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 85% of nominal (**714g** at the 120g target), 50g/day sanity floor |
 | **2 — Budgeted** | Allowed to break on ≤2 of 7 days | daily protein band (**108–132g**), carb cap (130g), calorie bounds (1600–2200) |
 | **3 — Scored** | Never rejects; only ranks | **R4 — lunch and dinner both flatbread/pasta**, variety, cuisine diversity, protein-family diversity, fibre, dinner calorie tapering, user preferences, anti-greedy |
 
@@ -108,6 +108,32 @@ breakfasts). That path can emit a week breaking R1–R3 — it exists so the
 validator has something to report on — so **never persist a week without
 running `validateWeek` first**.
 
+### How often a meal repeats is a property of the person, not the catalog
+
+**`src/lib/mealTiers.js` owns every per-dish repeat allowance.** `rules.hard.maxDishRepeatsPerWeek` is now the *default* (1), not the ceiling.
+
+| Tier | Per week | Score pull | Meaning |
+| --- | --- | --- | --- |
+| `staple` | 3 | +9 | Wanted often |
+| `regular` | 2 | +4 | Most weeks |
+| `occasional` | 1 | 0 | Default |
+| `rare` | 1 + 3-week cooldown | −6 | Served, not eaten |
+| `excluded` | 0 | — | Never planned |
+
+A tier resolves from an **explicit override → observed behaviour → default**. It is deliberately *not* a column in `mealDatabase.js`: a tier is a fact about a person, and every fact that got a second hand-maintained home in this repo drifted (see `cuisine`, 29 disagreements, audit #5). Passing no `tiers` reproduces the pre-tier engine exactly.
+
+**Do not remove `minConfirmsBeforeDemotion`.** `App.jsx` auto-confirms every past planned meal, so `mealHistory` cannot tell eaten from assumed — only the `confirm` event log can. Without the gate, a user who has not been pressing Confirm has their whole catalog demoted to `rare` at once. Silence is not dislike; `swap`/`skip` are deliberate and demote regardless.
+
+`pinnedDish` is superseded. It was never wired to anything — no caller ever set it, and `validateAndRepairWeek` did not forward it, so a pinned dish would have been rejected by the validator anyway.
+
+**The validator must be given the same `tiers` the optimizer planned under.** Otherwise every week containing a staple is "repaired" back into a week without one.
+
+### R5 — no signature ingredient twice in a day
+
+**`signature_ingredients` (not `primary_ingredient`) is what the day is judged on.** `derivePrimaryIngredient` returns one ingredient per meal — the highest protein contributor — so everything else in the bowl was invisible to every rule. Measured: 4 of the 15 soft-cheese meals in the catalog were invisible to the `cheese_soft` cap, and 5 of 7 generated days repeated an ingredient inside the day (paneer breakfast + palak paneer lunch, egg bhurji + egg curry) while every counter read green.
+
+R5 is enforced at **enumeration**, where R3 already is, because it is a property of one day. The pool drops 23,688 → 16,326 and the optimizer got *faster* (621ms → 537ms). Week-level leaning (`curry_base` ×10, `jowar_roti` ×7 before this) is **scored, never gated** — R3 forces seven Indian lunches and 18 of the 28 legal Indian lunches are flatbread-based, so a hard cap would make the week infeasible.
+
 **The anchor-ingredient cap** counts the ingredient a meal is *about* (highest protein contributor, derived from `parts[]` by `derivePrimaryIngredient`), not the meal name. Name-based caps let `Rajma chawal + raita` and `Rajma + paneer bowl` each appear twice — four rajma dinners in a week, every one legal.
 
 Budgets **pro-rate** for partial-week regenerations: a 4-day remainder gets 1 flex day and a 408g floor, not the full week's allowance.
@@ -116,7 +142,9 @@ Budgets **pro-rate** for partial-week regenerations: a 4-day remainder gets 1 fl
 
 ### Hybrid Generation Pipeline
 1. **Phase 1 (deterministic)** — `src/lib/planOptimizer.js` enumerates *every* Tier-1-legal breakfast/lunch/dinner combination (3,250 for the current catalog, ~250ms), scores each against Tiers 2 and 3, and beam-searches a week that satisfies the Tier-2 budgets by construction. Produces both a reference week and the per-date, per-slot shortlists.
-2. **Phase 2 (AI)** — `src/lib/planService.js` sends shortlists to `/api/generate-plan`. The `submit_weekly_plan` tool is built per request with a **per-day, per-slot `enum`** of legal meal names, so a hallucinated name is structurally impossible. The plan is keyed by date, not an array, because JSON Schema applies one `items` schema to every array element and that would collapse seven days into one shared enum.
+2. **Phase 2 (AI) — chooses between complete weeks, it does not assemble one.** `chooseWeeklyPlan` in `src/lib/planService.js` hands the model the optimizer's winning week plus the ~6 other finished weeks the beam is still holding, and asks it to pick one by id. Every option is legal by construction, so an illegal answer is *unrepresentable*, not merely detected. Any failure — no key, proxy error, timeout, unknown id — falls back to the optimizer's own pick, so the AI can never block a generation.
+
+   **Do not revert to the shortlist-assembly path** (`generateWeeklyPlan`, kept for reference). It was measured to be incapable of the job: sampling its tool schema 400 times the way the schema permits produced **0 legal weeks out of 400**. The shortlists are near-identical across days (the union of all seven breakfast lists is 9 meals) while R1 needs 21 distinct dishes; and four hard rules it was graded on (anchor-family caps, egg floor/ceiling, red-meat cap, duplicate-day) appeared nowhere in the prompt with no data in the payload to check them. Feeding 60 simulated answers through `validateAndRepairWeek` returned `regenerated_week` **60/60**, output identical to the optimizer's own — a no-op with a bill and 90s of latency.
 3. **Phase 3 (validation)** — `src/lib/planValidator.js` checks the returned week against all three tiers and repairs it deterministically if needed: first replacing only the days with Tier-1 violations, then rebuilding the whole run. Nothing invalid is ever written silently; if even the optimizer cannot satisfy the rules it returns `catalogInfeasible`.
 
 **Every path that writes a generated week MUST run Phase 3.** The optimizer's
@@ -220,10 +248,18 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 
   Findings **3, 4, 7–14 remain open**, including two that still disagree in production: two independent red-meat classifiers (#3) and name-based fibre scoring that contradicts measured grams on 14 meat meals (#4).
 
+- **Generation revamp (tiers, R5, week-choice) — shipped.** See `docs/SYSTEM_DIAGNOSIS.md` for the full measurements. Three defects, each of which passed every test and every acceptance criterion:
+  - **Frequency was inexpressible.** `accepts` at 2, 4, 8, 20 and 100 all produced a week containing the meal exactly once. `mealTiers.js` replaces the flat hard cap with a per-user allowance.
+  - **5 of 7 days repeated an ingredient in-day.** The caps counted one anchor per meal. `signature_ingredients` + R5 → **0 of 7**, and the optimizer got faster.
+  - **The AI phase produced 0 legal weeks out of 400 sampled, and was discarded 60/60.** It now chooses between complete legal weeks instead of assembling one.
+  - Also: `handleConfirm` wrote `{ meal: name }` while consumers read `.name`, so **confirming any meal deleted that whole day from the recency signal**. The only days that reached it were the ones the user ignored.
+
 ## Next Priorities (updated)
 
 0. **Confirm the five Phase 2 decisions.** `docs/PHASE2_HANDOVER.md` §4 asked the founder five product questions before the work; they were not answered, so Phase 2 proceeded on stated assumptions (meals authored for review, additive only, fibre in grams now, unimplemented goals left throwing, protein floor unchanged). §9.7 and §9.8 record what to confirm — including the measurement for raising the weekly protein floor.
-1. **Fix `buildPromotedCustomMeal` before re-enabling promotion.** See Known Gotchas. It is the only path feeding invented macros into a measured catalog, and it is currently unreachable because candidate detection is off (audit finding #6). Fix the macros first, then switch detection on — not the other way round.
+0.5. **Decide on R3 (`docs/SYSTEM_DIAGNOSIS.md` §5.1).** Indian lunch is hard on all 7 days. It makes 47 meals dinner-only and 28 lunch-only permanently, forces 7 lunches from a 28-meal pool that is 64% flatbread (the `jowar_roti` ×5–7 leaning, and why R4 can only be scored), and removes 84% of the candidate space. Moving it to Tier 2 at 5 of 7 is a small change. **Deliberately not made** — it is a founder-stated rule.
+0.6. **Next meal batch should be breakfasts.** 18 legal breakfasts for 7 slots, under R2 and an `egg` family cap of 4, is the tightest pool in the system and the single biggest source of perceived repetition. High-protein, non-egg.
+1. **Fix `buildPromotedCustomMeal` before re-enabling promotion.** Now *more* dangerous: the tier system will happily promote a fabricated-macro meal to `staple`. See Known Gotchas. It is the only path feeding invented macros into a measured catalog, and it is currently unreachable because candidate detection is off (audit finding #6). Fix the macros first, then switch detection on — not the other way round.
 2. **Next meal batch.** The optimizer is unblocked (Tier 1 shipped; ~1.0–1.25s at 110 meals) — the queued meal ingestion can now proceed against a fast optimizer. Tier 2/3 of `docs/PHASE3_HANDOVER.md` §4 stay parked until the catalog is well past 200 meals.
 3. **Switch timestamps to Firestore `serverTimestamp()`.** The current heal-on-read logic is defensive but brittle. Using server-assigned timestamps makes client-clock poisoning impossible and lets us delete the `isCorruptTs` / heal branches.
 4. **IF (Intermittent Fasting) mode.** `two_meals` is declared in onboarding and reconciled in `rules.js`, but has no ruleset — `getRules` throws for it by design. Give it real Tier-1/2/3 definitions and surface it so users can opt into 16/8 or 18/6 without overriding meals manually.
@@ -244,6 +280,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 | `docs/PHASE1_HANDOVER.md` | Shipped 2026-08-02. §9 records what the generation-engine rebuild measured — read it before changing any threshold. |
 | `docs/EVAL_AND_ROADMAP.md` | The original audit. §3 is now historical (that code is deleted); §4 onward is still live. |
 | `docs/QUALITY_RUBRIC.md` | **The four scored rules (R1–R4)** layered on top of the `rules.js` hard gates. Implemented in `src/lib/planScorer.js`. **Not yet calibrated** — the calibration in its §Calibration needs `docs/rejections/` and the founder's ideal week, neither of which is in the repo. |
+| `docs/SYSTEM_DIAGNOSIS.md` | **Read this first if the output looks wrong.** The end-to-end audit: why the system passed 199/199 tests and every acceptance criterion while still disappointing, with the measurement behind each finding. §5 is the open recommendation set — R3's cost, the breakfast bottleneck, and what not to do. |
 | `docs/CONSISTENCY_AUDIT.md` | **Every fact with more than one home**, and every concept inferred by pattern-matching where structured data exists — 14 findings ranked by blast radius, each with file:line, current values, and the location that should become authoritative. Findings 1, 2, 5 and 6 are fixed and marked as such; the rest are open. |
 
 ---
@@ -262,10 +299,11 @@ src/
     OnboardingFlow.jsx   First-run setup
   lib/
     rules.js             SINGLE SOURCE OF TRUTH for every threshold (3 tiers)
+    mealTiers.js         Per-meal weekly repeat allowance (override -> behaviour -> default)
     planOptimizer.js     Day enumeration + week beam search + shortlists
     planValidator.js     Post-generation validation + deterministic repair
     planScorer.js        Quality rubric R1-R4 (docs/QUALITY_RUBRIC.md) — scores, never gates
-    planService.js       Client wrapper for /api/generate-plan — weekly gen (Claude)
+    planService.js       Client wrapper for /api/generate-plan — week CHOICE (Claude)
     omniboxService.js    Client wrapper for /api/generate-plan — Omnibox intent parsing (Claude)
     plannerGenerator.js  Single-day generator (facade over planOptimizer)
     mealEvents.js        Event log → preference derivation
