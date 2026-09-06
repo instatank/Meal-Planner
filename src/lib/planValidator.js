@@ -14,6 +14,7 @@
  * Callers must not persist a week that comes back invalid.
  */
 
+import { maxPerWeek as tierMaxPerWeek } from './mealTiers.js';
 import {
   anchorFamilyMaxPerWeek,
   eggBreakfastsFloor,
@@ -23,6 +24,7 @@ import {
 import {
   CORE_SLOTS,
   annotateDay,
+  daySignatureCollisions,
   getMealName,
   getMealCuisine,
   getMealProtein,
@@ -158,6 +160,25 @@ const collectDayViolations = ({ day, rules, preferences }) => {
     }));
   }
 
+  // R5 — no signature ingredient twice in the same day. Hard here as well as
+  // at enumeration, for the same reason R3 is: Phase 2 hands the model flat
+  // per-slot shortlists with the day structure thrown away, so a recombination
+  // can put paneer at breakfast and palak paneer at lunch and nothing
+  // downstream would notice. Day-scoped, so repair replaces just this day.
+  const signatureCap = rules.hard.maxSameSignatureIngredientPerDay;
+  if (Number.isFinite(signatureCap)) {
+    for (const ingredientId of daySignatureCollisions(day, signatureCap)) {
+      found.push(violation({
+        code: 'signature_ingredient_repeated_in_day',
+        scope: 'day',
+        dateKey,
+        actual: ingredientId,
+        limit: signatureCap,
+        message: `${dateKey} uses ${ingredientId} in more than ${signatureCap} slot(s)`
+      }));
+    }
+  }
+
   const protein = day.totals?.protein ?? meals.reduce((sum, meal) => sum + getMealProtein(meal), 0);
   if (protein < rules.hard.dailyProteinSanityFloor) {
     found.push(violation({
@@ -173,7 +194,7 @@ const collectDayViolations = ({ day, rules, preferences }) => {
   return found;
 };
 
-const collectWeekViolations = ({ days, rules, lockedDays, summary, pinnedDish = null }) => {
+const collectWeekViolations = ({ days, rules, lockedDays, summary, pinnedDish = null, tiers = null }) => {
   const found = [];
   const dayCount = days.length;
 
@@ -197,14 +218,21 @@ const collectWeekViolations = ({ days, rules, lockedDays, summary, pinnedDish = 
   Object.values(lockedDays || {}).forEach(tally);
 
   for (const [name, count] of Object.entries(dishUse)) {
-    const isPinned = pinnedDish && name === pinnedDish;
-    const limit = isPinned ? rules.hard.pinnedDishMaxPerWeek : rules.hard.maxDishRepeatsPerWeek;
+    // Same resolution order as `dishCap` in planOptimizer.js: tier, then the
+    // legacy pin, then the flat default. The two must agree — if the validator
+    // used the flat cap while the optimizer used the tier, every week
+    // containing a staple would be "repaired" back into a week without one.
+    const hasTier = tiers && Object.prototype.hasOwnProperty.call(tiers, name);
+    const isPinned = !hasTier && pinnedDish && name === pinnedDish;
+    const limit = hasTier
+      ? tierMaxPerWeek(name, tiers)
+      : (isPinned ? rules.hard.pinnedDishMaxPerWeek : rules.hard.maxDishRepeatsPerWeek);
     if (count > limit) {
       found.push(violation({
         code: 'dish_repeat_exceeded',
         actual: count,
         limit,
-        message: `${name} is used ${count} times this week (max ${limit}${isPinned ? ', pinned' : ''})`
+        message: `${name} is used ${count} times this week (max ${limit}${hasTier ? `, tier ${tiers[name]}` : (isPinned ? ', pinned' : '')})`
       }));
     }
   }
@@ -338,13 +366,13 @@ const collectWeekViolations = ({ days, rules, lockedDays, summary, pinnedDish = 
  *             hardViolations: Array, budgetViolations: Array,
  *             invalidDateKeys: string[] }}
  */
-export const validateWeek = ({ days = [], rules, preferences = {}, lockedDays = {}, pinnedDish = null }) => {
+export const validateWeek = ({ days = [], rules, preferences = {}, lockedDays = {}, pinnedDish = null, tiers = null }) => {
   const annotated = days.map((day) => (day.totals ? day : { ...annotateDay(day, rules), dateKey: day.dateKey }));
   const summary = summariseWeek(annotated, rules);
 
   const violations = [
     ...annotated.flatMap((day) => collectDayViolations({ day, rules, preferences })),
-    ...collectWeekViolations({ days: annotated, rules, lockedDays, summary, pinnedDish })
+    ...collectWeekViolations({ days: annotated, rules, lockedDays, summary, pinnedDish, tiers })
   ];
 
   const hardViolations = violations.filter((v) => v.tier === TIER.HARD);
@@ -389,9 +417,11 @@ export const repairWeek = ({
   rules,
   preferences = {},
   historyMap = {},
-  lockedDays = {}
+  lockedDays = {},
+  pinnedDish = null,
+  tiers = null
 }) => {
-  const initial = validateWeek({ days, rules, preferences, lockedDays });
+  const initial = validateWeek({ days, rules, preferences, lockedDays, pinnedDish, tiers });
   if (initial.valid) {
     return { days: initial.days, validation: initial, repaired: false, strategy: 'none' };
   }
@@ -413,11 +443,13 @@ export const repairWeek = ({
       targetDateKeys: targetDateKeys.filter((dateKey) => brokenDates.has(dateKey)),
       historyMap,
       preferences,
-      lockedDays: keptLocked
+      lockedDays: keptLocked,
+      pinnedDish,
+      tiers
     });
 
     const merged = mergeByDate(initial.days, replacement.days);
-    const validation = validateWeek({ days: merged, rules, preferences, lockedDays });
+    const validation = validateWeek({ days: merged, rules, preferences, lockedDays, pinnedDish, tiers });
     if (validation.valid) {
       return { days: validation.days, validation, repaired: true, strategy: 'replaced_invalid_days' };
     }
@@ -430,9 +462,11 @@ export const repairWeek = ({
     targetDateKeys,
     historyMap,
     preferences,
-    lockedDays
+    lockedDays,
+    pinnedDish,
+    tiers
   });
-  const validation = validateWeek({ days: rebuilt.days, rules, preferences, lockedDays });
+  const validation = validateWeek({ days: rebuilt.days, rules, preferences, lockedDays, pinnedDish, tiers });
 
   return {
     days: validation.days,
@@ -463,7 +497,9 @@ export const validateAndRepairWeek = ({
   rules,
   preferences = {},
   historyMap = {},
-  lockedDays = {}
+  lockedDays = {},
+  pinnedDish = null,
+  tiers = null
 }) => {
   // A day carrying an unresolvable name comes back incomplete, which
   // `validateWeek` reports as `incomplete_day` — a Tier-1, day-scoped
@@ -476,7 +512,9 @@ export const validateAndRepairWeek = ({
     rules,
     preferences,
     historyMap,
-    lockedDays
+    lockedDays,
+    pinnedDish,
+    tiers
   });
 
   return { ...repair, resolutionViolations };

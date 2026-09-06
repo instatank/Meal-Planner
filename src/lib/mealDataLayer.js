@@ -194,6 +194,91 @@ export const derivePrimaryIngredient = (meal = {}) => {
   return best;
 };
 
+/**
+ * Ingredients nobody names when describing a meal.
+ *
+ * `derivePrimaryIngredient` above answers "what is this meal *about*", which
+ * the weekly anchor cap needs. `deriveSignatureIngredients` below answers a
+ * different question — "what would a person list if asked what was in this" —
+ * and that question is the one the *day* is judged on. A cooking fat is a real
+ * part of the macros and not part of the answer, so it is named here rather
+ * than filtered by a share threshold that would also drop genuine sauces.
+ */
+export const SEASONING_INGREDIENTS = Object.freeze(new Set([
+  'olive_oil'
+]));
+
+/** An ingredient must reach one of these shares of a meal to be a signature. */
+export const SIGNATURE_PROTEIN_SHARE = 0.20;
+export const SIGNATURE_CARB_SHARE = 0.25;
+export const SIGNATURE_CALORIE_SHARE = 0.20;
+
+/**
+ * Every ingredient a person would name when describing this meal.
+ *
+ * The weekly caps used to count `primary_ingredient` alone — one ingredient
+ * per meal, the highest protein contributor. Everything else in the bowl was
+ * invisible to every rule in the system, which is how `Moong dal chilla +
+ * paneer + hung curd` (anchored on the chilla) and `Palak paneer` (anchored on
+ * the paneer) could sit at breakfast and lunch on the same day with the
+ * soft-cheese counter reading a compliant 2 of 2. Measured on the shipped
+ * catalog, 4 of the 15 meals containing a soft cheese were invisible to the
+ * cheese cap, and 5 of 7 generated days repeated an ingredient inside the day.
+ *
+ * Returns a sorted array so the value is stable across rebuilds and safe to
+ * snapshot in a test.
+ */
+export const deriveSignatureIngredients = (meal = {}) => {
+  const parts = Array.isArray(meal.parts) ? meal.parts : [];
+  if (!parts.length) return [];
+
+  const contributions = [];
+  const totals = { p: 0, c: 0, cal: 0 };
+
+  for (const part of parts) {
+    const ing = ingredients[part.ingredientId];
+    if (!ing?.per100g) continue;
+
+    let weightG = Number(part.qty) || 0;
+    if (part.unit === 'piece' || part.unit === 'slice') {
+      weightG = weightG * (ing.defaultPortion?.pieceWeightG || 100);
+    }
+    const ratio = weightG / 100;
+    const entry = {
+      id: part.ingredientId,
+      p: (ing.per100g.p || 0) * ratio,
+      c: (ing.per100g.c || 0) * ratio,
+      cal: (ing.per100g.kcal || 0) * ratio
+    };
+    totals.p += entry.p;
+    totals.c += entry.c;
+    totals.cal += entry.cal;
+    contributions.push(entry);
+  }
+
+  const share = (value, total) => (total > 0 ? value / total : 0);
+  const signature = new Set();
+
+  for (const entry of contributions) {
+    if (SEASONING_INGREDIENTS.has(entry.id)) continue;
+    if (
+      share(entry.p, totals.p) >= SIGNATURE_PROTEIN_SHARE ||
+      share(entry.c, totals.c) >= SIGNATURE_CARB_SHARE ||
+      share(entry.cal, totals.cal) >= SIGNATURE_CALORIE_SHARE
+    ) {
+      signature.add(entry.id);
+    }
+  }
+
+  // A meal is always about at least the thing it is anchored on, even in the
+  // degenerate case where one ingredient carries every macro and the shares
+  // above tie.
+  const primary = derivePrimaryIngredient(meal);
+  if (primary && !SEASONING_INGREDIENTS.has(primary)) signature.add(primary);
+
+  return Array.from(signature).sort();
+};
+
 // ─── Carb type (rubric R4) ──────────────────────────────────────────────────
 //
 // `carb_type` answers one question: what starch *form* is this meal built on —

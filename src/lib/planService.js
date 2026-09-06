@@ -110,6 +110,165 @@ const buildShortlistsPayload = (shortlists) => {
   return compact;
 };
 
+// ─── Phase 2, the week-choice path ──────────────────────────────────────────
+//
+// The shortlist path below hands the model three flat per-slot lists per day
+// and asks it to assemble a week. It cannot do that job, and the failure is
+// arithmetic rather than a prompting problem:
+//
+//   - The tool schema permitted ~9.2e18 weeks. Sampling it 400 times the way
+//     the schema allows produced 0 legal weeks. Every sample broke a hard
+//     rule; the average sample carried 5 dish repeats and 2.5 anchor-family
+//     violations.
+//   - The shortlists are nearly identical across days — 7 of each day's 8
+//     breakfasts are the same meal on all seven days, and the union of all
+//     seven days' breakfast lists is 9 meals — while R1 requires 21 distinct
+//     dishes across the week.
+//   - Four of the hard rules it is graded on (the anchor-family caps, the
+//     egg-breakfast floor and ceiling, the red-meat cap, the duplicate-day
+//     rule) are not stated in the prompt at all, and the per-meal payload
+//     carries no anchor-ingredient field, so the model could not evaluate
+//     them even if it were told.
+//
+// Feeding 60 simulated model answers through `validateAndRepairWeek` returned
+// `strategy: 'regenerated_week'` 60 times out of 60, and the final week was
+// byte-identical to the optimizer's own in all 60. The AI phase was a no-op
+// with a bill and 90 seconds of latency attached.
+//
+// `chooseWeeklyPlan` gives it a job it can actually do. The optimizer already
+// builds several complete weeks that satisfy every rule by construction — they
+// sit in the final beam and used to be thrown away — so the model picks one
+// instead of assembling one. An illegal answer stops being something to detect
+// and becomes something that cannot be expressed.
+
+export const buildSelectWeekTool = (weekIds) => ({
+  name: 'select_weekly_plan',
+  description:
+    'Choose which of the offered complete weekly plans to use. Every option already satisfies every nutritional and variety rule, so choose on appetite, rhythm and how the week reads as a whole.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      week_id: {
+        type: 'string',
+        enum: weekIds,
+        description: 'The id of the week to use.'
+      },
+      reason: {
+        type: 'string',
+        description: 'One short sentence on why this week reads best. Shown in logs, not to the user.'
+      }
+    },
+    required: ['week_id'],
+    additionalProperties: false
+  }
+});
+
+/** Compact, model-readable description of one complete week option. */
+const describeWeekOption = (option, id) => ({
+  week_id: id,
+  weekly_protein_g: option.summary?.totalProtein ?? null,
+  distinct_meals: option.summary?.distinctMeals ?? null,
+  days: option.days.map((day) => ({
+    date: day.dateKey,
+    protein_g: Math.round(day.totals?.protein || 0),
+    calories: Math.round(day.totals?.calories || 0),
+    breakfast: getMealName(day.breakfast),
+    lunch: getMealName(day.lunch),
+    dinner: getMealName(day.dinner)
+  }))
+});
+
+/**
+ * Ask the model to pick one of the optimizer's complete legal weeks.
+ *
+ * Returns the chosen option's `days` — real meal objects, straight from the
+ * optimizer — so nothing needs resolving by name afterwards. On any failure
+ * (no key, proxy error, timeout, an id outside the enum) this returns the
+ * first option, which is the optimizer's own top-scoring week. The AI is a
+ * preference layer on top of a correct answer, never a dependency for getting
+ * one.
+ */
+export const chooseWeeklyPlan = async ({
+  weekOptions,
+  preferences,
+  tiers = null,
+  cloudConfig = null,
+  goal = 'high_protein'
+}) => {
+  if (!Array.isArray(weekOptions) || weekOptions.length === 0) {
+    throw new Error('chooseWeeklyPlan requires at least one week option from the optimizer.');
+  }
+  if (weekOptions.length === 1) {
+    return { days: weekOptions[0].days, weekId: 'week_1', chosenIndex: 0, source: 'only_option' };
+  }
+
+  const ids = weekOptions.map((_, index) => `week_${index + 1}`);
+  const config = getActiveConfig(cloudConfig);
+  const template = typeof config.prompts.weeklySelection === 'string'
+    ? config.prompts.weeklySelection
+    : FALLBACK_PROMPTS.weeklySelection;
+
+  // Only the meals the user has actually expressed something about — the full
+  // tier table is 110 entries of mostly "occasional" and would crowd the
+  // prompt with nothing.
+  const notableTiers = {};
+  for (const [name, tier] of Object.entries(tiers || {})) {
+    if (tier && tier !== 'occasional') notableTiers[name] = tier;
+  }
+
+  const systemInstruction = template
+    .replace('{{PREFS_ACCEPTS}}', JSON.stringify(preferences?.accepts || {}))
+    .replace('{{PREFS_AVOIDS}}', JSON.stringify(preferences?.avoids || {}))
+    .replace('{{MEAL_TIERS}}', JSON.stringify(notableTiers))
+    .replace('{{GOAL}}', String(goal));
+
+  const userMessage = JSON.stringify({
+    weeks: weekOptions.map((option, index) => describeWeekOption(option, ids[index]))
+  });
+
+  const fallback = { days: weekOptions[0].days, weekId: ids[0], chosenIndex: 0, source: 'fallback' };
+
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS) : null;
+
+  try {
+    const response = await fetch(PROXY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal: controller?.signal,
+      body: JSON.stringify({
+        system: systemInstruction,
+        userMessage,
+        tool: buildSelectWeekTool(ids)
+      })
+    });
+    if (timeoutId) clearTimeout(timeoutId);
+    if (!response.ok) {
+      const errPayload = await response.json().catch(() => ({}));
+      console.warn('[planService] week selection proxy error, using the optimizer\'s own pick:', errPayload);
+      return fallback;
+    }
+    const data = await response.json();
+    const chosen = String(data?.toolInput?.week_id || '');
+    const index = ids.indexOf(chosen);
+    if (index < 0) {
+      console.warn('[planService] week selection returned an unknown id:', chosen);
+      return fallback;
+    }
+    return {
+      days: weekOptions[index].days,
+      weekId: chosen,
+      chosenIndex: index,
+      reason: data?.toolInput?.reason || '',
+      source: 'ai'
+    };
+  } catch (error) {
+    if (timeoutId) clearTimeout(timeoutId);
+    console.warn('[planService] week selection failed, using the optimizer\'s own pick:', error?.message || error);
+    return fallback;
+  }
+};
+
 export const generateWeeklyPlan = async ({
   targetDateKeys,
   preferences,

@@ -94,6 +94,37 @@ CRITICAL RULES:
 3. Quantities should be numbers, units should be "g" or "piece" based on the catalog.
 `,
 
+  /**
+   * Phase 2, the week-choice path.
+   *
+   * Deliberately says nothing about protein, carbs, calories, repeat caps or
+   * cuisine direction. Every week offered already satisfies all of them by
+   * construction, so restating the rules here would only invite the model to
+   * re-derive constraints it cannot improve on and second-guess arithmetic it
+   * was not given the data to check. The one thing it is better at than the
+   * optimizer is how a week *reads*, so that is the only thing it is asked.
+   */
+  weeklySelection: `You are helping one person choose between meal plans for the coming week.
+
+Several complete weeks are offered below. Every one of them already satisfies every nutritional target, every repeat and variety rule, and every cuisine constraint — the numbers have been checked and they are not your problem. Do not try to re-verify them, and do not reject a week for a macro reason.
+
+Choose the week that reads best to a person actually eating it.
+
+WHAT TO WEIGH, in order
+1. MEALS THEY LOVE — the tiers below say what this person wants often. A week that includes their staples beats one that does not.
+2. MEALS THEY AVOID — steer away from anything in the avoid list.
+3. RHYTHM — heavier and lighter days alternating rather than clumping; a Friday or Saturday that feels like a treat.
+4. FLOW — consecutive days that do not feel like the same meal twice; a good spread of textures and cooking styles across the week.
+5. APPETITE — if two weeks are otherwise equal, pick the one that sounds better to eat.
+
+Goal: {{GOAL}}
+Meals they have accepted: {{PREFS_ACCEPTS}}
+Meals they avoid: {{PREFS_AVOIDS}}
+How often they want specific meals: {{MEAL_TIERS}}
+
+Call select_weekly_plan with the id of your chosen week and one short sentence of reasoning.
+`,
+
   weeklyGeneration: {
     high_protein: `You are a meal planning assistant. You make the final selection from shortlists a deterministic optimizer has already narrowed down.
 

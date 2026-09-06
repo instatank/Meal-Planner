@@ -221,7 +221,20 @@ export const RUBRIC_LIMITS = Object.freeze({
   // the anchor, not the name, so `egg_noodles` at dinner can never count.
   eggAnchorIngredients: Object.freeze(['egg_whole', 'egg_white', 'egg_yolk']),
   // R3 — the only free pattern is Indian lunch + non-Indian dinner.
-  lunchCuisine: 'indian'
+  lunchCuisine: 'indian',
+  // R5 — no signature ingredient twice in the same day.
+  //
+  // The most-reported defect that broke no rule. The anchor-family cap is
+  // weekly, so paneer at breakfast and palak paneer at lunch spent two of the
+  // week's two `cheese_soft` slots on one day and passed. Measured on the
+  // shipped catalog before this rule existed: 5 of 7 generated days repeated
+  // an ingredient inside the day (egg+egg, paneer+paneer, jowar roti twice,
+  // curry base three times in one day).
+  //
+  // Counted over `signature_ingredients` — every ingredient a person would
+  // name — rather than `primary_ingredient`, which sees one ingredient per
+  // meal and was blind to 4 of the 15 soft-cheese meals in the catalog.
+  maxSameSignatureIngredientPerDay: 1
 });
 
 const GOAL_DEFINITIONS = {
@@ -278,6 +291,20 @@ const GOAL_DEFINITIONS = {
       // out-of-band day. Weighted just above the taper so the beam gives it up
       // only when a budget is at stake.
       bothFlatbreadPastaPenalty: 16,
+      // Week-level ingredient monotony, applied per use of a signature
+      // ingredient beyond `signatureMonotonyFreeUses`. This is the scored
+      // counterpart to the hard per-day rule above: `curry_base` appeared 10
+      // times and `jowar_roti` 7 times in a measured week while every hard
+      // counter read green, because the caps only ever looked at one anchor
+      // ingredient per meal. Scored rather than gated because R3 forces seven
+      // Indian lunches and most of them are built on exactly these bases —
+      // a hard cap here would make the week infeasible.
+      signatureMonotonyPenalty: 2.2,
+      signatureMonotonyFreeUses: 4,
+      // Multiplier on `tierScoreBonus` from mealTiers.js. Held at 1 so the
+      // tier table's own numbers are the ones that matter; the knob exists so
+      // a goal can dial the whole tier effect without editing five tiers.
+      tierBonusWeight: 1,
       distinctMealBonus: 6,
       repeatUsePenalty: 5,
       lunchDinnerCuisineClashPenalty: 3,
@@ -322,6 +349,9 @@ const GOAL_DEFINITIONS = {
       dinnerCalorieShareTarget: 0.40,
       dinnerTaperPenalty: 8,
       bothFlatbreadPastaPenalty: 16,
+      signatureMonotonyPenalty: 2.2,
+      signatureMonotonyFreeUses: 4,
+      tierBonusWeight: 1,
       // `standard`'s stated priority is maximum catalog coverage.
       distinctMealBonus: 10,
       repeatUsePenalty: 8,

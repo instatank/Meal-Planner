@@ -3,6 +3,7 @@ import {
   deriveCarbType,
   deriveMealTags,
   derivePrimaryIngredient,
+  deriveSignatureIngredients,
   enrichMealForDataLayer
 } from '../lib/mealDataLayer.js';
 
@@ -2168,6 +2169,11 @@ const buildMeal = (meal, mealType) => {
       ...deriveMealTags(withMacros),
       ...(mealType === 'lunch_dinner' ? { carb_type: deriveCarbType(withMacros) } : {}),
       primary_ingredient: derivePrimaryIngredient(withMacros),
+      // Every ingredient a person would name, not just the one the meal is
+      // anchored on. The day-level collision rule and the weekly family caps
+      // both read this; `primary_ingredient` alone left 4 of the 15
+      // soft-cheese meals invisible to the cheese cap.
+      signature_ingredients: deriveSignatureIngredients(withMacros),
       ...(handAuthoredTags[meal.canonical_name] || {})
     },
     mealType

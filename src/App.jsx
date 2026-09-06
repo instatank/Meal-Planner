@@ -28,12 +28,80 @@ import {
   normalizeOnboardingProfile
 } from './lib/onboardingProfile';
 import { buildGoalAdjustedPlannerInput, getMealTypeOrderForGoal } from './lib/onboardingPlannerAdapter';
+import {
+  DEFAULT_TIER,
+  TIER_DEFINITIONS,
+  TIER_IDS,
+  normalizeTierOverrides,
+  resolveMealTiers
+} from './lib/mealTiers';
 import { computeMacros } from './lib/mealDataLayer';
 
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from './lib/firebase';
 import AdminTools from './components/AdminTools';
+
+/**
+ * How often should this meal come back?
+ *
+ * The one control that was missing. Everything else the user could say about a
+ * meal was indirect — Confirm meant "I ate this", Skip meant "not today" — and
+ * none of it could express frequency, because `maxDishRepeatsPerWeek` was a
+ * flat hard 1 for all 110 meals. Measured before tiers existed: setting a
+ * meal's `accepts` weight to 2, 4, 8, 20 or 100 produced a week containing it
+ * exactly once every time.
+ *
+ * Shows the derived tier as the starting point and says where it came from, so
+ * choosing an override is a correction to something visible rather than a
+ * setting typed into a vacuum.
+ */
+const MealTierControl = ({ mealName, tiering, disabled, onChange }) => {
+  const current = tiering?.tiers?.[mealName] || DEFAULT_TIER;
+  const source = tiering?.sources?.[mealName] || 'default';
+  const stat = tiering?.stats?.get?.(String(mealName).trim().toLowerCase());
+
+  const sourceNote = {
+    override: 'you set this',
+    derived: 'learned from what you eat',
+    cooldown: 'resting — served recently and not eaten',
+    default: 'no signal yet'
+  }[source];
+
+  return (
+    <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+      <div className="flex items-center justify-between mb-1.5">
+        <strong className="text-gray-700">How often?</strong>
+        <span className="text-[10px] text-gray-400">
+          {sourceNote}
+          {stat ? ` · eaten ${stat.eaten}/${Math.max(stat.served, stat.eaten)}` : ''}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {TIER_IDS.map((tierId) => (
+          <button
+            key={tierId}
+            type="button"
+            disabled={disabled}
+            title={TIER_DEFINITIONS[tierId].description}
+            onClick={() => onChange(mealName, tierId)}
+            className={`px-2 py-1 rounded border text-[11px] transition-colors disabled:opacity-50 ${
+              current === tierId
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+            }`}
+          >
+            {TIER_DEFINITIONS[tierId].label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-1.5 text-[10px] text-gray-400">{TIER_DEFINITIONS[current].description}</p>
+    </div>
+  );
+};
+
+/** Where explicit per-meal tier choices are persisted. */
+const MEAL_TIER_OVERRIDES_STORAGE_KEY = 'meal-tier-overrides';
 
 const MealPlannerMain = ({ user, handleSignOut }) => {
   const IST_TIME_ZONE = 'Asia/Kolkata';
@@ -310,6 +378,10 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
   const [mealHistory, setMealHistory] = useState({});
   const [preferences, setPreferences] = useState(() => normalizePreferences({}));
   const [mealEvents, setMealEvents] = useState([]);
+  // Explicit per-meal tier choices ("I want this weekly" / "never again").
+  // Behaviour-derived tiers are computed, never stored — only the overrides
+  // are, because they are the part the user authored.
+  const [mealTierOverrides, setMealTierOverrides] = useState({});
   const [onboardingProfile, setOnboardingProfile] = useState(null);
   const [showOnboardingEditor, setShowOnboardingEditor] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -534,6 +606,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         const userCatalogResult = await storageGet('meal-user-catalog');
         const onboardingResult = await storageGet(ONBOARDING_PROFILE_STORAGE_KEY);
         const autoGenResult = await storageGet('last-auto-gen-week');
+        const tierOverridesResult = await storageGet(MEAL_TIER_OVERRIDES_STORAGE_KEY);
 
         const parsedHistory = normalizeDateMap(safeParseJson(historyResult, historyResult) || {});
         const parsedPrefs = normalizePreferences(safeParseJson(prefsResult, prefsResult) || {});
@@ -562,6 +635,9 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         setMealPlans(parsedPlans);
         setMealEvents(parsedEvents);
         setUserMealCatalog(parsedUserCatalog);
+        setMealTierOverrides(
+          normalizeTierOverrides(safeParseJson(tierOverridesResult, tierOverridesResult) || {})
+        );
         setOnboardingProfile(parsedOnboarding);
 
         // Do NOT re-save meal-plans on boot: storageGet already mirrors the
@@ -607,6 +683,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
               if (!dayHistory[mealType] || (!dayHistory[mealType].confirmed && !dayHistory[mealType].skipped)) {
                 dayHistory[mealType] = {
                   meal: plan[mealType].name,
+                  name: plan[mealType].name,
                   protein: plan[mealType].protein,
                   cal: plan[mealType].cal,
                   confirmed: true,
@@ -719,12 +796,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         showNotification('✨ Generating intelligent meal plan for this week...');
 
         try {
-          const historyMap = {};
-          for (let i = 0; i < 7; i++) {
-            const d = shiftDateKey(today, -i);
-            if (mealHistory[d]) historyMap[d] = mealHistory[d];
-            else if (mealPlans[d]) historyMap[d] = mealPlans[d];
-          }
+          const historyMap = buildRecentContext(today);
 
           const { preferences: adjustedPrefs, dailyProteinTarget: adjustedProtein } = buildGoalAdjustedPlannerInput({
             goal: onboardingProfile?.goal,
@@ -732,7 +804,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             mealDatabase: mergedMealDatabase
           });
 
-          const { generateWeeklyPlan } = await import('./lib/planService.js');
+          const { chooseWeeklyPlan } = await import('./lib/planService.js');
           const { buildWeekPlan } = await import('./lib/planOptimizer.js');
           const { getRulesForProfile } = await import('./lib/rules.js');
 
@@ -746,22 +818,25 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             rules,
             targetDateKeys,
             historyMap,
-            preferences: adjustedPrefs
+            preferences: adjustedPrefs,
+            tiers: mealTiers
           });
-          const { shortlists, stats } = reference;
+          const { stats } = reference;
           console.info(`[Hybrid] Optimizer completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats, reference.summary);
 
-          // Phase 2: AI selects from shortlists (cheap, fast)
-          const generatedDays = await generateWeeklyPlan({
-            targetDateKeys,
+          // Phase 2: the AI picks between complete weeks the optimizer has
+          // already built, rather than assembling one from per-slot lists.
+          // Every option is legal by construction, so this can only change
+          // which good week you get — never whether you get one.
+          const choice = await chooseWeeklyPlan({
+            weekOptions: [{ days: reference.days, summary: reference.summary }, ...(reference.alternatives || [])],
             preferences: adjustedPrefs,
-            historyMap,
-            dailyProteinTarget: adjustedProtein,
+            tiers: mealTiers,
             cloudConfig: systemConfig,
-            goal: onboardingProfile?.goal,
-            rules,
-            shortlists
+            goal: onboardingProfile?.goal
           });
+          console.info(`[AutoGen] Week choice: ${choice.weekId} via ${choice.source}. ${choice.reason || ''}`);
+          const generatedDays = choice.days;
 
           // Phase 3: validate and deterministically repair, exactly as the
           // manual regen does. This path used to write the AI's answer
@@ -775,7 +850,11 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             rules,
             preferences: adjustedPrefs,
             historyMap,
-            lockedDays: buildLockedWeekDays(targetDateKeys)
+            lockedDays: buildLockedWeekDays(targetDateKeys),
+            // The validator must use the same repeat allowances the optimizer
+            // did. Without this every week containing a staple is "repaired"
+            // back into a week without one.
+            tiers: mealTiers
           });
 
           if (checked.resolutionViolations.length > 0) {
@@ -812,9 +891,99 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
 
       runAutoGeneration();
     }
-  }, [loading, pendingAutoGeneration, mergedMealDatabase, isViewerMode, mealHistory, mealPlans, preferences, onboardingProfile, selectedDateKey]);
+  }, [loading, pendingAutoGeneration, mergedMealDatabase, isViewerMode, mealHistory, mealPlans, preferences, mealTiers, onboardingProfile, selectedDateKey]);
 
   const selectedDayPlan = mealPlans[selectedDateKey] || {};
+  /**
+   * What the plan actually put in front of the user on days that have passed.
+   *
+   * This is the `served` half of tier derivation and it deliberately reads
+   * `mealPlans`, not `mealHistory`: the auto-confirmation effect above stamps
+   * `confirmed: true` on every past planned meal, so `mealHistory` cannot say
+   * whether a meal was eaten or merely assumed. Only the `confirm` event log
+   * can, and `resolveMealTiers` reads that separately.
+   */
+  const servedMap = useMemo(() => {
+    const map = {};
+    for (const [dateKey, plan] of Object.entries(mealPlans)) {
+      if (!plan || dateKey >= todayKey) continue;
+      const slots = {};
+      for (const slot of ['breakfast', 'lunch', 'dinner']) {
+        const name = plan[slot]?.name;
+        if (name) slots[slot] = name;
+      }
+      if (Object.keys(slots).length) map[dateKey] = slots;
+    }
+    return map;
+  }, [mealPlans, todayKey]);
+
+  /**
+   * The per-meal repeat allowances every generation path runs under.
+   *
+   * Recomputed rather than stored: the only durable input is
+   * `mealTierOverrides` (what the user authored). Everything else is derived
+   * from the event log, so a tier can never go stale against the behaviour it
+   * claims to describe — the failure mode every other duplicated fact in this
+   * repo has already hit (docs/CONSISTENCY_AUDIT.md).
+   */
+  const mealTiering = useMemo(() => resolveMealTiers({
+    events: mealEvents,
+    servedMap,
+    overrides: mealTierOverrides,
+    mealNames: [
+      ...(mergedMealDatabase.breakfast || []),
+      ...(mergedMealDatabase.lunchDinner || []),
+      ...(mergedMealDatabase.snack || [])
+    ].map((meal) => meal.name).filter(Boolean)
+  }), [mealEvents, servedMap, mealTierOverrides, mergedMealDatabase]);
+
+  const mealTiers = mealTiering.tiers;
+
+  const setMealTier = (mealName, tierId) => {
+    if (isViewerMode || !mealName) return;
+    setMealTierOverrides((prev) => {
+      const next = { ...prev };
+      // Choosing the default clears the override rather than pinning it, so
+      // behaviour can resume driving the tier once the user stops steering.
+      if (!tierId || tierId === DEFAULT_TIER) delete next[mealName];
+      else next[mealName] = tierId;
+      const normalized = normalizeTierOverrides(next);
+      void saveToStorage(MEAL_TIER_OVERRIDES_STORAGE_KEY, normalized);
+      return normalized;
+    });
+    showNotification(
+      tierId && tierId !== DEFAULT_TIER
+        ? `Marked "${mealName}" as ${TIER_DEFINITIONS[tierId].label}`
+        : `Reset "${mealName}" to ${TIER_DEFINITIONS[DEFAULT_TIER].label}`
+    );
+  };
+
+  /**
+   * Recent context for the optimizer's recency penalty.
+   *
+   * Merged per *slot*, preferring a real history entry and falling back to the
+   * plan. The old version chose per *day* and wholesale — `mealHistory[d] ||
+   * mealPlans[d]` — which, combined with history entries carrying no `.name`,
+   * meant confirming one meal erased the whole day from the recency signal.
+   */
+  const buildRecentContext = (anchorDateKey, lookbackDays = 7) => {
+    const map = {};
+    for (let i = 0; i < lookbackDays; i += 1) {
+      const dateKey = shiftDateKey(anchorDateKey, -i);
+      const history = mealHistory[dateKey];
+      const plan = mealPlans[dateKey];
+      if (!history && !plan) continue;
+      const day = {};
+      for (const slot of ['breakfast', 'lunch', 'dinner']) {
+        const entry = history?.[slot];
+        const name = entry?.name || entry?.meal || plan?.[slot]?.name;
+        if (name) day[slot] = { name };
+      }
+      if (Object.keys(day).length) map[dateKey] = day;
+    }
+    return map;
+  };
+
   const selectedDayHistory = mealHistory[selectedDateKey] || {};
   const customCandidates = useMemo(
     () => getCustomMealCandidates(mealEvents, allExistingMealNames, { lookbackDays: 45, minCount: 3 }),
@@ -920,7 +1089,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           ...prev,
           [selectedDateKey]: {
             ...prev[selectedDateKey],
-            [targetSlot]: { meal: mealData.name, confirmed: true, exactMatch: true }
+            [targetSlot]: { meal: mealData.name, name: mealData.name, confirmed: true, exactMatch: true }
           }
         }));
 
@@ -955,7 +1124,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           ...prev,
           [selectedDateKey]: {
             ...prev[selectedDateKey],
-            [targetSlot]: { meal: payload.data.name, confirmed: true, exactMatch: false }
+            [targetSlot]: { meal: payload.data.name, name: payload.data.name, confirmed: true, exactMatch: false }
           }
         }));
 
@@ -998,7 +1167,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           ...prev,
           [selectedDateKey]: {
             ...prev[selectedDateKey],
-            [targetSlot]: { meal: payload.data.name, confirmed: true, exactMatch: false }
+            [targetSlot]: { meal: payload.data.name, name: payload.data.name, confirmed: true, exactMatch: false }
           }
         }));
 
@@ -1036,6 +1205,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             ...prev[selectedDateKey],
             [targetSlot]: {
               meal: payload.data.name,
+              name: payload.data.name,
               confirmed: true,
               orderOut: true,
               protein: payload.data.estimatedProtein || 0,
@@ -1407,6 +1577,15 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     const plan = mealPlans[selectedDateKey]?.[mealType] || {};
     const newEntry = {
       meal: plan.name,
+      // `name` is what every consumer downstream reads (`getMealName` checks
+      // `.name` / `.canonical_name`, never `.meal`). Writing only `meal` here
+      // meant a confirmed day resolved to an empty name and dropped out of
+      // `buildHistoryCounts` entirely — and because `historyMap` preferred
+      // `mealHistory[d]` over `mealPlans[d]` wholesale, confirming ANY meal
+      // made the whole day invisible to the recency logic. The only days that
+      // reached it were the ones the user had not engaged with. `meal` is kept
+      // because two render paths still read it.
+      name: plan.name,
       protein: plan.protein,
       cal: plan.cal,
       confirmed: true
@@ -1588,12 +1767,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     showNotification('🧠 AI is drafting your weekly plan...');
 
     try {
-      const historyMap = {};
-      for (let i = 0; i < 7; i++) {
-        const d = shiftDateKey(selectedDateKey, -i);
-        if (mealHistory[d]) historyMap[d] = mealHistory[d];
-        else if (mealPlans[d]) historyMap[d] = mealPlans[d];
-      }
+      const historyMap = buildRecentContext(selectedDateKey);
 
       const { preferences: adjustedPrefs, dailyProteinTarget: adjustedProtein } = buildGoalAdjustedPlannerInput({
         goal: onboardingProfile?.goal,
@@ -1601,7 +1775,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         mealDatabase: mergedMealDatabase
       });
 
-      const { generateWeeklyPlan } = await import('./lib/planService.js');
+      const { chooseWeeklyPlan } = await import('./lib/planService.js');
       const { buildWeekPlan } = await import('./lib/planOptimizer.js');
       const { getRulesForProfile } = await import('./lib/rules.js');
 
@@ -1616,22 +1790,24 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         rules,
         targetDateKeys,
         historyMap,
-        preferences: adjustedPrefs
+        preferences: adjustedPrefs,
+        tiers: mealTiers
       });
-      const { shortlists, stats } = reference;
+      const { stats } = reference;
       console.info(`[Hybrid] Optimizer completed in ${(performance.now() - filterStart).toFixed(1)}ms`, stats, reference.summary);
 
-      // Phase 2: AI selects from shortlists (cheap, fast)
-      const generatedDays = await generateWeeklyPlan({
-        targetDateKeys,
+      // Phase 2: choose between complete, already-legal weeks. See the note
+      // above `chooseWeeklyPlan` in planService.js for the measurements that
+      // retired the shortlist-assembly path.
+      const choice = await chooseWeeklyPlan({
+        weekOptions: [{ days: reference.days, summary: reference.summary }, ...(reference.alternatives || [])],
         preferences: adjustedPrefs,
-        historyMap,
-        dailyProteinTarget: adjustedProtein,
+        tiers: mealTiers,
         cloudConfig: systemConfig,
-        goal: onboardingProfile?.goal,
-        rules,
-        shortlists
+        goal: onboardingProfile?.goal
       });
+      console.info(`[Hybrid] Week choice: ${choice.weekId} via ${choice.source}. ${choice.reason || ''}`);
+      const generatedDays = choice.days;
 
       // Phase 3: validate what came back, and repair it deterministically if
       // it breaks the rules. Nothing invalid is written silently.
@@ -1642,7 +1818,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         rules,
         preferences: adjustedPrefs,
         historyMap,
-        lockedDays: buildLockedWeekDays(targetDateKeys)
+        lockedDays: buildLockedWeekDays(targetDateKeys),
+        tiers: mealTiers
       });
 
       if (checked.resolutionViolations.length > 0) {
@@ -1996,6 +2173,14 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
                     <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
                       <strong>Total:</strong> {meal.cal} kcal | P: {meal.macros.p}g | C: {meal.macros.c}g | F: {meal.macros.f}g
                     </div>
+                    {meal.name && (
+                      <MealTierControl
+                        mealName={meal.name}
+                        tiering={mealTiering}
+                        disabled={isViewerMode}
+                        onChange={setMealTier}
+                      />
+                    )}
                   </div>
                 )}
               </div>

@@ -11,7 +11,7 @@
  *   npm run audit:generation -- --goal standard --days 7 --start 2026-08-03
  */
 
-import { buildWeekPlan, enumerateFeasibleDays } from '../src/lib/planOptimizer.js';
+import { buildWeekPlan, daySignatureCollisions, enumerateFeasibleDays } from '../src/lib/planOptimizer.js';
 import { validateWeek, formatViolations } from '../src/lib/planValidator.js';
 import { anchorFamilyMaxPerWeek, getRules } from '../src/lib/rules.js';
 import { mealDatabase } from '../src/data/mealDatabase.js';
@@ -201,6 +201,43 @@ const criteria = [
     label: 'no duplicate day in the week (lunch/dinner swaps count as duplicates)',
     pass: new Set(plan.days.map((d) => d.dishSetKey)).size === plan.days.length,
     detail: `${new Set(plan.days.map((d) => d.dishSetKey)).size} distinct days of ${plan.days.length}`
+  },
+  {
+    // R5. Before this rule existed, 5 of 7 days failed it while every other
+    // criterion on this list passed — which is the whole reason it exists.
+    label: 'no day names the same signature ingredient twice (R5)',
+    pass: plan.days.every(
+      (day) => daySignatureCollisions(day, rules.hard.maxSameSignatureIngredientPerDay).length === 0
+    ),
+    detail: (() => {
+      const offenders = plan.days
+        .map((day) => [day.dateKey, daySignatureCollisions(day, rules.hard.maxSameSignatureIngredientPerDay)])
+        .filter(([, ids]) => ids.length);
+      return offenders.length
+        ? offenders.map(([dateKey, ids]) => `${dateKey}: ${ids.join(', ')}`).join('; ')
+        : `0 of ${dayCount} days`;
+    })()
+  },
+  {
+    // The scored counterpart to R5: nothing forbids an ingredient appearing
+    // every day, so this reports what the week actually leans on.
+    label: 'week-level ingredient leaning (scored, never gated)',
+    pass: true,
+    detail: (() => {
+      const use = {};
+      for (const day of plan.days) {
+        for (const id of day.signatureIngredients || []) use[id] = (use[id] || 0) + 1;
+      }
+      const top = Object.entries(use).sort((a, b) => b[1] - a[1]).slice(0, 3);
+      return top.map(([id, n]) => `${id} x${n}`).join(', ') || 'none';
+    })()
+  },
+  {
+    label: 'complete alternative weeks offered to Phase 2, all legal',
+    pass: (plan.alternatives || []).every(
+      (alt) => validateWeek({ days: alt.days, rules, preferences: {} }).valid
+    ),
+    detail: `${(plan.alternatives || []).length} alternatives, all valid`
   },
   {
     label: 'no Tier-1 violation anywhere in the week',

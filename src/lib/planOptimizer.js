@@ -19,12 +19,14 @@
  * Deterministic and seedable: same inputs always give the same week.
  */
 
+import { maxPerWeek as tierMaxPerWeek, tierScoreBonus } from './mealTiers.js';
 import {
   CARB_HEAVY_THRESHOLD,
   FAT_HEAVY_THRESHOLD,
   FIBRE_MEAL_THRESHOLD,
   HEAVY_MEAL_CALORIES,
   PROTEIN_BALANCE_MAX_GAP,
+  ANCHOR_FAMILY,
   anchorFamilyMaxPerWeek,
   anchorFamilyOf,
   eggBreakfastsFloor,
@@ -143,7 +145,8 @@ const EMPTY_FACTS = {
   name: '', protein: 0, carbs: 0, fat: 0, calories: 0, cuisine: '',
   family: 'vegetarian', redMeat: false, primaryMeat: false,
   fibreScore: 0, fibre: false, heavy: false, carbHeavy: false, fatHeavy: false,
-  repeatedFamily: false, primaryIngredient: null
+  repeatedFamily: false, primaryIngredient: null,
+  signatureIngredients: [], signatureFamilies: []
 };
 
 export const mealFacts = (meal) => {
@@ -153,6 +156,9 @@ export const mealFacts = (meal) => {
 
   const family = getProteinFamily(meal);
   const fibreScore = getFibreScore(meal);
+  const signatureIngredients = Array.isArray(meal?.signature_ingredients) && meal.signature_ingredients.length
+    ? meal.signature_ingredients
+    : (meal?.primary_ingredient ? [meal.primary_ingredient] : []);
   const facts = {
     name: getMealName(meal),
     protein: getMealProtein(meal),
@@ -171,10 +177,59 @@ export const mealFacts = (meal) => {
     repeatedFamily: hasRepeatedFamilyInsideMeal(meal),
     // Derived in the data layer from parts[]; null for fixtures and
     // user-added meals that carry no ingredient list.
-    primaryIngredient: meal?.primary_ingredient || null
+    primaryIngredient: meal?.primary_ingredient || null,
+    // Every ingredient a person would name in this meal. Falls back to the
+    // anchor alone for fixtures and user-added meals, which carry no
+    // `signature_ingredients` — so those keep exactly the coverage they had
+    // before this field existed rather than silently losing the anchor cap.
+    signatureIngredients,
+    // Only the ingredients ANCHOR_FAMILY actually names are counted against
+    // the weekly family caps. An unmapped ingredient anchors itself, so
+    // counting every signature ingredient here would give `curry_base` and
+    // `jowar_roti` a hard cap of 2 a week — and R3 forces seven Indian
+    // lunches, most of them built on exactly those. Week-level monotony for
+    // the unmapped ones is scored instead, in `scoreWeekMonotony`.
+    signatureFamilies: signatureIngredients
+      .filter((id) => Object.prototype.hasOwnProperty.call(ANCHOR_FAMILY, id))
+      .map(anchorFamilyOf)
   };
   FACT_CACHE.set(meal, facts);
   return facts;
+};
+
+/**
+ * R5 — does this day name the same ingredient in more than one slot?
+ *
+ * `cap` is `rules.hard.maxSameSignatureIngredientPerDay`. At 1 (the shipped
+ * value) any shared signature ingredient across two slots rejects the day.
+ * Written as counting rather than a boolean so raising the cap to 2 is a
+ * threshold change in rules.js and not a code change here.
+ *
+ * Hot path: this runs once per enumerated combination, so the caller splits it
+ * — `signatureOverlap(a, b)` is checked for the breakfast/lunch pair in the
+ * middle loop and kills the whole dinner loop on a hit.
+ */
+export const signatureOverlap = (factsA, factsB) => {
+  const a = factsA.signatureIngredients;
+  const b = factsB.signatureIngredients;
+  if (!a.length || !b.length) return false;
+  for (const id of a) {
+    if (b.includes(id)) return true;
+  }
+  return false;
+};
+
+/** Every signature ingredient used more than `cap` times across the day. */
+export const daySignatureCollisions = (day, cap = 1) => {
+  const counts = {};
+  const over = [];
+  for (const slot of CORE_SLOTS) {
+    for (const id of mealFacts(day?.[slot]).signatureIngredients) {
+      counts[id] = (counts[id] || 0) + 1;
+      if (counts[id] === cap + 1) over.push(id);
+    }
+  }
+  return over;
 };
 
 export const getMealsForSlot = (mealDatabase, slot) => {
@@ -202,10 +257,15 @@ export const hashString = (input) => {
  * which removed the three highest-protein dishes in the catalog from the goal
  * that needs them most. Tapering is scored, by calories, in `scoreDayStandalone`.
  */
-export const isMealAdmissible = (meal, { rules, preferences = {} }) => {
+export const isMealAdmissible = (meal, { rules, preferences = {}, tiers = null }) => {
   if (!meal) return false;
   if (getMealProtein(meal) < rules.hard.minMealProtein) return false;
   if (Number(preferences?.avoids?.[getMealName(meal)] || 0) > rules.hard.avoidScoreExclusiveMax) return false;
+  // A meal the user has excluded, or one demoted to `excluded` by repeated
+  // rejection, is removed from the pool outright rather than merely scored
+  // down. `maxPerWeek: 0` would express the same thing at the week level, but
+  // dropping it here also keeps it out of the shortlists handed downstream.
+  if (tiers && tierMaxPerWeek(getMealName(meal), tiers) <= 0) return false;
   return true;
 };
 
@@ -223,10 +283,10 @@ export const summariseDay = (day) => {
  * Tier-1 check for a complete day. Deliberately short: the protein band, the
  * carb cap and the calorie bounds are Tier 2 and are judged across the week.
  */
-export const satisfiesDayHardConstraints = (day, { rules, preferences = {} }) => {
+export const satisfiesDayHardConstraints = (day, { rules, preferences = {}, tiers = null }) => {
   const meals = CORE_SLOTS.map((slot) => day?.[slot]);
   if (meals.some((meal) => !meal)) return false;
-  if (meals.some((mealForSlot) => !isMealAdmissible(mealForSlot, { rules, preferences }))) return false;
+  if (meals.some((mealForSlot) => !isMealAdmissible(mealForSlot, { rules, preferences, tiers }))) return false;
 
   const names = meals.map(getMealName);
   const counts = {};
@@ -268,18 +328,27 @@ const withinSameMealCap = (a, b, c, cap) => {
   return cap >= 1;
 };
 
-export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {} }) => {
+export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {}, tiers = null }) => {
   const breakfasts = getMealsForSlot(mealDatabase, 'breakfast')
-    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences, tiers }));
   const lunchDinners = getMealsForSlot(mealDatabase, 'lunch')
-    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences, tiers }));
 
   // Both pools are already filtered for admissibility, so the per-meal half of
   // `satisfiesDayHardConstraints` is answered before the loop starts. What is
   // left that genuinely varies per combination is the same-meal cap and the
   // protein sanity floor, checked inline below. The rejected combinations no
   // longer allocate a day object on their way to being discarded.
-  const { maxSameMealPerDay, dailyProteinSanityFloor, lunchCuisine } = rules.hard;
+  const {
+    maxSameMealPerDay,
+    dailyProteinSanityFloor,
+    lunchCuisine,
+    maxSameSignatureIngredientPerDay
+  } = rules.hard;
+  // R5 is only a pairwise check while the cap is 1: three slots can only
+  // exceed "at most once" by two of them sharing an ingredient. Above 1 the
+  // pairwise shortcut is not equivalent, so fall back to counting the day.
+  const pairwiseSignatureCheck = (maxSameSignatureIngredientPerDay ?? 1) === 1;
   const lunchDinnerFacts = lunchDinners.map(mealFacts);
   const days = [];
 
@@ -296,11 +365,15 @@ export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {} })
       // R3 is a property of the lunch alone at this level, so a non-Indian
       // lunch kills the whole dinner loop rather than each dinner in turn.
       if (l.cuisine !== lunchCuisine) continue;
+      // R5, breakfast/lunch half. Hoisted here so a colliding pair skips every
+      // dinner at once instead of being rejected 75 times over.
+      if (pairwiseSignatureCheck && signatureOverlap(b, l)) continue;
 
       for (let dinnerIndex = 0; dinnerIndex < lunchDinners.length; dinnerIndex += 1) {
         const d = lunchDinnerFacts[dinnerIndex];
         if (d.cuisine === lunchCuisine) continue;
         if (!withinSameMealCap(b.name, l.name, d.name, maxSameMealPerDay)) continue;
+        if (pairwiseSignatureCheck && (signatureOverlap(b, d) || signatureOverlap(l, d))) continue;
 
         const protein = pairProtein + d.protein;
         if (protein < dailyProteinSanityFloor) continue;
@@ -312,6 +385,7 @@ export const enumerateFeasibleDays = ({ mealDatabase, rules, preferences = {} })
           calories: pairCalories + d.calories
         };
         const day = { breakfast, lunch: lunchDinners[lunchIndex], dinner: lunchDinners[dinnerIndex] };
+        if (!pairwiseSignatureCheck && daySignatureCollisions(day, maxSameSignatureIngredientPerDay).length) continue;
         days.push(annotateDay(day, rules, totals));
       }
     }
@@ -352,9 +426,14 @@ export const annotateDay = (day, rules, totals = null) => {
     // The anchor-ingredient families this day spends, for the weekly cap.
     // Breakfast counts too — a chicken breakfast spends the same poultry
     // budget as a chicken dinner would.
-    anchorFamilies: [breakfast.primaryIngredient, lunch.primaryIngredient, dinner.primaryIngredient]
-      .map(anchorFamilyOf)
-      .filter(Boolean),
+    // Weekly family caps count every *signature* ingredient the day names, not
+    // just the three anchors. Counting anchors alone is what let a paneer
+    // breakfast and a palak paneer lunch both pass the `cheese_soft` cap:
+    // the breakfast anchored on its chilla and the paneer in it was invisible.
+    anchorFamilies: [breakfast, lunch, dinner].flatMap((meal) => meal.signatureFamilies),
+    // Flat list of every signature ingredient used today, for the week-level
+    // monotony score. Duplicates within a day cannot occur — R5 rejects them.
+    signatureIngredients: [breakfast, lunch, dinner].flatMap((meal) => meal.signatureIngredients),
     proteinInBand: resolvedTotals.protein >= dailyProteinMin && resolvedTotals.protein <= dailyProteinMax,
     underCarbCap: resolvedTotals.carbs <= dailyCarbCap,
     inCalorieBounds: resolvedTotals.calories >= dailyCalorieMin && resolvedTotals.calories <= dailyCalorieMax,
@@ -375,7 +454,7 @@ export const annotateDay = (day, rules, totals = null) => {
  * Score the parts of a day that do not depend on the rest of the week.
  * Higher is better; this never rejects.
  */
-export const scoreDayStandalone = (day, { rules, preferences = {} }) => {
+export const scoreDayStandalone = (day, { rules, preferences = {}, tiers = null }) => {
   const w = rules.scored;
   const breakfastFacts = mealFacts(day.breakfast);
   const lunchFacts = mealFacts(day.lunch);
@@ -483,6 +562,15 @@ export const scoreDayStandalone = (day, { rules, preferences = {} }) => {
     score -= Math.min(Number(avoids[name] || 0), 4) * w.preferenceAvoidWeight;
   }
 
+  // Tier pull. Being *allowed* to repeat is not enough on its own: the
+  // distinct-meal bonus (+6 per unused dish) would still crowd a favourite out
+  // in favour of something never eaten. A staple carries +9 per placement, so
+  // the search reaches for it before it reaches for novelty.
+  if (tiers) {
+    const tierWeight = Number(w.tierBonusWeight ?? 1);
+    for (const meal of facts) score += tierScoreBonus(meal.name, tiers) * tierWeight;
+  }
+
   return score;
 };
 
@@ -518,7 +606,7 @@ export const buildHistoryCounts = (historyMap = {}, { lookbackDays = 14 } = {}) 
  * wrapper object, which is what the search used to build: one throwaway object
  * per candidate, of which all but `maxCandidates` were discarded immediately.
  */
-export const scoreCandidates = (candidates, { rules, preferences = {}, historyMap = {} }) => {
+export const scoreCandidates = (candidates, { rules, preferences = {}, historyMap = {}, tiers = null }) => {
   const historyCounts = buildHistoryCounts(historyMap);
   const historyRepeatPenalty = rules.scored.historyRepeatPenalty;
 
@@ -527,12 +615,46 @@ export const scoreCandidates = (candidates, { rules, preferences = {}, historyMa
     for (const name of candidate.mealNames) {
       historyPenalty += Number(historyCounts[name] || 0) * historyRepeatPenalty;
     }
-    candidate.baseScore = scoreDayStandalone(candidate, { rules, preferences }) - historyPenalty;
+    candidate.baseScore = scoreDayStandalone(candidate, { rules, preferences, tiers }) - historyPenalty;
   }
   return candidates;
 };
 
+/**
+ * Week-level ingredient monotony.
+ *
+ * R5 stops an ingredient appearing twice in a *day*; nothing stopped it
+ * appearing ten times in a week. Measured before this existed: `curry_base` 10
+ * uses and `jowar_roti` 7 in a single generated week, with every hard counter
+ * reading green because the caps only ever looked at one anchor per meal.
+ *
+ * Scored, not gated, and only past `signatureMonotonyFreeUses`: R3 forces
+ * seven Indian lunches and most Indian lunches in this catalog are built on
+ * exactly these bases, so a hard cap would make the week infeasible. The free
+ * allowance is what keeps a normal Indian week from being penalised for being
+ * an Indian week.
+ */
+export const scoreWeekMonotony = (signatureCounts, rules) => {
+  const penaltyPerUse = Number(rules.scored.signatureMonotonyPenalty || 0);
+  if (!penaltyPerUse) return 0;
+  const free = Number(rules.scored.signatureMonotonyFreeUses ?? 4);
+  let penalty = 0;
+  for (const count of Object.values(signatureCounts || {})) {
+    if (count > free) penalty += (count - free) * penaltyPerUse;
+  }
+  return -penalty;
+};
+
 const DEFAULT_BEAM_WIDTH = 40;
+
+/**
+ * Complete alternative weeks returned alongside the chosen one.
+ *
+ * 6 keeps the Phase 2 prompt small while giving the model a real choice. They
+ * cost nothing to produce — the beam is holding `beamWidth` finished weeks at
+ * the last iteration and all of them were previously discarded.
+ */
+const DEFAULT_ALTERNATIVE_WEEKS = 6;
 
 /**
  * The three Tier-2 budgets, as (per-day verdict, running counter) pairs.
@@ -608,8 +730,25 @@ const trimCandidatePool = (sortedCandidates, maxCandidates) => {
  * eaten at lunch on Monday and at dinner on Thursday is a repeat. The old
  * split namespaces (breakfast 4, lunch/dinner 2) could not express that.
  */
-const dishCap = (name, rules, pinnedDish) =>
-  (pinnedDish && name === pinnedDish ? rules.hard.pinnedDishMaxPerWeek : rules.hard.maxDishRepeatsPerWeek);
+/**
+ * How many times this dish may appear in the week.
+ *
+ * Resolution order:
+ *   1. the meal's tier (mealTiers.js), when a tier table is supplied,
+ *   2. the legacy `pinnedDish` argument, kept so existing callers and tests
+ *      keep working — nothing in the app ever set it, which is why the
+ *      "one favourite may repeat" affordance never actually existed,
+ *   3. `rules.hard.maxDishRepeatsPerWeek`, the flat default.
+ *
+ * The flat default is still 1. What changed is that it is now a *default*
+ * rather than a ceiling: a meal the user eats every week resolves to `staple`
+ * and is allowed three, so wanting something often is finally expressible.
+ */
+const dishCap = (name, rules, pinnedDish, tiers = null) => {
+  if (tiers && Object.prototype.hasOwnProperty.call(tiers, name)) return tierMaxPerWeek(name, tiers);
+  if (pinnedDish && name === pinnedDish) return rules.hard.pinnedDishMaxPerWeek;
+  return rules.hard.maxDishRepeatsPerWeek;
+};
 
 /** Is this breakfast anchored on an egg, for R2? */
 const isEggBreakfast = (meal, rules) =>
@@ -647,10 +786,19 @@ const seedWeekState = (lockedDays, rules) => {
     const dishNames = CORE_SLOTS.map((slot) => getMealName(day[slot])).filter(Boolean);
     if (dishNames.length) dayKeys.add([...dishNames].sort().join('|'));
   }
-  return { usage, families, redMeat, eggBreakfasts, dayKeys, cuisines: new Set(), distinct: new Set() };
+  const signatureCounts = {};
+  for (const day of Object.values(lockedDays || {})) {
+    if (!day) continue;
+    for (const slot of CORE_SLOTS) {
+      for (const id of mealFacts(day[slot]).signatureIngredients) {
+        signatureCounts[id] = (signatureCounts[id] || 0) + 1;
+      }
+    }
+  }
+  return { usage, families, redMeat, eggBreakfasts, dayKeys, signatureCounts, cuisines: new Set(), distinct: new Set() };
 };
 
-const canPlaceDay = (state, candidate, rules, pinnedDish = null) => {
+const canPlaceDay = (state, candidate, rules, pinnedDish = null, tiers = null) => {
   // R1 — one week-wide counter per dish. Counted within the candidate day too,
   // so a day that would place the same dish in two slots spends two of its
   // allowance rather than one.
@@ -658,7 +806,7 @@ const canPlaceDay = (state, candidate, rules, pinnedDish = null) => {
   for (const name of candidate.mealNames) {
     if (!name) continue;
     pending[name] = (pending[name] || 0) + 1;
-    if ((state.usage[name] || 0) + pending[name] > dishCap(name, rules, pinnedDish)) return false;
+    if ((state.usage[name] || 0) + pending[name] > dishCap(name, rules, pinnedDish, tiers)) return false;
   }
 
   // R2 ceiling. The floor cannot be checked here — a partial week is allowed
@@ -701,9 +849,14 @@ const applyDay = (state, candidate) => {
   }
   const dayKeys = new Set(state.dayKeys);
   if (candidate.dishSetKey) dayKeys.add(candidate.dishSetKey);
+  const signatureCounts = { ...state.signatureCounts };
+  for (const id of candidate.signatureIngredients || []) {
+    signatureCounts[id] = (signatureCounts[id] || 0) + 1;
+  }
 
   return {
     usage,
+    signatureCounts,
     distinct,
     cuisines,
     families,
@@ -732,13 +885,17 @@ export const selectWeek = ({
   preferences = {},
   lockedDays = {},
   pinnedDish = null,
+  tiers = null,
   beamWidth = DEFAULT_BEAM_WIDTH,
+  // How many *other* complete legal weeks to hand back alongside the winner.
+  // Free: they are already sitting in the final beam.
+  maxAlternativeWeeks = DEFAULT_ALTERNATIVE_WEEKS,
   maxCandidates = DEFAULT_MAX_CANDIDATES,
   dayCandidates = null,
   scoredCandidates = null
 }) => {
   const dayCount = targetDateKeys.length;
-  const candidates = scoredCandidates || dayCandidates || enumerateFeasibleDays({ mealDatabase, rules, preferences });
+  const candidates = scoredCandidates || dayCandidates || enumerateFeasibleDays({ mealDatabase, rules, preferences, tiers });
 
   if (dayCount === 0 || candidates.length === 0) {
     return { days: [], candidateCount: candidates.length, feasible: candidates.length > 0, summary: null };
@@ -746,7 +903,7 @@ export const selectWeek = ({
 
   // Sorting a copy leaves the caller's candidate order untouched — the
   // shortlist builder relies on it for its own stable sort.
-  const scored = [...(scoredCandidates || scoreCandidates(candidates, { rules, preferences, historyMap }))];
+  const scored = [...(scoredCandidates || scoreCandidates(candidates, { rules, preferences, historyMap, tiers }))];
   scored.sort((a, b) => b.baseScore - a.baseScore || (a.nameKey < b.nameKey ? -1 : 1));
 
   const pool = trimCandidatePool(scored, maxCandidates);
@@ -783,7 +940,7 @@ export const selectWeek = ({
     for (const node of beam) {
       for (let candidateIndex = 0; candidateIndex < pool.length; candidateIndex += 1) {
         const candidate = pool[candidateIndex];
-        if (!canPlaceDay(node.state, candidate, rules, pinnedDish)) continue;
+        if (!canPlaceDay(node.state, candidate, rules, pinnedDish, tiers)) continue;
 
         // Tier-2 budgets, enforced by look-ahead rather than after the fact.
         // A branch dies the moment the days it has left can no longer supply
@@ -822,10 +979,32 @@ export const selectWeek = ({
         let repeatPenalty = 0;
         for (const name of candidate.mealNames) {
           if (!node.state.distinct.has(name)) newDistinct += 1;
-          // R1 caps every unpinned dish at one use, so this now only ever
-          // fires on the pinned dish — it ranks *where* the pin lands rather
-          // than whether a dish may repeat at all.
-          repeatPenalty += (node.state.usage[name] || 0) * rules.scored.repeatUsePenalty;
+          // Anti-greedy: a second use of a dish is worse than a first. It is
+          // deliberately NOT charged on a dish whose tier allows more than one
+          // use a week. The penalty exists to stop the beam reaching for the
+          // same high-scoring dish over and over when nothing said it should;
+          // a `staple` or `regular` is exactly the case where something did
+          // say so, and charging it here would cancel the tier bonus that the
+          // tier exists to grant. Measured: with this penalty applied to
+          // staples, a dish confirmed 6 times out of 6 still appeared once.
+          if (dishCap(name, rules, pinnedDish, tiers) <= 1) {
+            repeatPenalty += (node.state.usage[name] || 0) * rules.scored.repeatUsePenalty;
+          }
+        }
+
+        // Week-level ingredient monotony, charged incrementally: the delta
+        // this candidate adds to the running penalty, so the beam sees the
+        // cost of a seventh jowar roti at the moment it considers placing it.
+        let monotonyDelta = 0;
+        const freeUses = Number(rules.scored.signatureMonotonyFreeUses ?? 4);
+        const monotonyPerUse = Number(rules.scored.signatureMonotonyPenalty || 0);
+        if (monotonyPerUse) {
+          const pendingSignature = {};
+          for (const id of candidate.signatureIngredients || []) {
+            pendingSignature[id] = (pendingSignature[id] || 0) + 1;
+            const used = (node.state.signatureCounts[id] || 0) + pendingSignature[id];
+            if (used > freeUses) monotonyDelta += monotonyPerUse;
+          }
         }
         let newCuisines = 0;
         for (const cuisine of candidate.cuisines) {
@@ -839,6 +1018,7 @@ export const selectWeek = ({
           + newCuisines * rules.scored.weekCuisineVarietyBonus
           - repeatPenalty
           - budgetPressure
+          - monotonyDelta
           + tieBreak;
 
         next.push({ node, candidate, score });
@@ -858,9 +1038,10 @@ export const selectWeek = ({
         rules,
         lockedDays,
         pinnedDish,
+        tiers,
         diagnostics: {
           exhaustedOnDayIndex: dayIndex,
-          ...rubricFeasibility({ candidates: pool, mealDatabase, rules, preferences })
+          ...rubricFeasibility({ candidates: pool, mealDatabase, rules, preferences, tiers })
         }
       });
     }
@@ -883,8 +1064,31 @@ export const selectWeek = ({
   const days = winner.days.map(({ dateKey, candidate }) => ({ dateKey, ...candidate }));
   const summary = summariseWeek(days, rules);
 
+  // Every *other* finished week the beam is still holding.
+  //
+  // These are what Phase 2 should be choosing between. The beam has already
+  // built them subject to every hard rule and every Tier-2 budget, so any of
+  // them is a legal answer — which is exactly what the flat per-slot
+  // shortlists were not. Measured on the shipped catalog, sampling the
+  // shortlists the way the tool schema permits produced a legal week 0 times
+  // in 400, because a week must place 21 distinct dishes and the union of all
+  // seven days' breakfast lists held 9 meals. Handing the model whole weeks
+  // instead of parts makes an illegal answer unrepresentable rather than
+  // merely detected afterwards.
+  const alternatives = [];
+  const seenWeeks = new Set([winner.days.map(({ candidate }) => candidate.nameKey).join('#')]);
+  for (const node of (clearingBoth.length ? clearingBoth : clearingProtein.length ? clearingProtein : beam)) {
+    if (alternatives.length >= maxAlternativeWeeks) break;
+    const key = node.days.map(({ candidate }) => candidate.nameKey).join('#');
+    if (seenWeeks.has(key)) continue;
+    seenWeeks.add(key);
+    const altDays = node.days.map(({ dateKey, candidate }) => ({ dateKey, ...candidate }));
+    alternatives.push({ days: altDays, summary: summariseWeek(altDays, rules), score: node.score });
+  }
+
   return {
     days,
+    alternatives,
     candidateCount: candidates.length,
     feasible: isWeekWithinBudgets(summary),
     summary
@@ -910,11 +1114,11 @@ export const isWeekWithinBudgets = (summary) =>
  * Each count is the size of the pool the *next* rule has to work with, so the
  * line where the number collapses is the rule that made the week impossible.
  */
-export const rubricFeasibility = ({ candidates, mealDatabase, rules, preferences = {} }) => {
+export const rubricFeasibility = ({ candidates, mealDatabase, rules, preferences = {}, tiers = null }) => {
   const breakfasts = getMealsForSlot(mealDatabase, 'breakfast')
-    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences, tiers }));
   const lunchDinners = getMealsForSlot(mealDatabase, 'lunch')
-    .filter((meal) => isMealAdmissible(meal, { rules, preferences }));
+    .filter((meal) => isMealAdmissible(meal, { rules, preferences, tiers }));
 
   return {
     // R1 needs 3 distinct dishes per day, all distinct across the week.
@@ -943,7 +1147,7 @@ export const rubricFeasibility = ({ candidates, mealDatabase, rules, preferences
  * `feasible: false`, and carries the diagnosis of what ran out. Callers write
  * a week only after `validateWeek`, which fails it on the same rules.
  */
-const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays, pinnedDish = null, diagnostics = null }) => {
+const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays, pinnedDish = null, tiers = null, diagnostics = null }) => {
   const state = {
     ...seedWeekState(lockedDays, rules),
     protein: 0, inBand: 0, underCarb: 0, inCalorieBounds: 0, eggBreakfasts: 0
@@ -953,7 +1157,7 @@ const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays, pinnedDish 
   let constraintsRelaxed = false;
 
   for (const dateKey of targetDateKeys) {
-    const placeable = scored.find((candidate) => canPlaceDay(current, candidate, rules, pinnedDish));
+    const placeable = scored.find((candidate) => canPlaceDay(current, candidate, rules, pinnedDish, tiers));
     if (!placeable) constraintsRelaxed = true;
     const pick = placeable || scored[0];
     days.push({ dateKey, ...pick });
@@ -1114,15 +1318,21 @@ export const buildWeekPlan = ({
   historyMap = {},
   preferences = {},
   lockedDays = {},
-  // R1's optional pin. Threaded from the caller rather than read out of
-  // `preferences`, so a dish is only ever pinned deliberately.
+  // R1's optional pin. Superseded by `tiers` — kept because tests and the
+  // scoring path still accept it, and because a pin is exactly a one-off
+  // `staple` for callers that have no tier table.
   pinnedDish = null,
+  // Per-meal repeat allowances from mealTiers.js. Null means "no tier table",
+  // in which case every dish falls back to `rules.hard.maxDishRepeatsPerWeek`
+  // and the engine behaves exactly as it did before tiers existed.
+  tiers = null,
   beamWidth = DEFAULT_BEAM_WIDTH,
+  maxAlternativeWeeks = DEFAULT_ALTERNATIVE_WEEKS,
   shortlistPerSlot = DEFAULT_SHORTLIST_PER_SLOT
 }) => {
-  const dayCandidates = enumerateFeasibleDays({ mealDatabase, rules, preferences });
+  const dayCandidates = enumerateFeasibleDays({ mealDatabase, rules, preferences, tiers });
   // Scored once, here, and shared by both consumers below.
-  const scoredCandidates = scoreCandidates(dayCandidates, { rules, preferences, historyMap });
+  const scoredCandidates = scoreCandidates(dayCandidates, { rules, preferences, historyMap, tiers });
   const week = selectWeek({
     mealDatabase,
     rules,
@@ -1131,7 +1341,9 @@ export const buildWeekPlan = ({
     preferences,
     lockedDays,
     pinnedDish,
+    tiers,
     beamWidth,
+    maxAlternativeWeeks,
     dayCandidates,
     scoredCandidates
   });
