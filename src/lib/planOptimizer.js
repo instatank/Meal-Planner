@@ -661,7 +661,7 @@ const DEFAULT_MAX_CANDIDATES = CANDIDATE_BUDGET_CLASSES * CANDIDATES_PER_BUDGET_
  * Reduce the candidate pool to `maxCandidates`, keeping the best of each
  * budget-compliance class so no class is trimmed out of existence.
  */
-const trimCandidatePool = (sortedCandidates, maxCandidates, { reserveFor = null } = {}) => {
+const trimCandidatePool = (sortedCandidates, maxCandidates) => {
   if (sortedCandidates.length <= maxCandidates) return sortedCandidates;
 
   // One class per combination of the BUDGETS flags. Strata the trim does not
@@ -672,44 +672,7 @@ const trimCandidatePool = (sortedCandidates, maxCandidates, { reserveFor = null 
   const kept = [];
   const keptSet = new Set();
 
-  // Reservation pass — dishes the user has explicitly elevated.
-  //
-  // This exists because of a measurement, and the measurement was surprising.
-  // Marking a dish a staple raises its weekly cap to 3, but the cap was never
-  // what stopped it recurring: of 23,688 enumerated days only 300 survive this
-  // trim, and in that pool the *median lunch/dinner dish appears in 2 days*,
-  // while 31 of 75 appear in none at all. A dish present in one pooled day can
-  // be planned once no matter what any score says, because no day may repeat
-  // inside a week. Scoring changes cannot fix that; only pool composition can.
-  //
-  // So each elevated dish is guaranteed a few distinct days here, taken in
-  // score order. `reserveFor` maps a dish name to how many days it needs —
-  // its weekly cap plus headroom, so the beam has a real choice rather than
-  // exactly enough. At a handful of elevated dishes this displaces a few
-  // percent of the pool.
-  if (reserveFor && reserveFor.size > 0) {
-    const reserved = new Map();
-    for (const candidate of sortedCandidates) {
-      if (kept.length >= maxCandidates) break;
-      for (const name of candidate.mealNames) {
-        const quota = reserveFor.get(name);
-        if (!quota) continue;
-        const used = reserved.get(name) || 0;
-        if (used >= quota) continue;
-        reserved.set(name, used + 1);
-        if (!keptSet.has(candidate)) {
-          kept.push(candidate);
-          keptSet.add(candidate);
-          const key = BUDGETS.map((budget) => (candidate[budget.flag] ? 1 : 0)).join('');
-          classCounts.set(key, (classCounts.get(key) || 0) + 1);
-        }
-        break;
-      }
-    }
-  }
-
   for (const candidate of sortedCandidates) {
-    if (keptSet.has(candidate)) continue;
     const key = BUDGETS.map((budget) => (candidate[budget.flag] ? 1 : 0)).join('');
     const count = classCounts.get(key) || 0;
     if (count >= perClass) continue;
@@ -725,36 +688,6 @@ const trimCandidatePool = (sortedCandidates, maxCandidates, { reserveFor = null 
   }
 
   return kept.slice(0, maxCandidates);
-};
-
-/**
- * Which dishes need guaranteed room in the candidate pool, and how much.
- *
- * Only dishes the user has elevated by hand: a raised weekly cap, or a rating
- * of 4+. Both are explicit statements that the dish matters, and both are
- * useless if the dish never reaches the pool. A default-tier, unrated dish is
- * not reserved for — the pool already decides those on merit, and reserving
- * for everything would just be a slower way of not trimming.
- *
- * The quota is the dish's weekly cap plus headroom. Exactly `cap` days would
- * force the beam to take the only days available at any score; the margin
- * leaves it a genuine choice.
- */
-const RESERVE_HEADROOM = 3;
-
-const buildPoolReservations = (tierMap) => {
-  if (!tierMap) return null;
-  const reservations = new Map();
-
-  for (const [mealName, entry] of Object.entries(tierMap)) {
-    const cap = getTierDefinition(entry?.tier).maxPerWeek;
-    if (cap === 0) continue; // retired — excluded at enumeration already
-    const elevated = cap > 1 || Number(entry?.rating) >= 4;
-    if (!elevated) continue;
-    reservations.set(mealName, cap + RESERVE_HEADROOM);
-  }
-
-  return reservations.size > 0 ? reservations : null;
 };
 
 /**
@@ -920,10 +853,6 @@ export const selectWeek = ({
   // scoring on a retry leaves a staple permitted to repeat while removing the
   // pressure to, which is exactly the fallback we want.
   const tierValueActive = Boolean(tierMap) && !suppressTierRepeatValue;
-  // Reservations are built from the full map, not `tierMap`: a dish rated 5
-  // but left at the default tier still deserves to reach the pool, and
-  // `hasTierEffects` is false for a ratings-only map.
-  const poolReservations = buildPoolReservations(preferences.tiers || null);
   const candidates = scoredCandidates || dayCandidates || enumerateFeasibleDays({ mealDatabase, rules, preferences });
 
   if (dayCount === 0 || candidates.length === 0) {
@@ -935,7 +864,7 @@ export const selectWeek = ({
   const scored = [...(scoredCandidates || scoreCandidates(candidates, { rules, preferences, historyMap }))];
   scored.sort((a, b) => b.baseScore - a.baseScore || (a.nameKey < b.nameKey ? -1 : 1));
 
-  const pool = trimCandidatePool(scored, maxCandidates, { reserveFor: poolReservations });
+  const pool = trimCandidatePool(scored, maxCandidates);
   const maxDayProtein = pool.reduce((max, day) => Math.max(max, day.totals.protein), 0);
   const proteinFloor = weeklyProteinFloor(dayCount, rules);
   const requiredCompliant = requiredCompliantDays(dayCount, rules);

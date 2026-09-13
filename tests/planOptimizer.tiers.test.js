@@ -159,13 +159,14 @@ test('the legacy pinned dish can only loosen a tier, never tighten it', () => {
 });
 
 test('a staple actually recurs across most of the catalog, not just in theory', () => {
-  // The honest regression guard for this feature. Three earlier designs all
-  // passed a single-dish test while doing essentially nothing in aggregate:
-  // discounting the repeat penalty (staples never repeated, because a repeat
-  // also forgoes `distinctMealBonus`), raising the cap (the dish was not in
-  // the trimmed pool often enough to repeat), and paying repeats a bonus
-  // (the dish never scored well enough to be chosen at all). Only a sweep
-  // over the whole catalog catches that, so the sweep is the test.
+  // The honest regression guard for this feature. Earlier designs passed a
+  // single-dish test while doing essentially nothing in aggregate: discounting
+  // the repeat penalty (staples never repeated, because a repeat also forgoes
+  // `distinctMealBonus`) and paying repeats a bonus above break-even (every
+  // beam branch then made the same choice and they dead-ended together). What
+  // works is the per-appearance affinity — ablated and measured: without it
+  // 18 of 75 dishes appear and 13 recur; with it, 57 and 46. Only a sweep over
+  // the whole catalog catches the difference, so the sweep is the test.
   let appeared = 0;
   let repeated = 0;
   let infeasible = 0;
@@ -186,12 +187,13 @@ test('a staple actually recurs across most of the catalog, not just in theory', 
   assert.ok(repeated / total > 0.45, `only ${repeated}/${total} staples actually recurred`);
 });
 
-test('the candidate pool reserves room for dishes the user elevated', () => {
-  // The measurement behind the reservation pass: of 23,688 enumerated days
-  // only 300 survive the trim, and the median lunch/dinner dish appears in 2
-  // of them — 31 of 75 in none at all. A dish in one pooled day can be planned
-  // once whatever its score, because no day may repeat inside a week. No
-  // amount of scoring fixes that; only pool composition does.
+test('elevating a dish the planner never picks changes the week', () => {
+  // This was once believed to need a candidate-pool reservation. It does not:
+  // the pool holds 2400 days, in which the median lunch/dinner dish appears
+  // 52 times and only 1 of 75 appears in none — the pool was never the
+  // constraint. An ablation confirmed a reservation pass changed nothing at
+  // all (57/75 appearing either way), so it was removed and the affinity term
+  // alone carries this.
   const poorlyRanked = mealDatabase.lunchDinner.filter(
     (m) => !namesOf(plan(prefs())).includes(m.name)
   );
@@ -203,10 +205,12 @@ test('the candidate pool reserves room for dishes the user elevated', () => {
   assert.notDeepEqual(stapled, base, 'elevating an unpicked dish should change the week');
 });
 
-test('a high rating alone earns pool room, without any tier change', () => {
-  // `hasTierEffects` is false for a ratings-only map, so reservations are
-  // built from the full map rather than from that gate. A dish rated 5 and
-  // left at the default tier must still be reachable.
+test('a high rating alone steers the week, without any tier change', () => {
+  // `hasTierEffects` is false for a ratings-only map, so the tier-affinity
+  // block is skipped entirely and `mealRatingWeight` has to carry this on its
+  // own. Worth asserting separately: the two paths are gated by different
+  // predicates and it would be easy for a ratings-only map to fall between
+  // them and do nothing.
   const unpicked = mealDatabase.lunchDinner.find((m) => !namesOf(plan(prefs())).includes(m.name));
   assert.ok(unpicked);
   const rated = namesOf(plan(prefs({ [unpicked.name]: { rating: 5 } })));
