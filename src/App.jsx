@@ -22,6 +22,13 @@ import {
   getCustomMealCandidates
 } from './lib/mealEvents';
 import {
+  buildPlanReviewPayload,
+  collectWeekDishes,
+  toLegacyRejectionRecord
+} from './lib/planReview';
+import { PLAN_VERDICT } from './lib/feedbackSchema';
+import PlanReviewModal from './components/PlanReviewModal';
+import {
   ONBOARDING_MODE,
   buildOnboardingProfile,
   getDefaultOnboardingDraft,
@@ -315,6 +322,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
   const [onboardingProfile, setOnboardingProfile] = useState(null);
   const [showOnboardingEditor, setShowOnboardingEditor] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showPlanReviewModal, setShowPlanReviewModal] = useState(false);
 
   const isViewerMode = onboardingProfile?.mode === ONBOARDING_MODE.VIEWER;
   const onboardingDraft = onboardingProfile
@@ -1756,35 +1764,52 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       setIsRegenerating(false);
     }
   };
-  const rejectWeek = async () => {
-    if (!requireWriteAccess('Rejecting plans')) return;
+  /**
+   * Week review — accept, reject, rate, and say why.
+   *
+   * This replaced a `window.prompt` that captured one line of free text and
+   * appended it to `rejected-plans`, an array whose only reader is a CLI
+   * script needing Firebase Admin credentials. In a browser-only workflow
+   * that is not a reader, so the single most valuable subjective signal in
+   * the app was write-only.
+   *
+   * The review now lands in the event log alongside every other signal, which
+   * is what lets the learner read a stated complaint ("too much roti") and an
+   * observed behaviour (three roti lunches swapped away) as evidence about the
+   * same thing. `rejected-plans` is still written on a rejection so
+   * `scripts/scorePlan.mjs` and the export path keep working unchanged.
+   */
+  const openWeekReview = () => {
+    if (!requireWriteAccess('Reviewing plans')) return;
+    setShowPlanReviewModal(true);
+  };
 
-    const reason = window.prompt("Why are you rejecting this week's plan? (one line)");
-    if (reason === null) return; // user cancelled
-    const trimmedReason = reason.trim();
-    if (!trimmedReason) {
-      showNotification('⚠️ Rejection needs a reason');
-      return;
-    }
+  const submitWeekReview = async (draft) => {
+    setShowPlanReviewModal(false);
 
-    const weekKeys = getWeekDateKeys(selectedDateKey).sort();
-    const plan = {};
-    for (const key of weekKeys) {
-      if (mealPlans[key]) plan[key] = mealPlans[key];
-    }
+    const payload = buildPlanReviewPayload(draft);
+    appendMealEvent(payload);
 
-    const existingRejections = await storageGet('rejected-plans');
-    const nextRejections = [
-      ...(Array.isArray(existingRejections) ? existingRejections : []),
-      {
-        timestamp: new Date().toISOString(),
-        plan,
-        reason: trimmedReason
+    if (payload.verdict === PLAN_VERDICT.REJECTED) {
+      const plan = {};
+      for (const key of payload.dateKeys) {
+        if (mealPlans[key]) plan[key] = mealPlans[key];
       }
-    ];
 
-    await saveToStorage('rejected-plans', nextRejections);
-    showNotification('🚫 Week rejected and logged');
+      const existingRejections = await storageGet('rejected-plans');
+      const nextRejections = [
+        ...(Array.isArray(existingRejections) ? existingRejections : []),
+        toLegacyRejectionRecord({ plan, review: payload })
+      ];
+      await saveToStorage('rejected-plans', nextRejections);
+    }
+
+    const stars = payload.rating ? ` · rated ${payload.rating}/5` : '';
+    showNotification(
+      payload.verdict === PLAN_VERDICT.ACCEPTED
+        ? `\u2705 Week accepted${stars}`
+        : `\ud83d\udeab Week rejected${stars}`
+    );
   };
 
   const weekDateKeys = getWeekDateKeys(selectedDateKey);
@@ -1882,6 +1907,16 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             </div>
           </div>
         )}
+        {showPlanReviewModal && (
+          <PlanReviewModal
+            weekStartKey={getWeekDateKeys(selectedDateKey).sort()[0]}
+            dateKeys={getWeekDateKeys(selectedDateKey).sort()}
+            dishes={collectWeekDishes(mealPlans, getWeekDateKeys(selectedDateKey))}
+            onSubmit={submitWeekReview}
+            onClose={() => setShowPlanReviewModal(false)}
+          />
+        )}
+
         {showCalendarModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowCalendarModal(false)}>
             <div className="bg-white rounded-xl p-5 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
@@ -2225,11 +2260,11 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         </div>
 
         <button
-          onClick={rejectWeek}
-          className="w-full bg-red-100 text-red-700 py-3 rounded-lg font-semibold mb-4 hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          onClick={openWeekReview}
+          className="w-full bg-indigo-100 text-indigo-700 py-3 rounded-lg font-semibold mb-4 hover:bg-indigo-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           disabled={isViewerMode}
         >
-          🚫 Reject Week
+          📝 Review This Week
         </button>
 
         <AdminTools user={user} systemConfig={systemConfig} />
