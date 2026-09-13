@@ -5,6 +5,8 @@ import {
   derivePrimaryIngredient,
   enrichMealForDataLayer
 } from '../lib/mealDataLayer.js';
+import { ingredients } from './ingredients.js';
+import { expandMealTemplates } from './mealTemplates.js';
 
 // Base meals converted to the new Ingredient Architecture
 const baseMealsList = {
@@ -2174,8 +2176,31 @@ const buildMeal = (meal, mealType) => {
   );
 };
 
+/**
+ * Meals composed from `mealTemplates.js` — a base plus any one of several
+ * proteins.
+ *
+ * Built through the same `buildMeal` path as every hand-authored dish, so
+ * macros are computed from `parts[]` and the derived tags come out identical.
+ * A generated meal is not a second class of data; it is the same class of data
+ * with a different author.
+ *
+ * Hand-authored dishes win any name collision — see `expandMealTemplates`.
+ */
+const templateMeals = expandMealTemplates({
+  existingNames: [
+    ...baseMealsList.breakfast,
+    ...baseMealsList.lunchDinner,
+    ...baseMealsList.snack
+  ].map(meal => meal.canonical_name),
+  isAvailable: ingredientId => Boolean(ingredients[ingredientId])
+}).map(meal => buildMeal(meal, 'lunch_dinner'));
+
 export const mealDatabase = {
   breakfast: baseMealsList.breakfast.map(meal => buildMeal(meal, 'breakfast')),
-  lunchDinner: baseMealsList.lunchDinner.map(meal => buildMeal(meal, 'lunch_dinner')),
+  lunchDinner: [
+    ...baseMealsList.lunchDinner.map(meal => buildMeal(meal, 'lunch_dinner')),
+    ...templateMeals
+  ],
   snack: baseMealsList.snack.map(meal => buildMeal(meal, 'snack'))
 };
