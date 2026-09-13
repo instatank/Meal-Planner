@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import {
   EVENT_DEFINITIONS,
@@ -112,4 +114,17 @@ test('review reasons are uniquely identified and carry a usable signal', () => {
     assert.equal(PLAN_REVIEW_REASON_BY_ID[reason.id], reason);
   }
   assert.equal(RATING_NEUTRAL, 3, 'a middling rating must be the zero point');
+});
+
+test('the retention bound is enforced on load, not only on append', () => {
+  // A log can arrive already over the limit — synced from a device running an
+  // older build, or grown before the bound existed. Enforcing it only on
+  // append would let the persistence effect write the oversized log straight
+  // back out. This asserts the source does both.
+  const appSource = readFileSync(
+    fileURLToPath(new URL('../src/App.jsx', import.meta.url)),
+    'utf8'
+  );
+  assert.match(appSource, /setMealEvents\(trimEventLog\(parsedEvents\)\)/, 'load path does not trim');
+  assert.match(appSource, /trimEventLog\(\[\.\.\.prev, event\]\)/, 'append path does not trim');
 });

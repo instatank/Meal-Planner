@@ -220,6 +220,36 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 
   Findings **3, 4, 7–14 remain open**, including two that still disagree in production: two independent red-meat classifiers (#3) and name-based fibre scoring that contradicts measured grams on 14 meat meals (#4).
 
+- **Feedback + learning system — shipped.** Every interaction is now captured
+  against one typed schema, judged at the week level, learned from, and shown
+  back in the app. See `docs/FEEDBACK_SYSTEM.md`. The load-bearing parts:
+  - **Capture gaps closed.** `skip` recorded a date and a slot but never the
+    meal — "I will not eat this" without the "this". `custom` never wrote
+    `customMealText`, which is the mechanical reason the promotion path has
+    always found zero candidates (audit finding #6's second half). Both fixed,
+    and `tests/feedbackCapture.producers.test.js` now scans App.jsx and checks
+    all 11 `appendMealEvent` literals against the schema, so a producer can no
+    longer drift from its consumer unnoticed.
+  - **Week review replaces the `window.prompt`.** Accept/reject, a 1-5 rating
+    (3 is explicitly neutral and moves nothing), structured reason tags that
+    name the *same attribute keys the learner extracts from meals*, and a
+    verbatim note. `rejected-plans` is still written so `scorePlan.mjs` keeps
+    working.
+  - **Learning is attribute-level, not dish-level.** Every observation credits
+    the dish and its ten attributes, so three swaps off three paneer dishes
+    become one `primary:paneer` signal that generalises to paneer dishes never
+    served. Attributes are damped by inverse document frequency — measured,
+    because crediting keys equally made one observation reach a median 110 of
+    110 meals, which smears rather than generalises.
+  - **It cannot wreck a plan, and that is tested.** Tier 3 only; shrunk by
+    evidence; withheld below an evidence floor. With no model the optimizer is
+    *bit-identical*; with every attribute at -1 it still returns a feasible
+    week above the protein floor. `audit:generation` unchanged (1045ms ->
+    1041ms).
+  - **The legacy dish-name counters are untouched and still what is
+    persisted.** The learned model is additive and re-derived from the log on
+    every boot, never stored. Merging them waits for real data.
+
 ## Next Priorities (updated)
 
 0. **Confirm the five Phase 2 decisions.** `docs/PHASE2_HANDOVER.md` §4 asked the founder five product questions before the work; they were not answered, so Phase 2 proceeded on stated assumptions (meals authored for review, additive only, fibre in grams now, unimplemented goals left throwing, protein floor unchanged). §9.7 and §9.8 record what to confirm — including the measurement for raising the weekly protein floor.
@@ -229,7 +259,19 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 4. **IF (Intermittent Fasting) mode.** `two_meals` is declared in onboarding and reconciled in `rules.js`, but has no ruleset — `getRules` throws for it by design. Give it real Tier-1/2/3 definitions and surface it so users can opt into 16/8 or 18/6 without overriding meals manually.
 5. **Vegetarian goal.** Now cheap: Phase 2 added 2 vegetarian breakfasts and several vegetarian lunch/dinner dishes that sit inside the budgets. Still throws by design.
 6. **Tag AI-generated plans** (`_aiGenerated: true`) so future dedup/cleanup logic can tell pushed/AI/manual plans apart.
-7. **Bundle size.** 765KB, 200KB gzipped (down from 994KB/245KB — `@google/genai` removal alone was worth ~50KB gzip). Code-split Firebase, now the largest remaining offender.
+7. **Calibrate the learning constants against real use.** `PRIOR_STRENGTH`
+   (6), `MIN_EVIDENCE_TO_APPLY` (2.5) and `RECENCY_HALF_LIFE_DAYS` (70) are
+   defensible priors, not fitted values. The system is built so that is safe —
+   with no evidence it changes nothing and it shows its working — but after a
+   month of real events the question is whether they match how this user
+   actually behaves. `docs/FEEDBACK_SYSTEM.md` §4.
+8. **Decide whether to correct for exposure bias.** The planner shows what it
+   already believes you like, so disliked attributes stop appearing and freeze.
+   Currently surfaced honestly ("Barely tried" in the insights panel) but not
+   corrected. Fixing it means occasionally planning *against* current belief —
+   a worse week now for a better model later. Founder's call, not the code's.
+   `docs/FEEDBACK_SYSTEM.md` §7.
+9. **Bundle size.** 819KB, 212KB gzipped (up from 796KB/204KB with the feedback system; down from 994KB/245KB originally — `@google/genai` removal alone was worth ~50KB gzip). Code-split Firebase, now the largest remaining offender.
 
 ---
 
@@ -244,6 +286,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 | `docs/PHASE1_HANDOVER.md` | Shipped 2026-08-02. §9 records what the generation-engine rebuild measured — read it before changing any threshold. |
 | `docs/EVAL_AND_ROADMAP.md` | The original audit. §3 is now historical (that code is deleted); §4 onward is still live. |
 | `docs/QUALITY_RUBRIC.md` | **The four scored rules (R1–R4)** layered on top of the `rules.js` hard gates. Implemented in `src/lib/planScorer.js`. **Not yet calibrated** — the calibration in its §Calibration needs `docs/rejections/` and the founder's ideal week, neither of which is in the repo. |
+| `docs/FEEDBACK_SYSTEM.md` | **The capture, review and learning system.** What each event records and why, how week reviews work, the attribute-level learning model and its three constants, the three guards that keep it from wrecking a plan, measured cost, and its known limits (exposure bias, chief among them). Read §4 before changing any learning threshold. |
 | `docs/CONSISTENCY_AUDIT.md` | **Every fact with more than one home**, and every concept inferred by pattern-matching where structured data exists — 14 findings ranked by blast radius, each with file:line, current values, and the location that should become authoritative. Findings 1, 2, 5 and 6 are fixed and marked as such; the rest are open. |
 
 ---
@@ -258,6 +301,8 @@ src/
   App.jsx                Main component — state, sync, effects, UI
   components/
     Omnibox.jsx          NL input (Claude-backed via omniboxService)
+    PlanReviewModal.jsx  Week review sheet (verdict, rating, reasons, note)
+    InsightsPanel.jsx    What the planner learned, and what it has not
     AdminTools.jsx       Admin panel
     OnboardingFlow.jsx   First-run setup
   lib/
@@ -268,7 +313,12 @@ src/
     planService.js       Client wrapper for /api/generate-plan — weekly gen (Claude)
     omniboxService.js    Client wrapper for /api/generate-plan — Omnibox intent parsing (Claude)
     plannerGenerator.js  Single-day generator (facade over planOptimizer)
-    mealEvents.js        Event log → preference derivation
+    mealEvents.js        Event log → legacy dish-name preference derivation
+    feedbackSchema.js    SINGLE SOURCE OF TRUTH for what is captured (9 event
+                         types, their fields, and how each reads as a signal)
+    planReview.js        Week-level accept/reject/rate + structured reasons
+    preferenceLearning.js  Dish- AND attribute-level learning (see docs/FEEDBACK_SYSTEM.md)
+    feedbackAnalytics.js   Adherence, overrides, skips, most-rejected dishes
     firebase.js          Firebase client init
   data/
     mealDatabase.js      Canonical meal list

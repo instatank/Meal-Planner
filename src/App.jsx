@@ -581,7 +581,13 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         setMealHistory(parsedHistory);
         setPreferences(derivedPreferences);
         setMealPlans(parsedPlans);
-        setMealEvents(parsedEvents);
+        // Trimmed on the way in as well as on append. `appendMealEvent`
+        // enforces the bound for logs that grow here, but a log can also
+        // arrive already over it — synced from a device that ran an older
+        // build, or grown before the bound existed. Without this the
+        // persistence effect below would faithfully write the oversized log
+        // straight back out again.
+        setMealEvents(trimEventLog(parsedEvents));
         setLegacyRejections(Array.isArray(legacyRejectionsResult) ? legacyRejectionsResult : []);
         setUserMealCatalog(parsedUserCatalog);
         setOnboardingProfile(parsedOnboarding);
