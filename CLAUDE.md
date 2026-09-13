@@ -66,7 +66,7 @@ Rules live in **`src/lib/rules.js` and nowhere else**, split into three tiers.
 
 | Tier | Meaning | Examples |
 | --- | --- | --- |
-| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, **R1 — every dish at most once a week (one optional pinned dish up to 3)**, **R2 — 3–4 egg-anchored breakfasts**, **R3 — Indian lunch + non-Indian dinner, directional**, **anchor-ingredient cap (≤2/wk at lunch/dinner)**, **no two identical days in a week**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 85% of nominal (**714g** at the 120g target), 50g/day sanity floor |
+| **1 — Hard** | Never violate; a plan containing one is invalid | per-meal protein floor (20g), no meal twice in a day, **R1 — per-dish weekly cap from its frequency tier** (default `occasional` = once a week, identical to the old flat cap; `staple` 3, `retired` 0 — see `docs/MEAL_TIERS.md`), **R2 — 3–4 egg-anchored breakfasts**, **R3 — Indian lunch + non-Indian dinner, directional**, **anchor-ingredient cap (≤2/wk at lunch/dinner)**, **no two identical days in a week**, red-meat cap (3/wk), avoid score > 3, weekly protein ≥ 85% of nominal (**714g** at the 120g target), 50g/day sanity floor |
 | **2 — Budgeted** | Allowed to break on ≤2 of 7 days | daily protein band (**108–132g**), carb cap (130g), calorie bounds (1600–2200) |
 | **3 — Scored** | Never rejects; only ranks | **R4 — lunch and dinner both flatbread/pasta**, variety, cuisine diversity, protein-family diversity, fibre, dinner calorie tapering, user preferences, anti-greedy |
 
@@ -131,7 +131,7 @@ generation entry point, it validates or it does not ship.
 Re-measure any of this with `npm run audit:generation` — it enumerates rather than estimates and exits non-zero if an acceptance criterion fails.
 
 ### Meal Database
-`src/data/mealDatabase.js`, **110 meals** (20 breakfast / 75 lunchDinner / 15 snack) built from `src/data/ingredients.js` (92 ingredients). Meals may carry an optional `recipe_url`.
+`src/data/mealDatabase.js`, **120 meals** (20 breakfast / 85 lunchDinner / 15 snack) built from `src/data/ingredients.js` (92 ingredients). 10 of the lunch/dinner meals are composed from `mealTemplates.js` rather than hand-authored. Meals may carry an optional `recipe_url`.
 
 Macros are **computed from `parts[]`**, never typed. So are three tags that used to be hand-maintained beside them and drifted:
 
@@ -155,7 +155,7 @@ Rebuild downstream artifacts with `npm run db:pack` (needs `npm install` — it 
 | --- | --- | --- |
 | **Claude structured output** | Prefill (`"[":`) is not a reliable way to force JSON. Use `tool_use` with `tool_choice: {type: 'tool', name}`. | See `buildSubmitPlanTool` in `src/lib/planService.js` and `tool` handling in `api/generate-plan.js`. |
 | **Vercel timeouts** | `api/generate-plan.js` declares `maxDuration: 60`. Hobby plan caps at 10s regardless — upgrade to Pro or the regen will 504. | The proxy runs at `effort: 'low'` to stay inside the cap. Lower it further before reaching for a smaller model. |
-| **Optimizer enumeration is quadratic** | `breakfasts × lunchDinner²`, run **client-side before** the Anthropic call. **Current, at 110 meals: ~1.0–1.25s cold in `audit:generation`, over 99,900 (`high_protein`) to 111,000 (`standard`) candidates.** The ~630ms figure quoted below was measured at 97 meals and no longer describes this catalog. Growth headroom is shrinking again, and the shape is still quadratic. | Tier 1 (waste removal, byte-identical output) shipped and re-verified at 97 meals. The largest remaining cost is the full sort in `selectWeek`; removing it means restructuring `trimCandidatePool` (Tier 2, changes candidate visibility) — worth it only well past 200 meals. See `docs/PHASE3_REPORT.md` §4.1. |
+| **Optimizer enumeration is quadratic — but the beam dominates** | `breakfasts x lunchDinner^2`, run client-side before the Anthropic call. The quadratic is real but **no longer the binding cost**: growing lunch/dinner 75 -> 175 moves enumeration 79ms -> 157ms and scoring 35ms -> 82ms, inside a run of ~900ms that barely changes, because the beam search dominates and is bounded independently of catalog size. **Current at 120 meals: ~720ms, 28,728 candidates.** | The previous note here said growth headroom was shrinking and the catalog was blocked on the optimizer. That was measured at 97 meals before Phase 3 Tier 1 landed and is stale — doubling the catalog now costs ~14%. Catalog growth is cheap; see `docs/MEAL_TIERS.md` §5. |
 | **Promoted custom meals carry observed, not measured, macros** | `buildPromotedCustomMeal` no longer invents `{p: 24, c: 42, f: 14}`. A promoted meal now takes the **median** protein/cal/carbs/fat across every time the user logged it, and promotion **refuses** when no instance carried usable numbers. Median rather than mean because one mistyped portion would otherwise drag the meal far outside the calorie bounds. | Still not an ingredient rollup — flagged `macrosFromObservation: true` so a later pass can tell the two apart. The path is now *reachable*: closing the `customMealText` capture gap is what switched it on, which is why the macros were fixed in the same change. See `docs/FEEDBACK_SYSTEM.md` §2. |
 | **Sampling parameters** | Sonnet 5 returns a 400 for any non-default `temperature`/`top_p`/`top_k`. A model swap without removing them breaks the endpoint outright. | `buildAnthropicRequest` in `api/generate-plan.js` strips them defensively, so a stale cached client bundle degrades instead of breaking. |
 | **Thinking shares `max_tokens`** | Adaptive thinking is on by default on Sonnet 5 and counts against `max_tokens`. A budget sized for the response alone truncates mid-answer. | `DEFAULT_MAX_TOKENS` is 8192 for a response that is only a few enum picks. |
@@ -250,6 +250,28 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
     persisted.** The learned model is additive and re-derived from the log on
     every boot, never stored. Merging them waits for real data.
 
+- **Meal tiers, ratings and templates — shipped.** See `docs/MEAL_TIERS.md`.
+  - **R1's flat cap is now per-dish.** `occasional` (the default) caps at 1 and
+    is bit-identical to the old rule; `staple` allows 3, `retired` 0. The
+    single-pin hack is superseded and can now only loosen a tier. Asserted
+    against `RUBRIC_LIMITS` so the default cannot drift from the rule it
+    replaces.
+  - **Making a staple recur took four attempts.** Discounting the repeat
+    penalty does nothing (a repeat also forgoes `distinctMealBonus`); a repeat
+    bonus above break-even collapses the beam into a dead end; a candidate-pool
+    reservation — built on a mis-measurement and since removed — changed
+    nothing. What works is a per-appearance `affinity` in `baseScore`: 18/75
+    dishes appearing -> 57/75, 13/75 recurring -> 46/75.
+  - **Tiering can never produce a worse week than not tiering.** On a beam
+    dead-end `selectWeek` retries once with tier scoring suppressed, so the
+    fallback is the untiered search.
+  - **Tiers are proposed from the event log, never applied by it** — unlike the
+    learned model, which is Tier 3 and cannot make a plan illegal. Tiers change
+    a hard cap, so they ask.
+  - **Templates add mix-and-match meals**, expanded at catalog build. Catalog
+    110 -> 120. This *improved* the plan: carb cap 6/7 -> 7/7, weekly protein
+    100.4% -> 101.4%, runtime unchanged.
+
 ## Next Priorities (updated)
 
 0. **Confirm the five Phase 2 decisions.** `docs/PHASE2_HANDOVER.md` §4 asked the founder five product questions before the work; they were not answered, so Phase 2 proceeded on stated assumptions (meals authored for review, additive only, fibre in grams now, unimplemented goals left throwing, protein floor unchanged). §9.7 and §9.8 record what to confirm — including the measurement for raising the weekly protein floor.
@@ -278,7 +300,15 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
    corrected. Fixing it means occasionally planning *against* current belief —
    a worse week now for a better model later. Founder's call, not the code's.
    `docs/FEEDBACK_SYSTEM.md` §7.
-9. **Bundle size.** 819KB, 212KB gzipped (up from 796KB/204KB with the feedback system; down from 994KB/245KB originally — `@google/genai` removal alone was worth ~50KB gzip). Code-split Firebase, now the largest remaining offender.
+9. **Enforce `minGapDays` for the `rare` tier.** Declared and tested as data,
+   not yet wired — it needs history threaded into enumeration, where a
+   history-dependent hard rule can make the catalog infeasible in ways that are
+   hard to diagnose. The weekly cap and a negative affinity already make `rare`
+   behave rarely. `docs/MEAL_TIERS.md` §6.
+10. **Reconcile tier against learned preference.** A dish tiered `staple` and
+   then repeatedly swapped away from carries a positive affinity and a negative
+   learned score at once; they simply add. Defensible, but not designed.
+11. **Bundle size.** 819KB, 212KB gzipped (up from 796KB/204KB with the feedback system; down from 994KB/245KB originally — `@google/genai` removal alone was worth ~50KB gzip). Code-split Firebase, now the largest remaining offender.
 
 ---
 
@@ -293,6 +323,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 | `docs/PHASE1_HANDOVER.md` | Shipped 2026-08-02. §9 records what the generation-engine rebuild measured — read it before changing any threshold. |
 | `docs/EVAL_AND_ROADMAP.md` | The original audit. §3 is now historical (that code is deleted); §4 onward is still live. |
 | `docs/QUALITY_RUBRIC.md` | **The four scored rules (R1–R4)** layered on top of the `rules.js` hard gates. Implemented in `src/lib/planScorer.js`. **Not yet calibrated** — the calibration in its §Calibration needs `docs/rejections/` and the founder's ideal week, neither of which is in the repo. |
+| `docs/MEAL_TIERS.md` | **Tiers, ratings and templates.** The R1 change (the weekly cap is now per dish), the three wrong designs it took to make a staple actually recur and the ablation that settled it, how tiers are proposed from behaviour, the template system, and the known limits. **Read §3 before changing any tier number.** |
 | `docs/FEEDBACK_SYSTEM.md` | **The capture, review and learning system.** What each event records and why, how week reviews work, the attribute-level learning model and its three constants, the three guards that keep it from wrecking a plan, measured cost, and its known limits (exposure bias, chief among them). Read §4 before changing any learning threshold. |
 | `docs/CONSISTENCY_AUDIT.md` | **Every fact with more than one home**, and every concept inferred by pattern-matching where structured data exists — 14 findings ranked by blast radius, each with file:line, current values, and the location that should become authoritative. Findings 1, 2, 5 and 6 are fixed and marked as such; the rest are open. |
 
@@ -310,6 +341,7 @@ src/
     Omnibox.jsx          NL input (Claude-backed via omniboxService)
     PlanReviewModal.jsx  Week review sheet (verdict, rating, reasons, note)
     InsightsPanel.jsx    What the planner learned, and what it has not
+    MealTieringPanel.jsx Rate and tier the database; accept tier suggestions
     AdminTools.jsx       Admin panel
     OnboardingFlow.jsx   First-run setup
   lib/
@@ -326,10 +358,13 @@ src/
     planReview.js        Week-level accept/reject/rate + structured reasons
     preferenceLearning.js  Dish- AND attribute-level learning (see docs/FEEDBACK_SYSTEM.md)
     feedbackAnalytics.js   Adherence, overrides, skips, most-rejected dishes
+    mealTiers.js         Per-dish frequency tier, rating, pairing mode
+    tierProposals.js     Tiers suggested from behaviour (proposes, never applies)
     firebase.js          Firebase client init
   data/
     mealDatabase.js      Canonical meal list
     ingredients.js       Ingredient definitions
+    mealTemplates.js     Mix-and-match meals (base + protein) expanded at build
     fallbackPrompts.js   System-prompt templates (override via Firestore)
 scripts/                 CLI helpers (see "Scripts" above)
 tests/                   Node --test suite
