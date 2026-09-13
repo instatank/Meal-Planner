@@ -56,7 +56,22 @@ export const buildGoalAdjustedPlannerInput = ({ goal, preferences = {}, mealData
     accepts: { ...normalizedPreferences.accepts },
     avoids: { ...normalizedPreferences.avoids },
     edits: { ...normalizedPreferences.edits },
-    skips: { ...normalizedPreferences.skips }
+    skips: { ...normalizedPreferences.skips },
+    // Passed straight through, not adjusted. Goal adjustment is a statement
+    // about what the *goal* implies (high protein wants high-protein meals);
+    // the learned model is a statement about what the user does, and the two
+    // are combined by the optimizer's scoring, not by overwriting one with
+    // the other.
+    //
+    // Rebuilt key by key like the buckets above, which is precisely why it
+    // needs naming here: this function reconstructs the preference object
+    // rather than spreading it, so anything not listed is silently dropped.
+    // That is the exact shape of audit finding #1, where the same pattern
+    // swallowed `goalOverride` and routed every user to high_protein.
+    learned: {
+      dishes: { ...(normalizedPreferences.learned?.dishes || {}) },
+      attributes: { ...(normalizedPreferences.learned?.attributes || {}) }
+    }
   };
 
   const nextProteinTarget = resolveDailyProteinTarget(normalizedGoal, dailyProteinTarget);

@@ -49,11 +49,24 @@ export const DAILY_PROTEIN_SANITY_FLOOR = DEFAULT_RULES.hard.dailyProteinSanityF
 export const DAILY_CARB_HARD_CAP = DEFAULT_RULES.budgeted.dailyCarbCap;
 export const MIN_MEAL_PROTEIN = DEFAULT_RULES.hard.minMealProtein;
 
+/**
+ * `learned` is carried through rather than dropped.
+ *
+ * This function is the gate every preference object passes on its way to the
+ * optimizer, and it silently discarded any key it did not name — so a learned
+ * model attached upstream would have arrived empty, with nothing to indicate
+ * why. It stays a fixed shape (an unknown key is still dropped); `learned` is
+ * simply now one of the known ones.
+ */
 export const normalizePreferences = (prefs = {}) => ({
   accepts: prefs.accepts || {},
   avoids: prefs.avoids || {},
   edits: prefs.edits || {},
-  skips: prefs.skips || {}
+  skips: prefs.skips || {},
+  learned: {
+    dishes: prefs.learned?.dishes || {},
+    attributes: prefs.learned?.attributes || {}
+  }
 });
 
 export const getMealsForType = (mealDatabase, mealType) => {

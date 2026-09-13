@@ -19,6 +19,7 @@
  * Deterministic and seedable: same inputs always give the same week.
  */
 
+import { extractMealAttributes } from './mealDataLayer.js';
 import {
   CARB_HEAVY_THRESHOLD,
   FAT_HEAVY_THRESHOLD,
@@ -143,7 +144,7 @@ const EMPTY_FACTS = {
   name: '', protein: 0, carbs: 0, fat: 0, calories: 0, cuisine: '',
   family: 'vegetarian', redMeat: false, primaryMeat: false,
   fibreScore: 0, fibre: false, heavy: false, carbHeavy: false, fatHeavy: false,
-  repeatedFamily: false, primaryIngredient: null
+  repeatedFamily: false, primaryIngredient: null, attributeKeys: []
 };
 
 export const mealFacts = (meal) => {
@@ -171,7 +172,13 @@ export const mealFacts = (meal) => {
     repeatedFamily: hasRepeatedFamilyInsideMeal(meal),
     // Derived in the data layer from parts[]; null for fixtures and
     // user-added meals that carry no ingredient list.
-    primaryIngredient: meal?.primary_ingredient || null
+    primaryIngredient: meal?.primary_ingredient || null,
+    // The ten attribute buckets this meal belongs to, for learned preference.
+    // Memoised here for the same reason everything else in this record is:
+    // the search scores combinations, not meals, so computing these per
+    // candidate would run ten derivations ~100k times to answer 110 distinct
+    // questions.
+    attributeKeys: extractMealAttributes(meal)
   };
   FACT_CACHE.set(meal, facts);
   return facts;
@@ -481,6 +488,36 @@ export const scoreDayStandalone = (day, { rules, preferences = {} }) => {
     score += Math.min(Number(accepts[name] || 0), 4) * w.preferenceAcceptWeight;
     score += Math.min(Number(edits[name] || 0), 3) * w.preferenceEditWeight;
     score -= Math.min(Number(avoids[name] || 0), 4) * w.preferenceAvoidWeight;
+  }
+
+  // Learned preference — the last pass, and a strictly additive one.
+  //
+  // Two properties are load-bearing here. First, it is appended rather than
+  // folded into the loop above: floating-point addition is not associative, so
+  // reordering the existing terms could shift the last bits of a score and
+  // flip a tie in the candidate sort. Second, the whole block is skipped when
+  // there is no learned model, so a user with no history gets a score that is
+  // not merely equivalent but bit-for-bit the score this function returned
+  // before learning existed. `tests/planOptimizer.learned.test.js` asserts
+  // that equality on real candidates rather than trusting the argument.
+  const learnedDishes = preferences.learned?.dishes;
+  const learnedAttributes = preferences.learned?.attributes;
+  const hasLearnedDishes = learnedDishes && Object.keys(learnedDishes).length > 0;
+  const hasLearnedAttributes = learnedAttributes && Object.keys(learnedAttributes).length > 0;
+
+  if (hasLearnedDishes || hasLearnedAttributes) {
+    for (const meal of facts) {
+      if (hasLearnedDishes) {
+        const dishScore = Number(learnedDishes[meal.name] || 0);
+        if (dishScore) score += dishScore * w.learnedDishWeight;
+      }
+      if (hasLearnedAttributes) {
+        for (const key of meal.attributeKeys) {
+          const attributeScore = Number(learnedAttributes[key] || 0);
+          if (attributeScore) score += attributeScore * w.learnedAttributeWeight;
+        }
+      }
+    }
   }
 
   return score;

@@ -32,7 +32,7 @@ test('swap only first instance per day+slot counts as downvote', () => {
   assert.equal(prefs.avoids['Meal X'], 1.2);
 });
 
-test('edit and custom are recorded but do not move preferences', () => {
+test('edit and custom do not move the legacy dish-name counters', () => {
   // This test used to assert downvotes of 0.4 / 0.6 / 1.5 for these two event
   // types. Those weights are gone by decision, not by accident: all three read
   // `originalMealName` / `updatedMealName`, which no producer in App.jsx ever
@@ -42,8 +42,12 @@ test('edit and custom are recorded but do not move preferences', () => {
   // is why the old assertion passed here while the signal was dead in the app.
   //
   // Both types are now captured in full (App.jsx records `previousMealName` on
-  // custom events and emits real `edit` events) and interpreted by nothing,
-  // until there is enough data to validate what they should mean.
+  // custom events and emits real `edit` events). They *are* interpreted — by
+  // `preferenceLearning.js`, which reads every event type and is tested in
+  // tests/preferenceLearning.test.js. What they deliberately still do not
+  // touch is this function: the legacy dish-name counters keep the exact
+  // behaviour they were audited into, so the new model is additive and a
+  // regression in one cannot be hidden by the other.
   // See docs/CONSISTENCY_AUDIT.md finding #6.
   const events = [
     createMealEvent({ id: 'e1', type: 'edit', dateKey: '2026-02-17', mealType: 'dinner', originalMealName: 'Meal Old', updatedMealName: 'Meal New', timestamp: at('2026-02-17T08:00:00Z') }),
@@ -51,7 +55,12 @@ test('edit and custom are recorded but do not move preferences', () => {
   ];
 
   const prefs = derivePreferencesFromEvents(events);
-  assert.deepEqual(prefs, { accepts: {}, avoids: {}, edits: {}, skips: {} });
+  // Asserted per bucket rather than over the whole object: this test is about
+  // which signals move, not about the shape `normalizePreferences` returns.
+  assert.deepEqual(prefs.accepts, {});
+  assert.deepEqual(prefs.avoids, {});
+  assert.deepEqual(prefs.edits, {});
+  assert.deepEqual(prefs.skips, {});
 });
 
 test('undo reverses targeted event impacts', () => {
@@ -62,7 +71,10 @@ test('undo reverses targeted event impacts', () => {
   ];
 
   const prefs = derivePreferencesFromEvents(events);
-  assert.deepEqual(prefs, { accepts: {}, avoids: {}, edits: {}, skips: {} });
+  assert.deepEqual(prefs.accepts, {});
+  assert.deepEqual(prefs.avoids, {});
+  assert.deepEqual(prefs.edits, {});
+  assert.deepEqual(prefs.skips, {});
 });
 
 test('undo target lookup includes active slot events only', () => {

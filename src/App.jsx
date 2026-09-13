@@ -22,6 +22,11 @@ import {
   getCustomMealCandidates
 } from './lib/mealEvents';
 import {
+  buildAttributeIndex,
+  learnPreferences,
+  toLearnedPreferences
+} from './lib/preferenceLearning';
+import {
   buildPlanReviewPayload,
   collectWeekDishes,
   toLegacyRejectionRecord
@@ -669,13 +674,36 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     }
   }, [selectedDateKey, mealPlans, loading, preferences, mealHistory, mergedMealDatabase, onboardingProfile]);
 
+  /**
+   * The attribute index is a pure function of the catalog, so it is built once
+   * per catalog rather than on every event append — the effect below would
+   * otherwise re-derive ten attributes for all 110 meals on every confirm.
+   */
+  const attributeIndex = useMemo(() => buildAttributeIndex(mergedMealDatabase), [mergedMealDatabase]);
+
+  const learnedModel = useMemo(
+    () => learnPreferences({ events: mealEvents, mealDatabase: mergedMealDatabase, attributeIndex }),
+    [mealEvents, mergedMealDatabase, attributeIndex]
+  );
+
   useEffect(() => {
     if (loading) return;
-    const nextPreferences = derivePreferencesFromEvents(mealEvents);
-    setPreferences(nextPreferences);
+
+    // Two models, deliberately kept apart. `derivePreferencesFromEvents` is
+    // the audited dish-name counter and keeps exactly the behaviour it has;
+    // `learned` is the new attribute-level model. Additive rather than
+    // replacing, so a regression in one cannot be hidden by the other.
+    const legacyPreferences = derivePreferencesFromEvents(mealEvents);
+    setPreferences({ ...legacyPreferences, learned: toLearnedPreferences(learnedModel) });
+
     void saveToStorage('meal-events', mealEvents);
-    void saveToStorage('meal-preferences', nextPreferences);
-  }, [mealEvents, loading]);
+    // Only the legacy buckets are persisted. The learned model is derived
+    // from the event log on every boot, and storing a derived value beside
+    // the thing it derives from is how the two drift — the failure mode this
+    // codebase has already paid for with hand-typed meal tags and a protein
+    // target that lived in seven places.
+    void saveToStorage('meal-preferences', legacyPreferences);
+  }, [mealEvents, learnedModel, loading]);
 
   /**
    * Auto-generation detector.

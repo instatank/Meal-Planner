@@ -52,18 +52,15 @@
  * about whose week gets spent on it, not a decision this file should make.
  */
 
-import {
-  deriveCarbType,
-  deriveHasFibre,
-  deriveIsFatHeavy,
-  derivePrimaryIngredient,
-  flattenMealDatabase,
-  inferCarbLevel,
-  inferEffort,
-  inferFormat,
-  inferMealWeightClass,
-  inferProteinFamily
-} from './mealDataLayer.js';
+import { extractMealAttributes, flattenMealDatabase } from './mealDataLayer.js';
+
+// Re-exported rather than defined here. The extraction itself belongs beside
+// the other meal derivations in `mealDataLayer.js`, and it has to live there
+// for a mechanical reason too: `planOptimizer.js` needs it, and importing this
+// module from there would close a cycle
+// (planOptimizer -> preferenceLearning -> mealEvents -> plannerGenerator ->
+// planOptimizer). The data layer sits below all of them.
+export { extractMealAttributes };
 import {
   EVENT_DEFINITIONS,
   PLAN_REVIEW_REASON_BY_ID,
@@ -119,37 +116,6 @@ const REASON_WEIGHT = 1.5;
 const DISLIKED_DISH_WEIGHT = 1.5;
 
 const round3 = (value) => Number(Number(value).toFixed(3));
-
-/**
- * The attribute keys a meal belongs to.
- *
- * Ten dimensions, each a single string key, sharing one namespace so the
- * review vocabulary in `feedbackSchema.js` can name the same buckets a meal
- * lands in — `cuisine:indian` from a complaint and `cuisine:indian` from a
- * swap are the same evidence about the same thing.
- */
-export const extractMealAttributes = (meal) => {
-  if (!meal || typeof meal !== 'object') return [];
-
-  const keys = [];
-  const push = (dimension, value) => {
-    if (value === undefined || value === null || value === '') return;
-    keys.push(`${dimension}:${String(value).toLowerCase()}`);
-  };
-
-  push('cuisine', meal.cuisine);
-  push('primary', meal.primary_ingredient || derivePrimaryIngredient(meal));
-  push('family', inferProteinFamily(meal));
-  push('carb', deriveCarbType(meal));
-  push('carbLevel', inferCarbLevel(meal));
-  push('weight', inferMealWeightClass(meal));
-  push('format', inferFormat(meal));
-  push('effort', inferEffort(meal));
-  push('fatHeavy', deriveIsFatHeavy(meal) ? 'yes' : 'no');
-  push('fibre', deriveHasFibre(meal) ? 'yes' : 'no');
-
-  return keys;
-};
 
 /**
  * Name -> attribute-key lookup for a catalog.

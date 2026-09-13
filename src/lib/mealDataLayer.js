@@ -435,6 +435,38 @@ const computeConfidenceScore = ({ sourceType, issueCount, hasAssumptions }) => {
   return round2(clamp01(base - issuePenalty - assumptionPenalty));
 };
 
+/**
+ * The attribute keys a meal belongs to.
+ *
+ * Ten dimensions, each a single string key, sharing one namespace so the
+ * review vocabulary in `feedbackSchema.js` can name the same buckets a meal
+ * lands in — `cuisine:indian` from a complaint and `cuisine:indian` from a
+ * swap are the same evidence about the same thing.
+ */
+export const extractMealAttributes = (meal) => {
+  if (!meal || typeof meal !== 'object') return [];
+
+  const keys = [];
+  const push = (dimension, value) => {
+    if (value === undefined || value === null || value === '') return;
+    keys.push(`${dimension}:${String(value).toLowerCase()}`);
+  };
+
+  push('cuisine', meal.cuisine);
+  push('primary', meal.primary_ingredient || derivePrimaryIngredient(meal));
+  push('family', inferProteinFamily(meal));
+  push('carb', deriveCarbType(meal));
+  push('carbLevel', inferCarbLevel(meal));
+  push('weight', inferMealWeightClass(meal));
+  push('format', inferFormat(meal));
+  push('effort', inferEffort(meal));
+  push('fatHeavy', deriveIsFatHeavy(meal) ? 'yes' : 'no');
+  push('fibre', deriveHasFibre(meal) ? 'yes' : 'no');
+
+  return keys;
+};
+
+
 export const buildMealDataMetadata = ({ meal = {}, mealType = '' } = {}) => {
   const existingTags = meal.tags && typeof meal.tags === 'object' ? meal.tags : {};
   const existingNutrition = meal.nutrition_metadata && typeof meal.nutrition_metadata === 'object' ? meal.nutrition_metadata : {};

@@ -287,6 +287,21 @@ const GOAL_DEFINITIONS = {
       preferenceAcceptWeight: 2.5,
       preferenceEditWeight: 1.0,
       preferenceAvoidWeight: 3.0,
+      // Learned preference (src/lib/preferenceLearning.js). Tier 3 by
+      // construction: it ranks legal plans and can never reject one, so it
+      // cannot reach the protein floor, the repeat caps or the egg-breakfast
+      // rule however confident it becomes.
+      //
+      // Both weights multiply a score already bounded to (-1, 1) and already
+      // shrunk by evidence, so these numbers are the *ceiling* on how much a
+      // fully-convinced model may move a day — not its typical effect. The
+      // dish weight sits just under `preferenceAcceptWeight` so an explicit
+      // signal still outranks an inferred one. The attribute weight is
+      // smaller because a day pays it up to ten times over (once per
+      // dimension) per meal, and because each contribution is additionally
+      // damped by that attribute's specificity.
+      learnedDishWeight: 2.0,
+      learnedAttributeWeight: 1.2,
       historyRepeatPenalty: 2.5
     }
   },
@@ -332,6 +347,21 @@ const GOAL_DEFINITIONS = {
       preferenceAcceptWeight: 2.5,
       preferenceEditWeight: 1.0,
       preferenceAvoidWeight: 3.0,
+      // Learned preference (src/lib/preferenceLearning.js). Tier 3 by
+      // construction: it ranks legal plans and can never reject one, so it
+      // cannot reach the protein floor, the repeat caps or the egg-breakfast
+      // rule however confident it becomes.
+      //
+      // Both weights multiply a score already bounded to (-1, 1) and already
+      // shrunk by evidence, so these numbers are the *ceiling* on how much a
+      // fully-convinced model may move a day — not its typical effect. The
+      // dish weight sits just under `preferenceAcceptWeight` so an explicit
+      // signal still outranks an inferred one. The attribute weight is
+      // smaller because a day pays it up to ten times over (once per
+      // dimension) per meal, and because each contribution is additionally
+      // damped by that attribute's specificity.
+      learnedDishWeight: 2.0,
+      learnedAttributeWeight: 1.2,
       historyRepeatPenalty: 2.5
     }
   }
