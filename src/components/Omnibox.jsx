@@ -98,7 +98,12 @@ const Omnibox = ({ onAIAction, disabled = false, activeContext, onClearContext, 
 
         try {
             const intentPayload = await parseMealIntent(input, activeContext, systemConfig);
-            setPendingIntent(intentPayload);
+            // Carry the user's own words through with the parsed intent. The
+            // model's `data.name` is a normalized label; `rawText` is what was
+            // actually typed, and it is what the custom-meal candidate
+            // detector groups on. Without it that detector has nothing to key
+            // on and stays permanently empty.
+            setPendingIntent({ ...intentPayload, rawText: input.trim() });
             setInput(''); // Clear input after successful parse
         } catch (err) {
             setError("I couldn't quite understand that. Try formatting it like: 'I had 3 eggs and toast for breakfast'");

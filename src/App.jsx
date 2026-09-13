@@ -12,6 +12,8 @@ import {
 } from './lib/plannerGenerator';
 import {
   createMealEvent,
+  inspectMealEvent,
+  trimEventLog,
   normalizeMealEvents,
   derivePreferencesFromEvents,
   getUndoTargetsForSlots,
@@ -848,7 +850,17 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
 
   const appendMealEvent = (payload) => {
     const event = createMealEvent(payload);
-    setMealEvents((prev) => [...prev, event]);
+
+    // Advisory, never blocking: a misshapen event is still recorded, because
+    // losing a signal is worse than storing one oddly. But it is no longer
+    // silent — a producer that drops a field now says so in the console
+    // instead of being discovered months later as an empty preference map.
+    const inspection = inspectMealEvent(event);
+    if (!inspection.valid) {
+      console.warn(`[mealEvents] "${event.type}" event does not match its schema:`, inspection.issues, event);
+    }
+
+    setMealEvents((prev) => trimEventLog([...prev, event]));
     return event;
   };
 
@@ -929,7 +941,16 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           dateKey: selectedDateKey,
           mealType: targetSlot,
           mealName: mealData.name,
-          previousMealName
+          previousMealName,
+          // The user's own words, not the model's normalized label. This is
+          // the field `getCustomMealCandidates` groups on, and no producer
+          // wrote it until now — which is the whole mechanical reason the
+          // promotion path has always found zero candidates
+          // (docs/CONSISTENCY_AUDIT.md finding #6).
+          customMealText: payload.rawText || '',
+          source: 'db_match',
+          protein: mealData.protein ?? 0,
+          cal: mealData.cal ?? 0
         });
 
         showNotification(`✓ Logged ${mealData.name}`);
@@ -964,7 +985,16 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           dateKey: selectedDateKey,
           mealType: targetSlot,
           mealName: payload.data.name,
-          previousMealName
+          previousMealName,
+          // The user's own words, not the model's normalized label. This is
+          // the field `getCustomMealCandidates` groups on, and no producer
+          // wrote it until now — which is the whole mechanical reason the
+          // promotion path has always found zero candidates
+          // (docs/CONSISTENCY_AUDIT.md finding #6).
+          customMealText: payload.rawText || '',
+          source: 'custom_parts',
+          protein: computed.protein ?? 0,
+          cal: computed.cal ?? 0
         });
 
         showNotification(`✓ Logged ${payload.data.name}`);
@@ -1007,7 +1037,16 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           dateKey: selectedDateKey,
           mealType: targetSlot,
           mealName: payload.data.name,
-          previousMealName
+          previousMealName,
+          // The user's own words, not the model's normalized label. This is
+          // the field `getCustomMealCandidates` groups on, and no producer
+          // wrote it until now — which is the whole mechanical reason the
+          // promotion path has always found zero candidates
+          // (docs/CONSISTENCY_AUDIT.md finding #6).
+          customMealText: payload.rawText || '',
+          source: 'ai_estimate',
+          protein: payload.data.estimatedProtein || 0,
+          cal: payload.data.estimatedCalories || 0
         });
 
         showNotification(`🤖 Estimated: ${payload.data.name}`);
@@ -1049,7 +1088,16 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           dateKey: selectedDateKey,
           mealType: targetSlot,
           mealName: payload.data.name,
-          previousMealName
+          previousMealName,
+          // The user's own words, not the model's normalized label. This is
+          // the field `getCustomMealCandidates` groups on, and no producer
+          // wrote it until now — which is the whole mechanical reason the
+          // promotion path has always found zero candidates
+          // (docs/CONSISTENCY_AUDIT.md finding #6).
+          customMealText: payload.rawText || '',
+          source: 'dining_out',
+          protein: payload.data.estimatedProtein || 0,
+          cal: payload.data.estimatedCalories || 0
         });
 
         showNotification(`🍱 Cheated: ${payload.data.name}`);
@@ -1212,6 +1260,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
   const handleSkip = async (mealType) => {
     if (!requireWriteAccess('Skipping meals')) return;
 
+    // Read the plan before writing history. A skip is the user telling us they
+    // will not eat a specific dish, and until now we recorded only the date
+    // and the slot — the single largest hole in the capture surface. The name
+    // is what makes a skip learnable at all.
+    const skippedMeal = selectedDayPlan[mealType] || null;
+
     const newHistory = { ...mealHistory };
     if (!newHistory[selectedDateKey]) newHistory[selectedDateKey] = {};
 
@@ -1226,7 +1280,10 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     appendMealEvent({
       type: 'skip',
       dateKey: selectedDateKey,
-      mealType
+      mealType,
+      mealName: skippedMeal?.name || '',
+      protein: skippedMeal?.protein ?? 0,
+      cal: skippedMeal?.cal ?? 0
     });
 
     showNotification(`⊘ Skipped ${mealTypeLabels[mealType]}`);
