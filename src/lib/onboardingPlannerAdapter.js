@@ -71,7 +71,10 @@ export const buildGoalAdjustedPlannerInput = ({ goal, preferences = {}, mealData
     learned: {
       dishes: { ...(normalizedPreferences.learned?.dishes || {}) },
       attributes: { ...(normalizedPreferences.learned?.attributes || {}) }
-    }
+    },
+    // Same reason as `learned` above: this function rebuilds the preference
+    // object key by key, so an unlisted key is silently dropped.
+    tiers: { ...(normalizedPreferences.tiers || {}) }
   };
 
   const nextProteinTarget = resolveDailyProteinTarget(normalizedGoal, dailyProteinTarget);

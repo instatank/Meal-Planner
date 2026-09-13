@@ -21,6 +21,13 @@
 
 import { extractMealAttributes } from './mealDataLayer.js';
 import {
+  getMealWeeklyCap,
+  getTierDefinition,
+  hasRatingEffects,
+  hasTierEffects,
+  isRetired
+} from './mealTiers.js';
+import {
   CARB_HEAVY_THRESHOLD,
   FAT_HEAVY_THRESHOLD,
   FIBRE_MEAL_THRESHOLD,
@@ -138,6 +145,12 @@ const isFatHeavyMeal = (meal) => getMealFat(meal) > FAT_HEAVY_THRESHOLD;
  * it has been scored. Nothing in the app does that: meals come from the static
  * catalog or from fixtures, and edits replace the object rather than patch it.
  */
+/**
+ * The rating that means "no opinion". A 3 contributes exactly zero, so rating
+ * a dish average is the same as not rating it — which is what a user means.
+ */
+const MEAL_RATING_NEUTRAL = 3;
+
 const FACT_CACHE = new WeakMap();
 
 const EMPTY_FACTS = {
@@ -210,6 +223,11 @@ export const hashString = (input) => {
  * that needs them most. Tapering is scored, by calories, in `scoreDayStandalone`.
  */
 export const isMealAdmissible = (meal, { rules, preferences = {} }) => {
+  // Retirement is the one tier that gates rather than ranks: a retired dish is
+  // not a dish the planner should merely avoid, it is one the user has said to
+  // stop serving. Checked here, at the same place the avoid-score exclusion
+  // lives, so it applies before a single combination is enumerated.
+  if (isRetired(preferences.tiers || {}, getMealName(meal))) return false;
   if (!meal) return false;
   if (getMealProtein(meal) < rules.hard.minMealProtein) return false;
   if (Number(preferences?.avoids?.[getMealName(meal)] || 0) > rules.hard.avoidScoreExclusiveMax) return false;
@@ -490,6 +508,41 @@ export const scoreDayStandalone = (day, { rules, preferences = {} }) => {
     score -= Math.min(Number(avoids[name] || 0), 4) * w.preferenceAvoidWeight;
   }
 
+  // Your own rating of the dish, where you have given one.
+  //
+  // Appended before the learned pass and skipped entirely when nothing is
+  // rated, for the same reason that pass is: an untouched catalog must produce
+  // the identical number, not a number that happens to differ by zero.
+  //
+  // Centred on the neutral point so a 3 moves nothing, and weighted above the
+  // learned signal — a rating is you saying it outright, which should outrank
+  // anything inferred from behaviour.
+  const tiers = preferences.tiers;
+  if (tiers && hasRatingEffects(tiers)) {
+    for (const meal of facts) {
+      const rating = tiers[meal.name]?.rating;
+      if (Number.isFinite(rating)) {
+        score += (rating - MEAL_RATING_NEUTRAL) * w.mealRatingWeight;
+      }
+    }
+  }
+
+  // Frequency tier, per appearance.
+  //
+  // This is deliberately in `scoreDayStandalone` rather than in the week
+  // search, because `baseScore` is what the candidate sort, the pool trim and
+  // the beam all read — one number reaching all three. Putting it in the beam
+  // alone was measured at 0.44 average uses for a dish marked staple: raising
+  // its cap is meaningless if its days never rank high enough to be chosen in
+  // the first place. The cap permits, the repeat value makes recurrence
+  // affordable, and this makes the dish wanted at all.
+  if (tiers && hasTierEffects(tiers)) {
+    for (const meal of facts) {
+      const affinity = getTierDefinition(tiers[meal.name]?.tier).affinity;
+      if (affinity) score += affinity * w.tierAffinityWeight;
+    }
+  }
+
   // Learned preference — the last pass, and a strictly additive one.
   //
   // Two properties are load-bearing here. First, it is appended rather than
@@ -608,7 +661,7 @@ const DEFAULT_MAX_CANDIDATES = CANDIDATE_BUDGET_CLASSES * CANDIDATES_PER_BUDGET_
  * Reduce the candidate pool to `maxCandidates`, keeping the best of each
  * budget-compliance class so no class is trimmed out of existence.
  */
-const trimCandidatePool = (sortedCandidates, maxCandidates) => {
+const trimCandidatePool = (sortedCandidates, maxCandidates, { reserveFor = null } = {}) => {
   if (sortedCandidates.length <= maxCandidates) return sortedCandidates;
 
   // One class per combination of the BUDGETS flags. Strata the trim does not
@@ -619,7 +672,44 @@ const trimCandidatePool = (sortedCandidates, maxCandidates) => {
   const kept = [];
   const keptSet = new Set();
 
+  // Reservation pass — dishes the user has explicitly elevated.
+  //
+  // This exists because of a measurement, and the measurement was surprising.
+  // Marking a dish a staple raises its weekly cap to 3, but the cap was never
+  // what stopped it recurring: of 23,688 enumerated days only 300 survive this
+  // trim, and in that pool the *median lunch/dinner dish appears in 2 days*,
+  // while 31 of 75 appear in none at all. A dish present in one pooled day can
+  // be planned once no matter what any score says, because no day may repeat
+  // inside a week. Scoring changes cannot fix that; only pool composition can.
+  //
+  // So each elevated dish is guaranteed a few distinct days here, taken in
+  // score order. `reserveFor` maps a dish name to how many days it needs —
+  // its weekly cap plus headroom, so the beam has a real choice rather than
+  // exactly enough. At a handful of elevated dishes this displaces a few
+  // percent of the pool.
+  if (reserveFor && reserveFor.size > 0) {
+    const reserved = new Map();
+    for (const candidate of sortedCandidates) {
+      if (kept.length >= maxCandidates) break;
+      for (const name of candidate.mealNames) {
+        const quota = reserveFor.get(name);
+        if (!quota) continue;
+        const used = reserved.get(name) || 0;
+        if (used >= quota) continue;
+        reserved.set(name, used + 1);
+        if (!keptSet.has(candidate)) {
+          kept.push(candidate);
+          keptSet.add(candidate);
+          const key = BUDGETS.map((budget) => (candidate[budget.flag] ? 1 : 0)).join('');
+          classCounts.set(key, (classCounts.get(key) || 0) + 1);
+        }
+        break;
+      }
+    }
+  }
+
   for (const candidate of sortedCandidates) {
+    if (keptSet.has(candidate)) continue;
     const key = BUDGETS.map((budget) => (candidate[budget.flag] ? 1 : 0)).join('');
     const count = classCounts.get(key) || 0;
     if (count >= perClass) continue;
@@ -638,6 +728,36 @@ const trimCandidatePool = (sortedCandidates, maxCandidates) => {
 };
 
 /**
+ * Which dishes need guaranteed room in the candidate pool, and how much.
+ *
+ * Only dishes the user has elevated by hand: a raised weekly cap, or a rating
+ * of 4+. Both are explicit statements that the dish matters, and both are
+ * useless if the dish never reaches the pool. A default-tier, unrated dish is
+ * not reserved for — the pool already decides those on merit, and reserving
+ * for everything would just be a slower way of not trimming.
+ *
+ * The quota is the dish's weekly cap plus headroom. Exactly `cap` days would
+ * force the beam to take the only days available at any score; the margin
+ * leaves it a genuine choice.
+ */
+const RESERVE_HEADROOM = 3;
+
+const buildPoolReservations = (tierMap) => {
+  if (!tierMap) return null;
+  const reservations = new Map();
+
+  for (const [mealName, entry] of Object.entries(tierMap)) {
+    const cap = getTierDefinition(entry?.tier).maxPerWeek;
+    if (cap === 0) continue; // retired — excluded at enumeration already
+    const elevated = cap > 1 || Number(entry?.rating) >= 4;
+    if (!elevated) continue;
+    reservations.set(mealName, cap + RESERVE_HEADROOM);
+  }
+
+  return reservations.size > 0 ? reservations : null;
+};
+
+/**
  * R1 — how many times this dish may appear in the week.
  *
  * One counter for the whole week, not one per slot: the rubric says "every
@@ -645,8 +765,21 @@ const trimCandidatePool = (sortedCandidates, maxCandidates) => {
  * eaten at lunch on Monday and at dinner on Thursday is a repeat. The old
  * split namespaces (breakfast 4, lunch/dinner 2) could not express that.
  */
-const dishCap = (name, rules, pinnedDish) =>
-  (pinnedDish && name === pinnedDish ? rules.hard.pinnedDishMaxPerWeek : rules.hard.maxDishRepeatsPerWeek);
+const dishCap = (name, rules, pinnedDish, tierMap = null) => {
+  // A tier, when set, is the dish's own statement of how often it belongs in a
+  // week, so it wins over both the flat cap and the legacy single pin. The
+  // `tierMap` is null whenever no dish has a non-default tier, which keeps the
+  // untiered path exactly as it was — same lookup, same number.
+  if (tierMap) {
+    const tierCap = getMealWeeklyCap(tierMap, name);
+    // The pin predates tiers and still works, but it can only ever loosen:
+    // taking the larger means pinning a dish never silently tightens a cap the
+    // user set by hand.
+    if (pinnedDish && name === pinnedDish) return Math.max(tierCap, rules.hard.pinnedDishMaxPerWeek);
+    return tierCap;
+  }
+  return pinnedDish && name === pinnedDish ? rules.hard.pinnedDishMaxPerWeek : rules.hard.maxDishRepeatsPerWeek;
+};
 
 /** Is this breakfast anchored on an egg, for R2? */
 const isEggBreakfast = (meal, rules) =>
@@ -687,7 +820,7 @@ const seedWeekState = (lockedDays, rules) => {
   return { usage, families, redMeat, eggBreakfasts, dayKeys, cuisines: new Set(), distinct: new Set() };
 };
 
-const canPlaceDay = (state, candidate, rules, pinnedDish = null) => {
+const canPlaceDay = (state, candidate, rules, pinnedDish = null, tierMap = null) => {
   // R1 — one week-wide counter per dish. Counted within the candidate day too,
   // so a day that would place the same dish in two slots spends two of its
   // allowance rather than one.
@@ -695,7 +828,7 @@ const canPlaceDay = (state, candidate, rules, pinnedDish = null) => {
   for (const name of candidate.mealNames) {
     if (!name) continue;
     pending[name] = (pending[name] || 0) + 1;
-    if ((state.usage[name] || 0) + pending[name] > dishCap(name, rules, pinnedDish)) return false;
+    if ((state.usage[name] || 0) + pending[name] > dishCap(name, rules, pinnedDish, tierMap)) return false;
   }
 
   // R2 ceiling. The floor cannot be checked here — a partial week is allowed
@@ -772,9 +905,25 @@ export const selectWeek = ({
   beamWidth = DEFAULT_BEAM_WIDTH,
   maxCandidates = DEFAULT_MAX_CANDIDATES,
   dayCandidates = null,
-  scoredCandidates = null
+  scoredCandidates = null,
+  // Internal. Set only by this function's own retry (see the exhaustion
+  // branch below), never by a caller.
+  suppressTierRepeatValue = false
 }) => {
   const dayCount = targetDateKeys.length;
+  // Null unless at least one dish carries a non-default tier. Resolving this
+  // once, here, is what makes the untiered path identical rather than merely
+  // equivalent: `dishCap` and the repeat penalty both branch on it and skip
+  // the lookup entirely, so no new arithmetic touches the score.
+  const tierMap = hasTierEffects(preferences.tiers || {}) ? preferences.tiers : null;
+  // Whether tier *scoring* applies. Tier *caps* always do — suppressing the
+  // scoring on a retry leaves a staple permitted to repeat while removing the
+  // pressure to, which is exactly the fallback we want.
+  const tierValueActive = Boolean(tierMap) && !suppressTierRepeatValue;
+  // Reservations are built from the full map, not `tierMap`: a dish rated 5
+  // but left at the default tier still deserves to reach the pool, and
+  // `hasTierEffects` is false for a ratings-only map.
+  const poolReservations = buildPoolReservations(preferences.tiers || null);
   const candidates = scoredCandidates || dayCandidates || enumerateFeasibleDays({ mealDatabase, rules, preferences });
 
   if (dayCount === 0 || candidates.length === 0) {
@@ -786,7 +935,7 @@ export const selectWeek = ({
   const scored = [...(scoredCandidates || scoreCandidates(candidates, { rules, preferences, historyMap }))];
   scored.sort((a, b) => b.baseScore - a.baseScore || (a.nameKey < b.nameKey ? -1 : 1));
 
-  const pool = trimCandidatePool(scored, maxCandidates);
+  const pool = trimCandidatePool(scored, maxCandidates, { reserveFor: poolReservations });
   const maxDayProtein = pool.reduce((max, day) => Math.max(max, day.totals.protein), 0);
   const proteinFloor = weeklyProteinFloor(dayCount, rules);
   const requiredCompliant = requiredCompliantDays(dayCount, rules);
@@ -820,7 +969,7 @@ export const selectWeek = ({
     for (const node of beam) {
       for (let candidateIndex = 0; candidateIndex < pool.length; candidateIndex += 1) {
         const candidate = pool[candidateIndex];
-        if (!canPlaceDay(node.state, candidate, rules, pinnedDish)) continue;
+        if (!canPlaceDay(node.state, candidate, rules, pinnedDish, tierMap)) continue;
 
         // Tier-2 budgets, enforced by look-ahead rather than after the fact.
         // A branch dies the moment the days it has left can no longer supply
@@ -857,12 +1006,33 @@ export const selectWeek = ({
         // the survivors of the beam cut pay for it.
         let newDistinct = 0;
         let repeatPenalty = 0;
+        let repeatValue = 0;
         for (const name of candidate.mealNames) {
           if (!node.state.distinct.has(name)) newDistinct += 1;
-          // R1 caps every unpinned dish at one use, so this now only ever
-          // fires on the pinned dish — it ranks *where* the pin lands rather
-          // than whether a dish may repeat at all.
-          repeatPenalty += (node.state.usage[name] || 0) * rules.scored.repeatUsePenalty;
+          // Without a tier map this only ever fires on the pinned dish, since
+          // R1 caps everything else at one use — it ranks *where* the pin
+          // lands rather than whether a dish may repeat at all.
+          //
+          // With tiers it does real work. Raising a staple's cap to 3 is not
+          // enough on its own: `distinctMealBonus` pays 6 for a new dish while
+          // a repeat costs 5, so a week of 21 distinct dishes outscores any
+          // week that reuses a staple, and the raised cap would go unused. The
+          // tier's `repeatPenaltyScale` is what makes a permitted repeat a
+          // wanted one.
+          const uses = node.state.usage[name] || 0;
+          if (uses > 0) {
+            if (tierValueActive) {
+              const tier = getTierDefinition(tierMap[name]?.tier);
+              repeatPenalty += uses * rules.scored.repeatUsePenalty * tier.repeatPenaltyScale;
+              // Pay the repeat something. Discounting the penalty alone cannot
+              // work: a repeat also forgoes `distinctMealBonus`, so even at
+              // zero penalty it loses by that much. Expressed as a multiple of
+              // that bonus so the two cannot drift apart.
+              repeatValue += rules.scored.distinctMealBonus * tier.repeatValueRatio;
+            } else {
+              repeatPenalty += uses * rules.scored.repeatUsePenalty;
+            }
+          }
         }
         let newCuisines = 0;
         for (const cuisine of candidate.cuisines) {
@@ -874,6 +1044,7 @@ export const selectWeek = ({
           + candidate.baseScore
           + newDistinct * rules.scored.distinctMealBonus
           + newCuisines * rules.scored.weekCuisineVarietyBonus
+          + repeatValue
           - repeatPenalty
           - budgetPressure
           + tieBreak;
@@ -889,12 +1060,43 @@ export const selectWeek = ({
       // rubric this is no longer only a budget failure: R1 needs 21 distinct
       // dishes and R3 splits the lunch/dinner catalog into two pools that
       // cannot cover for each other.
+      // Tier scoring can dead-end the beam, and the mechanism is worth naming.
+      // A staple's repeat is worth more than a novel dish (that is the point),
+      // so *every* branch prefers the repeat, the beam fills with branches
+      // that made the same choice, and diversity collapses — then all of them
+      // run out of legal days together. Measured: one staple on this catalog
+      // was enough.
+      //
+      // Rather than tune the bonus to a knife edge, retry once with tier
+      // scoring off. Caps stay, so a staple may still repeat if the search
+      // naturally wants it; only the pressure is removed. This buys a property
+      // worth more than any single week: turning on tiering can never produce
+      // a worse outcome than leaving it off, because the fallback *is* the
+      // untiered search. The retry reuses the scored pool, so it costs one
+      // beam pass and no rescoring.
+      if (tierValueActive) {
+        return selectWeek({
+          mealDatabase,
+          rules,
+          targetDateKeys,
+          historyMap,
+          preferences,
+          lockedDays,
+          pinnedDish,
+          beamWidth,
+          maxCandidates,
+          scoredCandidates: scored,
+          suppressTierRepeatValue: true
+        });
+      }
+
       return bestEffortWeek({
         scored,
         targetDateKeys,
         rules,
         lockedDays,
         pinnedDish,
+        tierMap,
         diagnostics: {
           exhaustedOnDayIndex: dayIndex,
           ...rubricFeasibility({ candidates: pool, mealDatabase, rules, preferences })
@@ -980,7 +1182,7 @@ export const rubricFeasibility = ({ candidates, mealDatabase, rules, preferences
  * `feasible: false`, and carries the diagnosis of what ran out. Callers write
  * a week only after `validateWeek`, which fails it on the same rules.
  */
-const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays, pinnedDish = null, diagnostics = null }) => {
+const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays, pinnedDish = null, tierMap = null, diagnostics = null }) => {
   const state = {
     ...seedWeekState(lockedDays, rules),
     protein: 0, inBand: 0, underCarb: 0, inCalorieBounds: 0, eggBreakfasts: 0
@@ -990,7 +1192,7 @@ const bestEffortWeek = ({ scored, targetDateKeys, rules, lockedDays, pinnedDish 
   let constraintsRelaxed = false;
 
   for (const dateKey of targetDateKeys) {
-    const placeable = scored.find((candidate) => canPlaceDay(current, candidate, rules, pinnedDish));
+    const placeable = scored.find((candidate) => canPlaceDay(current, candidate, rules, pinnedDish, tierMap));
     if (!placeable) constraintsRelaxed = true;
     const pick = placeable || scored[0];
     days.push({ dateKey, ...pick });

@@ -302,6 +302,18 @@ const GOAL_DEFINITIONS = {
       // damped by that attribute's specificity.
       learnedDishWeight: 2.0,
       learnedAttributeWeight: 1.2,
+      // Your own 1-5 rating of a dish, centred on 3. Weighted above
+      // `learnedDishWeight` because a rating is you saying it outright, and an
+      // explicit statement should outrank anything inferred from behaviour.
+      // A 5 moves a meal by +6, a 1 by -6 — enough to reorder a shortlist,
+      // nowhere near enough to breach a budget.
+      mealRatingWeight: 3.0,
+      // How strongly a frequency tier pulls a dish toward (or away from) the
+      // week, per appearance. Applied in `scoreDayStandalone`, so it reaches
+      // the candidate sort, the pool trim and the beam through one number
+      // rather than three. 4.0 is a little under `distinctMealBonus` (6): a
+      // staple outranks a comparable dish without overpowering variety.
+      tierAffinityWeight: 4.0,
       historyRepeatPenalty: 2.5
     }
   },
@@ -362,6 +374,18 @@ const GOAL_DEFINITIONS = {
       // damped by that attribute's specificity.
       learnedDishWeight: 2.0,
       learnedAttributeWeight: 1.2,
+      // Your own 1-5 rating of a dish, centred on 3. Weighted above
+      // `learnedDishWeight` because a rating is you saying it outright, and an
+      // explicit statement should outrank anything inferred from behaviour.
+      // A 5 moves a meal by +6, a 1 by -6 — enough to reorder a shortlist,
+      // nowhere near enough to breach a budget.
+      mealRatingWeight: 3.0,
+      // How strongly a frequency tier pulls a dish toward (or away from) the
+      // week, per appearance. Applied in `scoreDayStandalone`, so it reaches
+      // the candidate sort, the pool trim and the beam through one number
+      // rather than three. 4.0 is a little under `distinctMealBonus` (6): a
+      // staple outranks a comparable dish without overpowering variety.
+      tierAffinityWeight: 4.0,
       historyRepeatPenalty: 2.5
     }
   }

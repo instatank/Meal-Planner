@@ -26,13 +26,23 @@
  *
  * ── Why a cap is not enough ──
  *
- * Permitting a staple three times does not make it appear three times. The
- * scorer pays `distinctMealBonus` for new dishes and `repeatUsePenalty` for
- * repeats, so a week of 21 distinct dishes always outscores one that reuses a
- * staple. A tier therefore carries `repeatPenaltyScale` as well: for a staple
- * the cost of repeating is most of the way discounted, for an occasional dish
- * it is unchanged. The cap says what is allowed; the scale says what is
- * wanted.
+ * Permitting a staple three times does not make it appear three times, and the
+ * reason is worth stating precisely because the obvious fix does not work.
+ *
+ * Reusing a dish costs two things: it forgoes `distinctMealBonus` (+6, paid
+ * only for a dish not yet in the week) and it pays `repeatUsePenalty` (5).
+ * Discounting the penalty therefore cannot be enough — at a penalty of *zero*
+ * a repeat still loses by the 6 it did not earn, so a week of 21 distinct
+ * dishes wins every time and the raised cap goes unused. Measured, not
+ * reasoned about: the first version of this file discounted only the penalty
+ * and staples kept appearing exactly once.
+ *
+ * So a tier carries two numbers. `repeatPenaltyScale` discounts the cost, and
+ * `repeatValueRatio` pays a repeat something — expressed as a multiple of
+ * `distinctMealBonus` so the two stay coupled if that ever moves. At 1.5 a
+ * staple's second appearance is worth 9 against the 6 a novel dish earns, so
+ * it wins by 2 and actually recurs. The cap says what is allowed; these two
+ * say what is wanted.
  */
 
 /**
@@ -50,15 +60,25 @@ export const FREQUENCY_TIER = Object.freeze({
   RETIRED: 'retired'
 });
 
-export const TIER_DEFINITIONS = Object.freeze({
+const TIER_DEFINITIONS_RAW = {
   [FREQUENCY_TIER.STAPLE]: {
     id: FREQUENCY_TIER.STAPLE,
     label: 'Staple',
     hint: 'Happy to eat this several times a week',
     maxPerWeek: 3,
-    // Heavily discounted: without this the variety bonus wins every time and
-    // a staple stays a once-a-week dish that merely *could* repeat.
     repeatPenaltyScale: 0.2,
+    // Preferred on every appearance, not only when repeating. Without this a
+    // staple that scores poorly is simply never chosen, and its raised cap is
+    // irrelevant — measured at 0.44 average uses per week before this existed.
+    affinity: 1,
+    // Worth more than a novel dish, but only just.
+    //
+    // Break-even is (distinctMealBonus + repeatUsePenalty x repeatPenaltyScale)
+    // / distinctMealBonus = (6 + 1) / 6 = 1.17. Below that a staple never
+    // repeats at all; above it, it repeats whenever legal. 1.4 sits clearly
+    // above break-even without being so large that a third use outranks
+    // everything else on the board.
+    repeatValueRatio: 1.4,
     minGapDays: 0,
     order: 0
   },
@@ -68,6 +88,10 @@ export const TIER_DEFINITIONS = Object.freeze({
     hint: 'Once or twice a week',
     maxPerWeek: 2,
     repeatPenaltyScale: 0.6,
+    affinity: 0.5,
+    // Below 1: a regular dish repeats only when the novel alternatives on
+    // offer are poor, rather than by default.
+    repeatValueRatio: 0.7,
     minGapDays: 0,
     order: 1
   },
@@ -77,6 +101,10 @@ export const TIER_DEFINITIONS = Object.freeze({
     hint: 'Once a week at most — the default',
     maxPerWeek: 1,
     repeatPenaltyScale: 1,
+    // Zero, and the cap is 1 anyway, so this never fires — stated explicitly
+    // so the default tier is visibly inert rather than inert by omission.
+    repeatValueRatio: 0,
+    affinity: 0,
     minGapDays: 0,
     order: 2
   },
@@ -86,6 +114,10 @@ export const TIER_DEFINITIONS = Object.freeze({
     hint: 'A treat — once a month or so',
     maxPerWeek: 1,
     repeatPenaltyScale: 1,
+    repeatValueRatio: 0,
+    // Negative: a treat should lose to an everyday dish when both are legal,
+    // which is what "rare" means in a week the planner is free to fill.
+    affinity: -0.6,
     // Enforced against history, not within the week: capping at 1 per week
     // cannot express "not two weeks running".
     minGapDays: 21,
@@ -97,10 +129,26 @@ export const TIER_DEFINITIONS = Object.freeze({
     hint: 'Never plan this again',
     maxPerWeek: 0,
     repeatPenaltyScale: 1,
+    repeatValueRatio: 0,
+    affinity: 0,
     minGapDays: 0,
     order: 4
   }
-});
+};
+
+/**
+ * Deep-frozen, not shallow.
+ *
+ * `Object.freeze` on the outer map still leaves each tier's numbers writable,
+ * and these are read inside the optimizer's hot loop — a stray write would
+ * change how every future week is planned with nothing to show where it came
+ * from.
+ */
+export const TIER_DEFINITIONS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(TIER_DEFINITIONS_RAW).map(([id, tier]) => [id, Object.freeze(tier)])
+  )
+);
 
 /**
  * The tier a dish has when nobody has said otherwise.

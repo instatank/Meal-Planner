@@ -66,7 +66,13 @@ export const normalizePreferences = (prefs = {}) => ({
   learned: {
     dishes: prefs.learned?.dishes || {},
     attributes: prefs.learned?.attributes || {}
-  }
+  },
+  // Per-dish frequency tiers and ratings (src/lib/mealTiers.js). Carried on
+  // `preferences` rather than threaded separately because every consumer that
+  // needs them — admissibility, day scoring, the week search — already
+  // receives this object, and a second channel for the same data is how two
+  // homes for one fact get created.
+  tiers: prefs.tiers || {}
 });
 
 export const getMealsForType = (mealDatabase, mealType) => {
