@@ -1,5 +1,10 @@
 import { normalizePreferences } from './plannerGenerator.js';
 import { flattenMealDatabase, scoreMealMetadataSimilarity } from './mealDataLayer.js';
+import {
+  FEEDBACK_SCHEMA_VERSION,
+  MAX_RETAINED_EVENTS,
+  validateEvent
+} from './feedbackSchema.js';
 
 /**
  * Weights for the event types that move preferences.
@@ -37,14 +42,42 @@ const addDelta = (bucket, key, delta) => {
   else bucket[key] = next;
 };
 
+/**
+ * Build one event, stamped with the schema version it was written under.
+ *
+ * Validation is advisory and reported, never enforced: an event that fails
+ * its definition is still returned and still stored, because losing a signal
+ * is strictly worse than storing a misshapen one. `inspectMealEvent` is how a
+ * caller sees the problem — `App.jsx` logs it, and `feedbackSchema.test.js`
+ * asserts on it, so a producer that drops a field is caught by the suite
+ * rather than discovered months later in an empty preference map.
+ */
 export const createMealEvent = (payload = {}) => ({
   id: payload.id || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+  v: payload.v || FEEDBACK_SCHEMA_VERSION,
   type: payload.type || 'unknown',
   dateKey: payload.dateKey || '',
   mealType: payload.mealType || '',
   timestamp: payload.timestamp || new Date().toISOString(),
   ...payload
 });
+
+/** `validateEvent`, minus the universal fields every event has by construction. */
+export const inspectMealEvent = (event) => validateEvent(event);
+
+/**
+ * Hold the log to `MAX_RETAINED_EVENTS`, keeping the newest.
+ *
+ * The log lives in a single Firestore document and in localStorage, both of
+ * which have hard ceilings, and `saveToStorage` swallows a quota error with a
+ * console warning — so an unbounded log does not fail loudly, it just stops
+ * recording one day. Trimming here makes the bound explicit and keeps the
+ * part the learner actually weights.
+ */
+export const trimEventLog = (events = [], limit = MAX_RETAINED_EVENTS) => {
+  if (!Array.isArray(events) || events.length <= limit) return events;
+  return events.slice(events.length - limit);
+};
 
 export const normalizeMealEvents = (rawValue) => {
   if (!Array.isArray(rawValue)) return [];
