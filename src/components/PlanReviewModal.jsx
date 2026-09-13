@@ -157,7 +157,7 @@ const PlanReviewModal = ({ weekStartKey, dateKeys = [], dishes = [], onSubmit, o
             <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
               Which dishes?
             </label>
-            <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+            <div className="flex flex-wrap gap-1.5 max-h-56 overflow-y-auto rounded-lg border border-gray-100 p-1.5">
               {dishes.map((dish) => (
                 <button
                   key={dish.name}

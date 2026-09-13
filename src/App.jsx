@@ -33,6 +33,7 @@ import {
 } from './lib/planReview';
 import { PLAN_VERDICT } from './lib/feedbackSchema';
 import PlanReviewModal from './components/PlanReviewModal';
+import InsightsPanel from './components/InsightsPanel';
 import {
   ONBOARDING_MODE,
   buildOnboardingProfile,
@@ -328,6 +329,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
   const [showOnboardingEditor, setShowOnboardingEditor] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showPlanReviewModal, setShowPlanReviewModal] = useState(false);
+  const [legacyRejections, setLegacyRejections] = useState([]);
 
   const isViewerMode = onboardingProfile?.mode === ONBOARDING_MODE.VIEWER;
   const onboardingDraft = onboardingProfile
@@ -549,6 +551,10 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         const userCatalogResult = await storageGet('meal-user-catalog');
         const onboardingResult = await storageGet(ONBOARDING_PROFILE_STORAGE_KEY);
         const autoGenResult = await storageGet('last-auto-gen-week');
+        // Read so the insights panel can show rejections logged before the
+        // event log existed. Thin data, but it is the only record of what was
+        // disliked back then, and it is never written from here.
+        const legacyRejectionsResult = await storageGet('rejected-plans');
 
         const parsedHistory = normalizeDateMap(safeParseJson(historyResult, historyResult) || {});
         const parsedPrefs = normalizePreferences(safeParseJson(prefsResult, prefsResult) || {});
@@ -576,6 +582,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         setPreferences(derivedPreferences);
         setMealPlans(parsedPlans);
         setMealEvents(parsedEvents);
+        setLegacyRejections(Array.isArray(legacyRejectionsResult) ? legacyRejectionsResult : []);
         setUserMealCatalog(parsedUserCatalog);
         setOnboardingProfile(parsedOnboarding);
 
@@ -2269,6 +2276,13 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
             )}
           </div>
         )}
+
+        <InsightsPanel
+          events={mealEvents}
+          learned={learnedModel}
+          mealDatabase={mergedMealDatabase}
+          legacyRejections={legacyRejections}
+        />
 
         <div className="flex gap-2 mb-4">
           <button
