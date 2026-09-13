@@ -34,6 +34,10 @@ import {
 import { PLAN_VERDICT } from './lib/feedbackSchema';
 import PlanReviewModal from './components/PlanReviewModal';
 import InsightsPanel from './components/InsightsPanel';
+import MealTieringPanel from './components/MealTieringPanel';
+import { normalizeMealTierMap, normalizeMealTier } from './lib/mealTiers';
+import { getRulesForProfile as resolveRulesForProfile } from './lib/rules';
+import { proposeMealTiers } from './lib/tierProposals';
 import {
   ONBOARDING_MODE,
   buildOnboardingProfile,
@@ -159,6 +163,21 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       snack: mergeMealsUniqueByCanonicalName(activeMealDatabase.snack || [], userMealCatalog.snack || [])
     }),
     [userMealCatalog, activeMealDatabase]
+  );
+
+  /**
+   * Every meal the planner can actually place, for the tiering screen.
+   *
+   * Breakfast and lunch/dinner only: snacks are not slots the week search
+   * fills, so tiering one would be a control that does nothing. Sorted by name
+   * because the screen is browsed, not ranked.
+   */
+  const allPlannableMeals = useMemo(
+    () =>
+      [...(mergedMealDatabase.breakfast || []), ...(mergedMealDatabase.lunchDinner || [])]
+        .filter((meal) => meal?.name)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [mergedMealDatabase]
   );
 
   const allExistingMealNames = useMemo(
@@ -330,6 +349,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showPlanReviewModal, setShowPlanReviewModal] = useState(false);
   const [legacyRejections, setLegacyRejections] = useState([]);
+  const [mealTiers, setMealTiers] = useState({});
+  const [dismissedTierProposals, setDismissedTierProposals] = useState({});
 
   const isViewerMode = onboardingProfile?.mode === ONBOARDING_MODE.VIEWER;
   const onboardingDraft = onboardingProfile
@@ -555,6 +576,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         // event log existed. Thin data, but it is the only record of what was
         // disliked back then, and it is never written from here.
         const legacyRejectionsResult = await storageGet('rejected-plans');
+        const tiersResult = await storageGet('meal-tiers');
+        const dismissedResult = await storageGet('meal-tier-dismissals');
 
         const parsedHistory = normalizeDateMap(safeParseJson(historyResult, historyResult) || {});
         const parsedPrefs = normalizePreferences(safeParseJson(prefsResult, prefsResult) || {});
@@ -589,6 +612,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         // straight back out again.
         setMealEvents(trimEventLog(parsedEvents));
         setLegacyRejections(Array.isArray(legacyRejectionsResult) ? legacyRejectionsResult : []);
+        setMealTiers(normalizeMealTierMap(safeParseJson(tiersResult, tiersResult) || {}));
+        setDismissedTierProposals(safeParseJson(dismissedResult, dismissedResult) || {});
         setUserMealCatalog(parsedUserCatalog);
         setOnboardingProfile(parsedOnboarding);
 
@@ -707,7 +732,11 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     // `learned` is the new attribute-level model. Additive rather than
     // replacing, so a regression in one cannot be hidden by the other.
     const legacyPreferences = derivePreferencesFromEvents(mealEvents);
-    setPreferences({ ...legacyPreferences, learned: toLearnedPreferences(learnedModel) });
+    setPreferences({
+      ...legacyPreferences,
+      learned: toLearnedPreferences(learnedModel),
+      tiers: mealTiers
+    });
 
     void saveToStorage('meal-events', mealEvents);
     // Only the legacy buckets are persisted. The learned model is derived
@@ -716,7 +745,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     // codebase has already paid for with hand-typed meal tags and a protein
     // target that lived in seven places.
     void saveToStorage('meal-preferences', legacyPreferences);
-  }, [mealEvents, learnedModel, loading]);
+  }, [mealEvents, learnedModel, mealTiers, loading]);
 
   /**
    * Auto-generation detector.
@@ -912,6 +941,82 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     setMealEvents((prev) => trimEventLog([...prev, event]));
     return event;
   };
+
+
+  // ─── Meal tiers ───────────────────────────────────────────────────────────
+  //
+  // Persisted separately from `meal-preferences` because a tier is something
+  // the user *said*, not something derived from the log. The learned model is
+  // rebuilt from events on every boot and never stored; this is the opposite
+  // and must survive.
+
+  const updateMealTier = async (mealName, patch) => {
+    if (!requireWriteAccess('Tiering meals')) return;
+    const existing = mealTiers[mealName] || {};
+    const next = {
+      ...mealTiers,
+      [mealName]: normalizeMealTier({
+        ...existing,
+        ...patch,
+        // Stamped on every edit so `proposeMealTiers` can tell a decision you
+        // just made from one you made months ago, and stop arguing with the
+        // former.
+        updatedAt: new Date().toISOString()
+      })
+    };
+    setMealTiers(next);
+    await saveToStorage('meal-tiers', next);
+  };
+
+  const handleSetTier = (mealName, tier) => updateMealTier(mealName, { tier });
+  const handleSetRating = (mealName, rating) => updateMealTier(mealName, { rating });
+
+  const handleAcceptTierProposal = async (proposal) => {
+    await updateMealTier(proposal.mealName, { tier: proposal.proposedTier });
+    showNotification(`\u2713 ${proposal.mealName} is now ${proposal.proposedTier}`);
+  };
+
+  const handleDismissTierProposal = async (proposal) => {
+    // Dismissal is recorded against the *proposed* tier, not the dish. If
+    // behaviour later points somewhere else, that is a new suggestion and
+    // deserves to be asked again.
+    const key = `${proposal.mealName}::${proposal.proposedTier}`;
+    const next = { ...dismissedTierProposals, [key]: new Date().toISOString() };
+    setDismissedTierProposals(next);
+    await saveToStorage('meal-tier-dismissals', next);
+  };
+
+  /**
+   * The daily protein target, for the tiering screen's "is this staple big
+   * enough?" hint.
+   *
+   * Wrapped because `getRulesForProfile` throws `UnsupportedGoalError` for
+   * goals onboarding declares but nobody built. That is correct behaviour in
+   * the planner — better than silently planning a vegetarian a week of chicken
+   * — but a display hint is not worth taking the whole screen down for.
+   */
+  const plannerDailyProteinTarget = useMemo(() => {
+    try {
+      return resolveRulesForProfile(onboardingProfile?.goal).dailyProteinTarget;
+    } catch {
+      return 120;
+    }
+  }, [onboardingProfile]);
+
+  const tierProposals = useMemo(() => {
+    const result = proposeMealTiers({
+      events: mealEvents,
+      tierMap: mealTiers,
+      mealNames: allExistingMealNames,
+      nowMs: Date.now()
+    });
+    return {
+      ...result,
+      proposals: result.proposals.filter(
+        (p) => !dismissedTierProposals[`${p.mealName}::${p.proposedTier}`]
+      )
+    };
+  }, [mealEvents, mealTiers, allExistingMealNames, dismissedTierProposals]);
 
   const regenerateCurrentWeekForGoal = (goal) => {
     const keysToEnsure = Array.from(new Set([selectedDateKey, ...getWeekDateKeys(selectedDateKey)])).sort();
@@ -2330,6 +2435,18 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           learned={learnedModel}
           mealDatabase={mergedMealDatabase}
           legacyRejections={legacyRejections}
+        />
+
+        <MealTieringPanel
+          meals={allPlannableMeals}
+          tierMap={mealTiers}
+          proposals={tierProposals}
+          dailyProteinTarget={plannerDailyProteinTarget}
+          onSetTier={handleSetTier}
+          onSetRating={handleSetRating}
+          onAcceptProposal={handleAcceptTierProposal}
+          onDismissProposal={handleDismissTierProposal}
+          disabled={isViewerMode}
         />
 
         <div className="flex gap-2 mb-4">

@@ -18,6 +18,9 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import InsightsPanel from './components/InsightsPanel';
 import PlanReviewModal from './components/PlanReviewModal';
+import MealTieringPanel from './components/MealTieringPanel';
+import { normalizeMealTierMap } from './lib/mealTiers';
+import { proposeMealTiers } from './lib/tierProposals';
 import { mealDatabase } from './data/mealDatabase';
 import { createMealEvent } from './lib/mealEvents';
 import { buildPlanReviewPayload, collectWeekDishes } from './lib/planReview';
@@ -31,8 +34,8 @@ const chicken = meals.filter((m) => extractMealAttributes(m).includes('family:ch
 
 let n = 0;
 const events = [
-  ...paneer.slice(0, 4).map((name, i) => createMealEvent({ id: `s${n++}`, type: 'swap', dateKey: `2026-09-0${i + 1}`, mealType: 'lunch', fromMealName: name, toMealName: 'X', timestamp: ago(i * 4 + 2) })),
-  ...chicken.slice(0, 7).map((name, i) => createMealEvent({ id: `c${n++}`, type: 'confirm', dateKey: `2026-09-0${i + 1}`, mealType: 'dinner', mealName: name, protein: 42, timestamp: ago(i * 3 + 1) })),
+  ...paneer.slice(0, 4).map((name, i) => createMealEvent({ id: `s${n++}`, type: 'swap', dateKey: `2026-09-0${i + 1}`, mealType: 'lunch', fromMealName: name, toMealName: 'X', timestamp: ago(i * 8 + 2) })),
+  ...chicken.slice(0, 7).map((name, i) => createMealEvent({ id: `c${n++}`, type: 'confirm', dateKey: `2026-09-0${i + 1}`, mealType: 'dinner', mealName: name, protein: 42, timestamp: ago(i * 5 + 1) })),
   createMealEvent({ id: 'k1', type: 'skip', dateKey: '2026-09-05', mealType: 'breakfast', mealName: paneer[0], protein: 24, timestamp: ago(6) }),
   createMealEvent({ id: 'k2', type: 'skip', dateKey: '2026-09-08', mealType: 'breakfast', mealName: paneer[0], protein: 24, timestamp: ago(3) }),
   createMealEvent({ id: 'x1', type: 'custom', dateKey: '2026-09-09', mealType: 'lunch', mealName: 'Shawarma bowl', previousMealName: paneer[1], customMealText: 'shawarma bowl', source: 'custom_parts', protein: 38, timestamp: ago(2) }),
@@ -46,10 +49,31 @@ const week = {
   '2026-09-08': { breakfast: { name: chicken[2] }, lunch: { name: paneer[1] }, dinner: { name: chicken[3] } }
 };
 
+const tierMap = normalizeMealTierMap({
+  [chicken[0]]: { tier: 'staple', rating: 5 },
+  [chicken[1]]: { tier: 'regular' },
+  [paneer[0]]: { tier: 'retired' },
+  [paneer[1]]: { tier: 'rare', rating: 2 },
+  'Rajma chawal + raita': { tier: 'staple' }
+});
+
+const tierProposals = proposeMealTiers({ events, tierMap, nowMs: Date.now() });
+const plannable = [...mealDatabase.breakfast, ...mealDatabase.lunchDinner].sort((a, b) => a.name.localeCompare(b.name));
+
 const App = () => (
   <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
     <div className="max-w-md mx-auto">
       <InsightsPanel events={events} learned={learned} mealDatabase={mealDatabase} legacyRejections={[]} />
+      <MealTieringPanel
+        meals={plannable}
+        tierMap={tierMap}
+        proposals={tierProposals}
+        dailyProteinTarget={120}
+        onSetTier={(n, t) => console.log('tier', n, t)}
+        onSetRating={(n, r) => console.log('rating', n, r)}
+        onAcceptProposal={(p) => console.log('accept', p)}
+        onDismissProposal={(p) => console.log('dismiss', p)}
+      />
     </div>
     {new URLSearchParams(location.search).has('modal') && (
       <PlanReviewModal
