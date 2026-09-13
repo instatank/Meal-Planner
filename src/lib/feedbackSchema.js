@@ -125,7 +125,11 @@ export const EVENT_DEFINITIONS = Object.freeze({
     requireOneOf: [['mealName', 'customMealText']],
     // `customMealText` is what the user actually typed, before it was matched
     // to a catalog meal. `getCustomMealCandidates` keys on it.
-    optional: ['previousMealName', 'customMealText', 'source', 'protein', 'cal'],
+    // `macros` matters more than it looks. A custom meal logged often enough
+    // gets promoted into the catalog, and the optimizer trusts catalog macros
+    // completely — so without the real numbers here, promotion has to invent
+    // them. See `buildPromotedCustomMeal` in App.jsx.
+    optional: ['previousMealName', 'customMealText', 'source', 'protein', 'cal', 'macros'],
     describes: 'The user logged something other than the planned meal.',
     signals: [
       { field: 'mealName', valence: 1.0 },

@@ -191,6 +191,37 @@ export const getCustomMealOccurrenceCount = (events = [], customMealText = '', l
   }).length;
 };
 
+/**
+ * The macros a repeatedly-logged custom meal actually had.
+ *
+ * Median, not mean: one mis-logged portion ("2000 cal") would drag a mean far
+ * enough to push the promoted meal outside the calorie bounds, and a custom
+ * log is exactly the kind of entry that gets fat-fingered.
+ *
+ * Returns `null` when no instance carried usable numbers, which is the signal
+ * for the caller to refuse rather than to guess. That distinction is the whole
+ * point: promoting a meal with invented macros puts fiction into a catalog the
+ * optimizer trusts completely.
+ */
+export const summarizeObservedMacros = (observations = []) => {
+  const usable = observations.filter((o) => o && (o.protein > 0 || o.cal > 0));
+  if (!usable.length) return null;
+
+  const median = (values) => {
+    const sorted = values.slice().sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+
+  return {
+    sampleSize: usable.length,
+    protein: Math.round(median(usable.map((o) => o.protein))),
+    cal: Math.round(median(usable.map((o) => o.cal))),
+    carbs: Math.round(median(usable.map((o) => o.carbs))),
+    fat: Math.round(median(usable.map((o) => o.fat)))
+  };
+};
+
 const resolveCandidateTargetType = (mealTypeCounts = {}) => {
   const sorted = Object.entries(mealTypeCounts).sort((a, b) => b[1] - a[1]);
   const topMealType = sorted[0]?.[0];
@@ -231,9 +262,18 @@ export const getCustomMealCandidates = (events = [], existingMealNames = [], opt
       displayName: String(event.customMealText || '').trim(),
       count: 0,
       lastSeenAt: event.timestamp,
-      mealTypeCounts: {}
+      mealTypeCounts: {},
+      // Every logged instance's macros, so promotion can use what was actually
+      // eaten instead of inventing a number. See `summarizeObservedMacros`.
+      observations: []
     };
 
+    current.observations.push({
+      protein: Number(event.protein || 0),
+      cal: Number(event.cal || 0),
+      carbs: Number(event.macros?.c || 0),
+      fat: Number(event.macros?.f || 0)
+    });
     current.count += 1;
     current.mealTypeCounts[event.mealType] = (current.mealTypeCounts[event.mealType] || 0) + 1;
     if (String(event.timestamp) > String(current.lastSeenAt)) {
@@ -252,7 +292,8 @@ export const getCustomMealCandidates = (events = [], existingMealNames = [], opt
       count: item.count,
       lastSeenAt: item.lastSeenAt,
       mealTypeCounts: item.mealTypeCounts,
-      suggestedMealType: resolveCandidateTargetType(item.mealTypeCounts)
+      suggestedMealType: resolveCandidateTargetType(item.mealTypeCounts),
+      observedMacros: summarizeObservedMacros(item.observations)
     }))
     .sort((a, b) => b.count - a.count || String(b.lastSeenAt).localeCompare(String(a.lastSeenAt)));
 };

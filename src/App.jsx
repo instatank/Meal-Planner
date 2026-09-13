@@ -999,7 +999,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           customMealText: payload.rawText || '',
           source: 'db_match',
           protein: mealData.protein ?? 0,
-          cal: mealData.cal ?? 0
+          cal: mealData.cal ?? 0,
+          macros: mealData.macros || null
         });
 
         showNotification(`✓ Logged ${mealData.name}`);
@@ -1043,7 +1044,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           customMealText: payload.rawText || '',
           source: 'custom_parts',
           protein: computed.protein ?? 0,
-          cal: computed.cal ?? 0
+          cal: computed.cal ?? 0,
+          macros: computed.macros || null
         });
 
         showNotification(`✓ Logged ${payload.data.name}`);
@@ -1095,7 +1097,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           customMealText: payload.rawText || '',
           source: 'ai_estimate',
           protein: payload.data.estimatedProtein || 0,
-          cal: payload.data.estimatedCalories || 0
+          cal: payload.data.estimatedCalories || 0,
+          macros: {
+            p: payload.data.estimatedProtein || 0,
+            c: payload.data.estimatedCarbs || 0,
+            f: payload.data.estimatedFats || 0
+          }
         });
 
         showNotification(`🤖 Estimated: ${payload.data.name}`);
@@ -1146,7 +1153,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           customMealText: payload.rawText || '',
           source: 'dining_out',
           protein: payload.data.estimatedProtein || 0,
-          cal: payload.data.estimatedCalories || 0
+          cal: payload.data.estimatedCalories || 0,
+          macros: {
+            p: payload.data.estimatedProtein || 0,
+            c: payload.data.estimatedCarbs || 0,
+            f: payload.data.estimatedFats || 0
+          }
         });
 
         showNotification(`🍱 Cheated: ${payload.data.name}`);
@@ -1167,29 +1179,54 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
     }
   };
 
-  const buildPromotedCustomMeal = (candidateName, targetMealType) => {
-    const canonicalName = String(candidateName || '').trim();
+  /**
+   * Turn a repeatedly-logged custom meal into a catalog entry — using the
+   * macros it actually had.
+   *
+   * This function used to assign every promoted lunch/dinner a flat
+   * `{p: 24, c: 42, f: 14}` regardless of what the dish was. That was safe
+   * only because it was unreachable: `getCustomMealCandidates` groups on
+   * `customMealText`, no producer wrote that field, so the candidate list was
+   * always empty and the button that calls this never rendered. CLAUDE.md
+   * records the hazard and the order to fix it in: "Fix the macros before
+   * switching it on."
+   *
+   * Closing the capture gap switched it on. So the macros are fixed here, in
+   * the same change: a candidate now carries the median protein, calories,
+   * carbs and fat across every time it was logged, and this uses them.
+   *
+   * When there are no usable numbers it returns `null` and the caller
+   * refuses. Declining to promote is strictly better than promoting a
+   * fiction — the optimizer trusts catalog macros completely, so an invented
+   * 24g of protein is not a harmless placeholder, it is a meal that can be
+   * planned to satisfy a protein floor it does not meet.
+   */
+  const buildPromotedCustomMeal = (candidate, targetMealType) => {
+    const canonicalName = String(candidate?.displayName || '').trim();
+    if (!canonicalName) return null;
+
+    const observed = candidate?.observedMacros;
+    if (!observed || !(observed.protein > 0 || observed.cal > 0)) return null;
+
     const label = canonicalName.length > 44 ? `${canonicalName.slice(0, 43)}…` : canonicalName;
     const idSuffix = slugifyMealId(canonicalName);
-    const profileByType = {
-      breakfast: { p: 20, c: 30, f: 10, cal: 310 },
-      lunchDinner: { p: 24, c: 42, f: 14, cal: 450 },
-      snack: { p: 12, c: 20, f: 8, cal: 220 }
-    };
-    const profile = profileByType[targetMealType] || profileByType.lunchDinner;
 
     return {
       meal_id: `user_${targetMealType}_${idSuffix}`,
       canonical_name: canonicalName,
       display_name: label,
-      nutrition_source: 'User-promoted custom meal',
-      assumption_version: 'user_promoted_v1',
+      nutrition_source: `Median of ${observed.sampleSize} logged instances`,
+      assumption_version: 'user_promoted_v2_observed',
       name: canonicalName,
-      protein: profile.p,
-      cal: profile.cal,
-      macros: { p: profile.p, c: profile.c, f: profile.f },
+      protein: observed.protein,
+      cal: observed.cal,
+      macros: { p: observed.protein, c: observed.carbs, f: observed.fat },
       cuisine: 'custom',
-      isUserAdded: true
+      isUserAdded: true,
+      // Flagged so a later pass can tell a measured catalog meal from one
+      // derived by observation. The numbers are real, but they are a median of
+      // what the user logged, not an ingredient rollup.
+      macrosFromObservation: true
     };
   };
 
@@ -1205,7 +1242,12 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       return;
     }
 
-    const promotedMeal = buildPromotedCustomMeal(candidate.displayName, targetMealType);
+    const promotedMeal = buildPromotedCustomMeal(candidate, targetMealType);
+    if (!promotedMeal) {
+      showNotification('⚠️ Not enough macro data logged for this meal yet');
+      return;
+    }
+
     const nextCatalog = normalizeUserMealCatalog({
       ...userMealCatalog,
       [targetMealType]: [...(userMealCatalog[targetMealType] || []), promotedMeal]

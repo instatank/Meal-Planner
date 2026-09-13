@@ -62,7 +62,7 @@ watching it go red.
 | `skip` | **meal**, protein, cal | −0.6 |
 | `swap` | from → to | −1.0 on `from` only |
 | `edit` | original → replacement | −1.0 / +1.0 |
-| `custom` | meal, what it displaced, **raw text**, source | +1.0 / −0.6 |
+| `custom` | meal, what it displaced, **raw text**, source, **macros** | +1.0 / −0.6 |
 | `plan_review` | verdict, rating, reasons, note, dishes | see §3 |
 | `undo`, `regen`, `custom_promoted` | bookkeeping | nothing |
 
@@ -73,6 +73,22 @@ the single largest hole in the capture surface.
 **A swap credits only the meal left behind.** `handleSwap` advances through an
 ordered list, so the meal arrived at was not chosen, it was next. Crediting it
 would teach the planner that whatever sorts after a disliked dish is liked.
+
+**Why `custom` records macros.** A custom meal logged three times in 45 days
+becomes a promotion candidate, and a promoted meal enters the catalog the
+optimizer trusts completely. `buildPromotedCustomMeal` used to assign every
+one of them a flat `{p: 24, c: 42, f: 14}` — safe only because the path was
+unreachable, since `getCustomMealCandidates` groups on `customMealText` and no
+producer wrote it.
+
+Closing that capture gap switched the path on. So promotion now takes the
+**median** protein, calories, carbs and fat across every logged instance, and
+**refuses** when no instance carried usable numbers. Median rather than mean:
+one mistyped portion would drag a mean far enough to push the meal outside the
+calorie bounds, and a hand-typed log is exactly where that happens. Declining
+to promote beats promoting a fiction — an invented 24g of protein is not a
+placeholder, it is a meal that can be planned to satisfy a floor it does not
+meet. Promoted meals are flagged `macrosFromObservation: true`.
 
 **The log is bounded** at 4000 events, newest kept — about three years at four
 events a day. It lives in one Firestore document (1MB limit) mirrored into
