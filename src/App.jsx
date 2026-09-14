@@ -565,19 +565,44 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
   useEffect(() => {
     const loadStoredData = async () => {
       try {
-        const historyResult = await storageGet('meal-history');
-        const prefsResult = await storageGet('meal-preferences');
-        const plansResult = await storageGet('meal-plans');
-        const eventsResult = await storageGet('meal-events');
-        const userCatalogResult = await storageGet('meal-user-catalog');
-        const onboardingResult = await storageGet(ONBOARDING_PROFILE_STORAGE_KEY);
-        const autoGenResult = await storageGet('last-auto-gen-week');
-        // Read so the insights panel can show rejections logged before the
-        // event log existed. Thin data, but it is the only record of what was
-        // disliked back then, and it is never written from here.
-        const legacyRejectionsResult = await storageGet('rejected-plans');
-        const tiersResult = await storageGet('meal-tiers');
-        const dismissedResult = await storageGet('meal-tier-dismissals');
+        // Read in parallel, not in sequence.
+        //
+        // Every one of these is a Firestore round trip, and awaiting them one
+        // after another made boot latency the sum of ten of them — on a phone,
+        // seconds of staring at the spinner. They are wholly independent: each
+        // reads a different document under `users/{uid}/metrics/`, and
+        // `storageGet`'s heal-on-read writes back only to the key it was given.
+        //
+        // This was seven sequential reads before the feedback and tier work
+        // added three more, so parallelising is also paying back the boot cost
+        // those features introduced rather than leaving it on the user.
+        //
+        // `rejected-plans` is read so the insights panel can show rejections
+        // logged before the event log existed. Thin data, but it is the only
+        // record of what was disliked back then, and it is never written here.
+        const [
+          historyResult,
+          prefsResult,
+          plansResult,
+          eventsResult,
+          userCatalogResult,
+          onboardingResult,
+          autoGenResult,
+          legacyRejectionsResult,
+          tiersResult,
+          dismissedResult
+        ] = await Promise.all([
+          storageGet('meal-history'),
+          storageGet('meal-preferences'),
+          storageGet('meal-plans'),
+          storageGet('meal-events'),
+          storageGet('meal-user-catalog'),
+          storageGet(ONBOARDING_PROFILE_STORAGE_KEY),
+          storageGet('last-auto-gen-week'),
+          storageGet('rejected-plans'),
+          storageGet('meal-tiers'),
+          storageGet('meal-tier-dismissals')
+        ]);
 
         const parsedHistory = normalizeDateMap(safeParseJson(historyResult, historyResult) || {});
         const parsedPrefs = normalizePreferences(safeParseJson(prefsResult, prefsResult) || {});
