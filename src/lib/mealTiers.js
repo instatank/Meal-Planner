@@ -199,12 +199,28 @@ export const getTierDefinition = (tier) =>
 /**
  * One meal's tiering record, normalised.
  *
- * An unknown tier falls back to the default rather than being rejected: a
- * record written by a newer build, or hand-edited, should degrade to "no
- * opinion" instead of throwing inside the planner.
+ * `tier` is **null when the user has never set one**, and that null is the
+ * point: the default tier is `occasional`, so a dish nobody has judged and a
+ * dish deliberately marked `occasional` would otherwise be the same record.
+ * The tiering screen needs to tell them apart to put the unjudged ones first,
+ * and no amount of reading `getMealTier` can recover a distinction that was
+ * never stored.
+ *
+ * Nothing downstream has to care. Every consumer reads through `getMealTier`
+ * or `getTierDefinition`, both of which resolve null to `DEFAULT_TIER` — so a
+ * null tier plans exactly as `occasional` does, which is what it means.
+ *
+ * An unknown tier resolves the same way rather than being rejected: a record
+ * written by a newer build, or hand-edited, should degrade to "no opinion"
+ * instead of throwing inside the planner.
+ *
+ * Records written before this field could be null always carried a concrete
+ * tier string, because this function put one there — so existing tiering
+ * reads as explicit and nobody is asked to re-tier a catalog they already
+ * worked through.
  */
 export const normalizeMealTier = (entry = {}) => ({
-  tier: isKnownTier(entry.tier) ? entry.tier : DEFAULT_TIER,
+  tier: isKnownTier(entry.tier) ? entry.tier : null,
   rating: clampRating(entry.rating),
   pairing: entry.pairing === PAIRING_MODE.MODULAR ? PAIRING_MODE.MODULAR : DEFAULT_PAIRING_MODE,
   // Free-text, never parsed — the same role the review note plays. "Only when
@@ -234,8 +250,33 @@ export const normalizeMealTierMap = (raw = {}) => {
   return out;
 };
 
-export const getMealTier = (tierMap = {}, mealName = '') =>
-  tierMap[String(mealName || '').trim()]?.tier || DEFAULT_TIER;
+/**
+ * The tier the planner should apply — always a real tier, never null.
+ *
+ * Validates rather than passing the stored string through. The map is
+ * normalised on load, so in the app an unrecognised value cannot reach here;
+ * but this is the public accessor, it is handed raw maps by tests, fixtures
+ * and the harness, and `?.tier || DEFAULT_TIER` quietly returned `legendary`
+ * for a hand-edited record — a value with no definition, which every caller
+ * downstream would then have to re-check. Validating once, here, is what makes
+ * "every consumer sees a real tier" true rather than merely usual.
+ */
+export const getMealTier = (tierMap = {}, mealName = '') => {
+  const stored = tierMap[String(mealName || '').trim()]?.tier;
+  return isKnownTier(stored) ? stored : DEFAULT_TIER;
+};
+
+/**
+ * Has the user actually said how often this dish belongs in a week?
+ *
+ * Distinct from `getMealTier`, which answers the planner's question ("what cap
+ * applies") and therefore can never return "nothing". This answers the
+ * screen's question ("is there anything here to show the user"), and rating a
+ * dish does not count — a rating says how much you like it, which is a
+ * different axis and leaves the frequency question open.
+ */
+export const hasExplicitTier = (tierMap = {}, mealName = '') =>
+  isKnownTier(tierMap[String(mealName || '').trim()]?.tier);
 
 export const getMealRating = (tierMap = {}, mealName = '') =>
   tierMap[String(mealName || '').trim()]?.rating ?? null;
@@ -257,10 +298,99 @@ export const isRetired = (tierMap = {}, mealName = '') =>
  * two are asked separately.
  */
 export const hasTierEffects = (tierMap = {}) =>
-  Object.values(tierMap).some((entry) => entry.tier !== DEFAULT_TIER);
+  // Resolved rather than compared raw: an entry carrying a null tier (rated
+  // but never tiered) is behaviourally `occasional` and must not count as an
+  // effect. Comparing `entry.tier !== DEFAULT_TIER` directly would say null is
+  // an effect, switch the optimizer off its untiered path, and quietly end the
+  // "an untiered catalog plans identically" guarantee the whole file rests on.
+  Object.values(tierMap).some((entry) => (entry.tier || DEFAULT_TIER) !== DEFAULT_TIER);
 
 export const hasRatingEffects = (tierMap = {}) =>
   Object.values(tierMap).some((entry) => Number.isFinite(entry.rating));
+
+/**
+ * The bucket a dish sits in on the tiering screen — a tier, or "not judged".
+ *
+ * A sentinel rather than `null` so it can be a map key, a filter value and a
+ * React key without every call site re-deciding how to spell "no tier". It is
+ * deliberately not a member of `FREQUENCY_TIER`: the planner has no such
+ * concept and must never be handed one.
+ */
+export const UNTIERED = 'untiered';
+
+export const UNTIERED_DEFINITION = Object.freeze({
+  id: UNTIERED,
+  label: 'Not set yet',
+  hint: 'You have not said how often you want this — it is planned as Occasional until you do'
+});
+
+/**
+ * Display order for the tiering screen: unjudged first, then most frequent to
+ * least.
+ *
+ * Unjudged goes on top because this screen's job is to be worked *through*.
+ * Sorting purely by frequency would bury the only rows that need a decision
+ * under a hundred that do not, and with 120 meals in the catalog the ones
+ * nobody has touched are exactly the ones that never get touched. Everything
+ * below that is `TIER_ORDER`, which is already coarsest-first, so the list
+ * reads as a single descending gradient of "how much of my week is this".
+ */
+export const TIER_DISPLAY_ORDER = Object.freeze([UNTIERED, ...TIER_ORDER]);
+
+export const getTierBucket = (tierMap = {}, mealName = '') =>
+  hasExplicitTier(tierMap, mealName) ? getMealTier(tierMap, mealName) : UNTIERED;
+
+export const getBucketDefinition = (bucket) =>
+  bucket === UNTIERED ? UNTIERED_DEFINITION : getTierDefinition(bucket);
+
+const bucketRank = (bucket) => {
+  const index = TIER_DISPLAY_ORDER.indexOf(bucket);
+  // An unrecognised bucket sorts last rather than first. Sorting it first
+  // would put whatever a newer build invented above the rows the user actually
+  // needs to act on.
+  return index === -1 ? TIER_DISPLAY_ORDER.length : index;
+};
+
+/**
+ * Meals in display order: unjudged first, then by descending frequency, then
+ * alphabetically inside each group.
+ *
+ * Alphabetical within a group rather than by protein or calories, because the
+ * list is *browsed* — you come here to find the dish you are thinking of, and
+ * a name is how you look for it. Ranking within a group by some macro would
+ * imply an ordering the tier does not have.
+ */
+export const sortMealsByTier = (meals = [], tierMap = {}) =>
+  [...meals].sort((a, b) => {
+    const rankDelta = bucketRank(getTierBucket(tierMap, a?.name)) - bucketRank(getTierBucket(tierMap, b?.name));
+    if (rankDelta !== 0) return rankDelta;
+    return String(a?.name || '').localeCompare(String(b?.name || ''));
+  });
+
+/**
+ * The same ordering, but as labelled groups so the screen can head each one.
+ *
+ * Empty groups are dropped: a heading over nothing is noise, and "Retired (0)"
+ * on a catalog nobody has retired from is a heading that will be there for
+ * the life of the app.
+ */
+export const groupMealsByTier = (meals = [], tierMap = {}) => {
+  const byBucket = new Map(TIER_DISPLAY_ORDER.map((bucket) => [bucket, []]));
+
+  for (const meal of sortMealsByTier(meals, tierMap)) {
+    const bucket = getTierBucket(tierMap, meal?.name);
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket).push(meal);
+  }
+
+  return TIER_DISPLAY_ORDER
+    .filter((bucket) => byBucket.get(bucket)?.length)
+    .map((bucket) => ({
+      bucket,
+      definition: getBucketDefinition(bucket),
+      meals: byBucket.get(bucket)
+    }));
+};
 
 /**
  * Count how much of the catalog each tier holds.
@@ -276,9 +406,15 @@ export const summarizeTierCoverage = (tierMap = {}, mealNames = []) => {
   let rated = 0;
   let ratingTotal = 0;
 
+  let untiered = 0;
+
   for (const name of mealNames) {
     const entry = tierMap[name];
     counts[entry?.tier || DEFAULT_TIER] += 1;
+    // Counted alongside, not instead of, the tier counts: an untiered dish is
+    // still planned as `occasional` and still consumes a weekly slot, so
+    // `weeklyCapacity` below must keep seeing it as one.
+    if (!isKnownTier(entry?.tier)) untiered += 1;
     if (Number.isFinite(entry?.rating)) {
       rated += 1;
       ratingTotal += entry.rating;
@@ -291,6 +427,7 @@ export const summarizeTierCoverage = (tierMap = {}, mealNames = []) => {
   return {
     total,
     counts,
+    untiered,
     retired,
     available: total - retired,
     rated,

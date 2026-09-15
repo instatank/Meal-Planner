@@ -6,13 +6,21 @@ import {
   FREQUENCY_TIER,
   PAIRING_MODE,
   TIER_DEFINITIONS,
+  TIER_DISPLAY_ORDER,
   TIER_ORDER,
+  UNTIERED,
+  getMealTier,
   getMealWeeklyCap,
+  getTierDefinition,
+  groupMealsByTier,
+  hasExplicitTier,
   hasRatingEffects,
   hasTierEffects,
+  isKnownTier,
   isRetired,
   normalizeMealTier,
   normalizeMealTierMap,
+  sortMealsByTier,
   summarizeTierCoverage
 } from '../src/lib/mealTiers.js';
 import { RUBRIC_LIMITS } from '../src/lib/rules.js';
@@ -53,8 +61,121 @@ test('a rare dish is bounded by a gap in days, not by the weekly cap', () => {
 
 test('an unknown tier degrades to the default instead of throwing', () => {
   // A record from a newer build, or hand-edited, must not break the planner.
-  assert.equal(normalizeMealTier({ tier: 'legendary' }).tier, DEFAULT_TIER);
+  //
+  // Asserted through the accessor, not the stored field. The record now keeps
+  // `null` rather than writing `occasional` over an answer it did not
+  // understand — but every consumer reads through `getMealTier` /
+  // `getTierDefinition`, so the planner still sees the default. That is the
+  // guarantee worth pinning; which literal sits in storage is not.
+  assert.equal(getMealTier({ X: { tier: 'legendary' } }, 'X'), DEFAULT_TIER);
   assert.equal(getMealWeeklyCap({ X: { tier: 'legendary' } }, 'X'), 1);
+  assert.equal(getTierDefinition(normalizeMealTier({ tier: 'legendary' }).tier).id, DEFAULT_TIER);
+});
+
+test('a dish nobody has judged is distinguishable from one judged Occasional', () => {
+  // The whole reason `tier` is nullable. `occasional` is the default, so
+  // without this the two are the same record and the tiering screen cannot put
+  // the unjudged ones first — which is the one thing that screen is for.
+  const tierMap = normalizeMealTierMap({
+    Judged: { tier: FREQUENCY_TIER.OCCASIONAL },
+    RatedOnly: { rating: 5 },
+    Untouched: {}
+  });
+
+  assert.equal(hasExplicitTier(tierMap, 'Judged'), true);
+  assert.equal(hasExplicitTier(tierMap, 'RatedOnly'), false, 'a rating says how much, not how often');
+  assert.equal(hasExplicitTier(tierMap, 'Untouched'), false);
+  assert.equal(hasExplicitTier(tierMap, 'NotInTheMapAtAll'), false);
+
+  // ...and all of them still plan identically, because that is what the null
+  // means. A distinction the screen can see must stay invisible to the planner.
+  for (const name of ['Judged', 'RatedOnly', 'Untouched', 'NotInTheMapAtAll']) {
+    assert.equal(getMealTier(tierMap, name), DEFAULT_TIER);
+    assert.equal(getMealWeeklyCap(tierMap, name), 1);
+  }
+});
+
+test('a rating alone never switches the optimizer off its untiered path', () => {
+  // `hasTierEffects` used to compare `entry.tier !== DEFAULT_TIER` on the raw
+  // field. A nullable tier makes that comparison true for a rated-but-untiered
+  // dish, which would quietly end the "an untiered catalog plans identically"
+  // guarantee — the property the whole tier system rests on.
+  const ratedOnly = normalizeMealTierMap({ A: { rating: 5 }, B: { rating: 1 } });
+  assert.equal(hasTierEffects(ratedOnly), false);
+  assert.equal(hasRatingEffects(ratedOnly), true);
+
+  assert.equal(hasTierEffects(normalizeMealTierMap({ A: { tier: FREQUENCY_TIER.OCCASIONAL } })), false);
+  assert.equal(hasTierEffects(normalizeMealTierMap({ A: { tier: FREQUENCY_TIER.STAPLE } })), true);
+});
+
+test('meals are ordered unjudged first, then most frequent to least', () => {
+  const meals = [
+    { name: 'Zebra staple' },
+    { name: 'Apple retired' },
+    { name: 'Mango unset' },
+    { name: 'Apricot unset' },
+    { name: 'Banana occasional' },
+    { name: 'Cherry regular' },
+    { name: 'Date rare' }
+  ];
+  const tierMap = normalizeMealTierMap({
+    'Zebra staple': { tier: FREQUENCY_TIER.STAPLE },
+    'Apple retired': { tier: FREQUENCY_TIER.RETIRED },
+    'Banana occasional': { tier: FREQUENCY_TIER.OCCASIONAL },
+    'Cherry regular': { tier: FREQUENCY_TIER.REGULAR },
+    'Date rare': { tier: FREQUENCY_TIER.RARE }
+  });
+
+  assert.deepEqual(
+    sortMealsByTier(meals, tierMap).map((m) => m.name),
+    [
+      // Unjudged first — alphabetical within the group, because the list is
+      // browsed by name.
+      'Apricot unset',
+      'Mango unset',
+      'Zebra staple',
+      'Cherry regular',
+      'Banana occasional',
+      'Date rare',
+      'Apple retired'
+    ]
+  );
+
+  // Sorting must not mutate the caller's array.
+  assert.equal(meals[0].name, 'Zebra staple');
+});
+
+test('grouping labels each band and drops the empty ones', () => {
+  const meals = [{ name: 'A' }, { name: 'B' }, { name: 'C' }];
+  const tierMap = normalizeMealTierMap({ B: { tier: FREQUENCY_TIER.STAPLE } });
+  const groups = groupMealsByTier(meals, tierMap);
+
+  assert.deepEqual(groups.map((g) => g.bucket), [UNTIERED, FREQUENCY_TIER.STAPLE]);
+  assert.deepEqual(groups[0].meals.map((m) => m.name), ['A', 'C']);
+  assert.ok(groups[0].definition.label, 'the unjudged group needs a label of its own');
+  assert.equal(groups[1].definition.label, TIER_DEFINITIONS[FREQUENCY_TIER.STAPLE].label);
+
+  // Every meal appears exactly once, whatever the grouping does.
+  assert.equal(groups.reduce((n, g) => n + g.meals.length, 0), meals.length);
+});
+
+test('UNTIERED is a display concept and never a tier the planner can receive', () => {
+  assert.ok(!TIER_ORDER.includes(UNTIERED));
+  assert.equal(isKnownTier(UNTIERED), false);
+  assert.equal(getMealTier({ X: { tier: UNTIERED } }, 'X'), DEFAULT_TIER);
+  assert.equal(TIER_DISPLAY_ORDER[0], UNTIERED);
+  assert.deepEqual(TIER_DISPLAY_ORDER.slice(1), [...TIER_ORDER]);
+});
+
+test('coverage counts the unjudged without changing what a week can hold', () => {
+  const names = ['A', 'B', 'C'];
+  const tierMap = normalizeMealTierMap({ A: { tier: FREQUENCY_TIER.STAPLE }, B: { rating: 4 } });
+  const coverage = summarizeTierCoverage(tierMap, names);
+
+  assert.equal(coverage.untiered, 2, 'B is rated but not tiered, C is untouched');
+  // An untiered dish is still planned as occasional, so it still supplies a
+  // weekly slot. Counting it as unjudged must not remove it from capacity.
+  assert.equal(coverage.weeklyCapacity, 3 + 1 + 1, 'staple 3 + occasional 1 + occasional 1');
 });
 
 test('ratings are clamped; a non-numeric rating is absent, not zero', () => {

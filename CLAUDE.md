@@ -273,6 +273,19 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
     110 -> 120. This *improved* the plan: carb cap 6/7 -> 7/7, weekly protein
     100.4% -> 101.4%, runtime unchanged.
 
+- **Tiering screen ordered by frequency, unjudged first — shipped.** See
+  `docs/MEAL_TIERS.md` §1 and §3a. **`tier` is now nullable**, and that is the
+  substance of the change rather than a detail of it: `occasional` is the
+  default, so "nobody has judged this" and "judged as occasional" were the same
+  record and the screen could not put the former first. Null resolves to
+  `occasional` through `getMealTier` / `getTierDefinition`, so the planner is
+  unaffected — but `hasTierEffects` had to start resolving before comparing,
+  or a rating-only entry would switch the optimizer off its untiered path and
+  end the "untiered catalog plans identically" guarantee. `getMealTier` now
+  validates the stored string too; it used to pass `legendary` straight through
+  for any map that had not been normalised first. Legacy records all carry a
+  concrete tier, so nobody re-tiers a catalog they already worked through.
+
 - **User-added meals — shipped.** See `docs/USER_MEALS.md`. The tiering screen
   let you say how often a dish should appear; this lets you say a dish exists.
   - **A meal you type is not a meal the planner can see.** It is a *draft*,

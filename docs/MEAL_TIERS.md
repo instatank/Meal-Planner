@@ -11,10 +11,39 @@ these cost, and §6 for what is still wrong.
 
 | Field | Means | Default |
 | --- | --- | --- |
-| `tier` | How often this belongs in a week | `occasional` |
+| `tier` | How often this belongs in a week | `null` — planned as `occasional` |
 | `rating` | 1–5, your own opinion | none |
 | `pairing` | `fixed` composite, or `modular` pattern | `fixed` |
 | `note` | Free text, never parsed | empty |
+
+**`tier` is null when you have not judged the dish, and that null is
+load-bearing.** The default tier is `occasional`, so a dish nobody has looked
+at and a dish deliberately marked `occasional` would otherwise be the same
+record — and the tiering screen could not put the unjudged ones first, which is
+the one thing that screen is for. A distinction that was never stored cannot be
+recovered by reading harder.
+
+Nothing downstream cares. Every consumer reads through `getMealTier` or
+`getTierDefinition`, both of which resolve null to `occasional`, so a null tier
+*plans* exactly as `occasional` does — which is what it means. `hasExplicitTier`
+is the only accessor that can see the difference, and only the screen calls it.
+
+Two consequences worth stating, because both were bugs waiting to happen:
+
+- **`hasTierEffects` resolves before comparing.** Comparing `entry.tier !==
+  DEFAULT_TIER` on the raw field says a null tier *is* an effect, which would
+  switch the optimizer off its untiered path for a user who has only ever rated
+  something — quietly ending the "an untiered catalog plans identically"
+  guarantee this whole file rests on.
+- **A rating is not a tier.** Rating a dish leaves `tier` null, so the screen
+  keeps asking how often you want it. That is correct: the two are different
+  axes (§ the rating section), and answering one must not silently answer the
+  other.
+
+Records written before `tier` could be null always carried a concrete tier
+string, because `normalizeMealTier` put one there. So existing tiering reads as
+explicit and **nobody is asked to re-tier a catalog they already worked
+through.**
 
 Stored per meal **name**, in the `meal-tiers` key. Name, not `meal_id`, because
 that is what the event log, the optimizer's repeat counters and the preference
@@ -124,6 +153,42 @@ budgets**, not to the cap: Rajma chawal is 21g of protein against a 120g daily
 target and cannot carry a third of a day. That is the macro rules correctly
 outranking a preference, so the tiering screen says so on the row rather than
 leaving you to conclude the feature is broken.
+
+---
+
+## 3a. How the screen is ordered
+
+Unjudged first, then most frequent to least: **Not set → Staple → Regular →
+Occasional → Rare → Retired**, alphabetical inside each band, with a sticky
+heading per band.
+
+Unjudged goes on top because the screen is something you work *through*. With
+120 meals in the catalog, sorting purely by frequency buries the only rows that
+need a decision under a hundred that do not — and the rows nobody has touched
+are precisely the rows that never get touched. The header count leads with
+"N not set" for the same reason: it is the only figure on that line that asks
+for anything.
+
+Alphabetical within a band rather than by protein or calories, because the list
+is browsed — you come here to find the dish you are thinking of, and a name is
+how you look for it. Ranking within a band by a macro would imply an ordering
+the tier does not have.
+
+Two details that are not cosmetic:
+
+- **An unjudged dish highlights no tier button.** Previously the row resolved
+  the tier for display, so every untouched dish showed `Occasional` as if
+  selected — telling the user they had already answered a question they had
+  not, on a hundred rows at once.
+- **The list is capped at 60 with a "Show N more".** Stated rather than silent,
+  and the cap is applied *after* grouping so a heading never claims more than
+  it shows. The ordering guarantees what is cut is the already-decided end of
+  the list, never a row awaiting a decision.
+
+The ordering itself lives in `mealTiers.js` (`sortMealsByTier`,
+`groupMealsByTier`), not in the component. "Not judged" versus "judged as
+occasional" is a fact about the data; a component that re-derived it would be a
+second opinion on what the tier map means.
 
 ---
 
