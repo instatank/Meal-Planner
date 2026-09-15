@@ -35,7 +35,18 @@ import { PLAN_VERDICT } from './lib/feedbackSchema';
 import PlanReviewModal from './components/PlanReviewModal';
 import InsightsPanel from './components/InsightsPanel';
 import MealTieringPanel from './components/MealTieringPanel';
+import AddMealPanel from './components/AddMealPanel';
 import { normalizeMealTierMap, normalizeMealTier } from './lib/mealTiers';
+import {
+  buildIngestionPayload,
+  buildUserCatalogMeal,
+  createMealDraft,
+  describeDraftImpact,
+  findDuplicateName,
+  normalizeMealDraft,
+  normalizeMealDraftList
+} from './lib/userMeals';
+import { estimateMealIngredients } from './lib/mealIngestService';
 import { getRulesForProfile as resolveRulesForProfile } from './lib/rules';
 import { proposeMealTiers } from './lib/tierProposals';
 import {
@@ -351,6 +362,10 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
   const [legacyRejections, setLegacyRejections] = useState([]);
   const [mealTiers, setMealTiers] = useState({});
   const [dismissedTierProposals, setDismissedTierProposals] = useState({});
+  // Meals the user typed in but that have no ingredient rollup yet. Held apart
+  // from `userMealCatalog` on purpose — see the header of `lib/userMeals.js`:
+  // a draft is inert, and the planner must not be able to reach one.
+  const [mealDrafts, setMealDrafts] = useState([]);
 
   const isViewerMode = onboardingProfile?.mode === ONBOARDING_MODE.VIEWER;
   const onboardingDraft = onboardingProfile
@@ -590,7 +605,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           autoGenResult,
           legacyRejectionsResult,
           tiersResult,
-          dismissedResult
+          dismissedResult,
+          draftsResult
         ] = await Promise.all([
           storageGet('meal-history'),
           storageGet('meal-preferences'),
@@ -601,7 +617,8 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           storageGet('last-auto-gen-week'),
           storageGet('rejected-plans'),
           storageGet('meal-tiers'),
-          storageGet('meal-tier-dismissals')
+          storageGet('meal-tier-dismissals'),
+          storageGet('meal-drafts')
         ]);
 
         const parsedHistory = normalizeDateMap(safeParseJson(historyResult, historyResult) || {});
@@ -639,6 +656,7 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
         setLegacyRejections(Array.isArray(legacyRejectionsResult) ? legacyRejectionsResult : []);
         setMealTiers(normalizeMealTierMap(safeParseJson(tiersResult, tiersResult) || {}));
         setDismissedTierProposals(safeParseJson(dismissedResult, dismissedResult) || {});
+        setMealDrafts(normalizeMealDraftList(safeParseJson(draftsResult, draftsResult) || []));
         setUserMealCatalog(parsedUserCatalog);
         setOnboardingProfile(parsedOnboarding);
 
@@ -1042,6 +1060,233 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
       )
     };
   }, [mealEvents, mealTiers, allExistingMealNames, dismissedTierProposals]);
+
+  // ─── Meals the user adds ──────────────────────────────────────────────────
+  //
+  // Two stores, on purpose. A draft goes to `meal-drafts` and is invisible to
+  // the planner; an approved meal goes to `meal-user-catalog`, which
+  // `mergedMealDatabase` already merges and which `buildPromotedCustomMeal`
+  // already writes to. Approval is the only door between them, and it is shut
+  // unless the dish has `parts[]` that roll up to real macros — because the
+  // optimizer enforces a 20g per-meal floor and a 714g weekly floor against
+  // exactly these numbers, and a meal that reports protein it does not have
+  // produces a week that says it hit the target and did not.
+
+  const persistMealDrafts = async (next) => {
+    setMealDrafts(next);
+    await saveToStorage('meal-drafts', next);
+  };
+
+  /**
+   * What a draft would become if approved — the meal, why not, and what is
+   * worth knowing before saying yes.
+   *
+   * Computed for display rather than stored, so it cannot go stale against an
+   * edited quantity. Cheap enough to run per render: it is one `computeMacros`
+   * over a handful of parts.
+   */
+  const previewMealDraft = (draft) => {
+    const { meal, reason, dropped } = buildUserCatalogMeal(draft);
+    let rules = null;
+    try {
+      rules = resolveRulesForProfile(onboardingProfile?.goal);
+    } catch {
+      // An unimplemented goal throws by design. The preview degrades to "no
+      // rule-based warnings" rather than taking the screen down — the same
+      // call this file already wraps for the tiering hint.
+      rules = null;
+    }
+    return {
+      meal,
+      reason,
+      dropped,
+      warnings: describeDraftImpact(meal, draft.slot, rules)
+    };
+  };
+
+  const handleAddMealDraft = async (input) => {
+    if (!requireWriteAccess('Adding meals')) return { error: 'Viewer mode.' };
+
+    const duplicate = findDuplicateName(input.name, {
+      existingNames: allExistingMealNames,
+      drafts: mealDrafts
+    });
+    if (duplicate) {
+      return {
+        error: duplicate.kind === 'catalog'
+          ? `You already have "${duplicate.name}" in your meals.`
+          : `"${duplicate.name}" is already waiting in the queue.`
+      };
+    }
+
+    const draft = createMealDraft(input);
+    await persistMealDrafts([draft, ...mealDrafts]);
+    showNotification(`✓ Added "${draft.name}" to the queue`);
+    return { draft };
+  };
+
+  const handleUpdateMealDraft = async (draftId, patch) => {
+    if (!requireWriteAccess('Editing meals')) return;
+    const next = mealDrafts.map((draft) =>
+      draft.id === draftId
+        ? normalizeMealDraft({ ...draft, ...patch, updatedAt: new Date().toISOString() })
+        : draft
+    );
+    await persistMealDrafts(next);
+  };
+
+  /**
+   * Ask the estimator to express the dish in known ingredients.
+   *
+   * An empty `parts` result is not an error and is not treated as one: it is
+   * the model declining to guess at a dish it does not know, which is the
+   * behaviour the prompt asks for. It lands as `unresolved`, which is a real
+   * state with its own copy on screen and its own place in the export.
+   */
+  const handleEstimateMealDraft = async (draft) => {
+    if (!requireWriteAccess('Adding meals')) return { error: 'Viewer mode.' };
+
+    try {
+      const result = await estimateMealIngredients({
+        name: draft.name,
+        slot: draft.slot,
+        note: draft.note
+      });
+
+      await handleUpdateMealDraft(draft.id, {
+        parts: result.parts,
+        // A cuisine the user picked outranks the estimator's guess: the
+        // estimator is inferring from a name, the user knows what they ate.
+        cuisine: draft.cuisine && draft.cuisine !== 'general' ? draft.cuisine : (result.cuisine || draft.cuisine),
+        unmatched: result.unmatched,
+        estimateNote: result.notes,
+        confidence: result.confidence,
+        estimateSource: 'ai'
+      });
+
+      if (!result.parts.length) {
+        showNotification('⚠️ Could not build that from known ingredients');
+      }
+      return { ok: true };
+    } catch (error) {
+      console.error('[App] meal estimate failed:', error);
+      return { error: error?.message || 'Could not work out the ingredients.' };
+    }
+  };
+
+  const handleApproveMealDraft = async (draft) => {
+    if (!requireWriteAccess('Adding meals')) return;
+
+    const { meal, reason } = buildUserCatalogMeal(draft);
+    if (!meal) {
+      showNotification(`⚠️ ${reason}`);
+      return;
+    }
+
+    // Re-checked at approval, not only at add: the catalog can have grown
+    // (another device, a promoted custom meal) while this draft sat in the
+    // queue, and two records for one dish means two independent weekly caps.
+    const duplicate = findDuplicateName(meal.name, { existingNames: allExistingMealNames });
+    if (duplicate) {
+      showNotification(`⚠️ "${duplicate.name}" is already in your meals`);
+      await persistMealDrafts(mealDrafts.filter((d) => d.id !== draft.id));
+      return;
+    }
+
+    const nextCatalog = normalizeUserMealCatalog({
+      ...userMealCatalog,
+      [draft.slot]: [...(userMealCatalog[draft.slot] || []), meal]
+    });
+
+    setUserMealCatalog(nextCatalog);
+    await saveToStorage('meal-user-catalog', nextCatalog);
+    await persistMealDrafts(mealDrafts.filter((d) => d.id !== draft.id));
+
+    // The frequency the user chose when adding, applied now that the dish
+    // exists to apply it to. Skipped when they said nothing — an untouched
+    // tier map is what keeps the planner bit-identical for anyone who has no
+    // opinion, and writing a default `occasional` entry for every added meal
+    // would quietly end that guarantee.
+    if (draft.tier) {
+      await updateMealTier(meal.name, { tier: draft.tier });
+    }
+
+    appendMealEvent({
+      type: 'meal_added',
+      dateKey: selectedDateKey,
+      mealType: draft.slot,
+      mealName: meal.name,
+      cuisine: meal.cuisine,
+      source: draft.estimateSource || 'manual'
+    });
+
+    showNotification(`✓ ${meal.name} is now in your rotation`);
+  };
+
+  const handleDiscardMealDraft = async (draftId) => {
+    if (!requireWriteAccess('Editing meals')) return;
+    await persistMealDrafts(mealDrafts.filter((d) => d.id !== draftId));
+  };
+
+  /**
+   * Remove a meal the user added.
+   *
+   * Only ever removes `isUserAdded` entries. A name collision with a shipped
+   * dish would otherwise delete the shipped one from the merged view, which
+   * the user cannot undo from this screen.
+   */
+  const handleRemoveUserMeal = async (mealName) => {
+    if (!requireWriteAccess('Editing meals')) return;
+    const nextCatalog = normalizeUserMealCatalog(
+      Object.fromEntries(
+        Object.entries(userMealCatalog).map(([slot, meals]) => [
+          slot,
+          (meals || []).filter((meal) => !(meal?.isUserAdded && meal.name === mealName))
+        ])
+      )
+    );
+    setUserMealCatalog(nextCatalog);
+    await saveToStorage('meal-user-catalog', nextCatalog);
+    showNotification(`✓ Removed ${mealName}`);
+  };
+
+  const userAddedMeals = useMemo(
+    () =>
+      Object.values(userMealCatalog)
+        .flat()
+        .filter((meal) => meal?.isUserAdded)
+        .sort((a, b) => String(a.name).localeCompare(String(b.name))),
+    [userMealCatalog]
+  );
+
+  /**
+   * Hand the whole lot over to the repo.
+   *
+   * Clipboard rather than a file download, and JSON rather than a script,
+   * because the founder works entirely in the browser and in chat sessions —
+   * the same constraint that made `generateConsolePaste.mjs` the preferred
+   * push path over the admin SDK. `scripts/ingestUserMeals.mjs` reads exactly
+   * what this writes.
+   */
+  const handleExportUserMeals = async () => {
+    const payload = buildIngestionPayload({
+      drafts: mealDrafts,
+      userCatalog: userMealCatalog,
+      tierMap: mealTiers
+    });
+    const json = JSON.stringify(payload, null, 2);
+
+    try {
+      await navigator.clipboard.writeText(json);
+      showNotification(`📋 Copied ${payload.approved.length + payload.drafts.length} meals`);
+    } catch {
+      // Clipboard access is denied on insecure origins and in some in-app
+      // browsers. Falling back to the console beats a button that silently
+      // does nothing.
+      console.log('[userMeals] export payload:\n', json);
+      showNotification('⚠️ Clipboard blocked — payload logged to the console');
+    }
+  };
 
   const regenerateCurrentWeekForGoal = (goal) => {
     const keysToEnsure = Array.from(new Set([selectedDateKey, ...getWeekDateKeys(selectedDateKey)])).sort();
@@ -2460,6 +2705,20 @@ const MealPlannerMain = ({ user, handleSignOut }) => {
           learned={learnedModel}
           mealDatabase={mergedMealDatabase}
           legacyRejections={legacyRejections}
+        />
+
+        <AddMealPanel
+          drafts={mealDrafts}
+          userMeals={userAddedMeals}
+          onAddDraft={handleAddMealDraft}
+          onEstimateDraft={handleEstimateMealDraft}
+          onUpdateDraft={handleUpdateMealDraft}
+          onApproveDraft={handleApproveMealDraft}
+          onDiscardDraft={handleDiscardMealDraft}
+          onRemoveUserMeal={handleRemoveUserMeal}
+          onExport={handleExportUserMeals}
+          previewDraft={previewMealDraft}
+          disabled={isViewerMode}
         />
 
         <MealTieringPanel

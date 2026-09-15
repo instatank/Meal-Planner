@@ -1,10 +1,4 @@
-import {
-  computeMacros,
-  deriveCarbType,
-  deriveMealTags,
-  derivePrimaryIngredient,
-  enrichMealForDataLayer
-} from '../lib/mealDataLayer.js';
+import { buildCatalogMeal } from '../lib/mealDataLayer.js';
 import { ingredients } from './ingredients.js';
 import { expandMealTemplates } from './mealTemplates.js';
 
@@ -2154,27 +2148,16 @@ export const handAuthoredTagFields = Object.freeze(['cuisine']);
 export { handAuthoredTags };
 
 /**
- * Compute macros from `parts[]`, derive the three computed tags from those
- * macros, then layer the subjective hand-authored tags on top. Order matters:
- * macros first, because the derivations read them.
+ * Build one catalog meal: macros from `parts[]`, derived tags from those
+ * macros, hand-authored tags on top.
  *
- * `carb_type` is derived here too, but only for lunch/dinner: it exists for
- * rubric R4, which exempts breakfast, so carrying it on breakfast and snack
- * meals would be a field nothing reads.
+ * The pipeline itself lives in `mealDataLayer.buildCatalogMeal` so that a meal
+ * the user adds from the app comes out of exactly the same function. All this
+ * wrapper adds is *which* hand-authored tags apply — a lookup that only makes
+ * sense for the shipped catalog.
  */
-const buildMeal = (meal, mealType) => {
-  const withMacros = { ...meal, ...computeMacros(meal.parts) };
-  return enrichMealForDataLayer(
-    {
-      ...withMacros,
-      ...deriveMealTags(withMacros),
-      ...(mealType === 'lunch_dinner' ? { carb_type: deriveCarbType(withMacros) } : {}),
-      primary_ingredient: derivePrimaryIngredient(withMacros),
-      ...(handAuthoredTags[meal.canonical_name] || {})
-    },
-    mealType
-  );
-};
+const buildMeal = (meal, mealType) =>
+  buildCatalogMeal(meal, mealType, handAuthoredTags[meal.canonical_name] || {});
 
 /**
  * Meals composed from `mealTemplates.js` — a base plus any one of several

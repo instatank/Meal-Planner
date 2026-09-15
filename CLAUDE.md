@@ -192,6 +192,7 @@ Deploy happens on `git push origin main` (Vercel auto-deploys). Feature branches
 | `scripts/buildDatabasePack.mjs` | Regenerate derived meal-database artifacts. | — |
 | `scripts/auditGeneration.mjs` | Enumerate all legal day combinations and score a generated week against the Phase 1 acceptance criteria. | — |
 | `scripts/scorePlan.mjs` | Score a week against the quality rubric (R1–R4). Accepts a rejection record, a `mealPlans` map, or `{ days: [...] }`. | — |
+| `scripts/ingestUserMeals.mjs` | Fold app-added meals into `mealDatabase.js`. Reads the app's "Copy for the database" payload; prints paste-ready entries, a macro table with warnings, and the ingredient backlog. Never writes. | — |
 | `scripts/exportRejections.mjs` | Dump rejected weeks from Firestore to `docs/rejections/`. **Needed before the rubric can be calibrated.** | Firebase Admin service account JSON. |
 | `scripts/exportDatabase.mjs` / `exportMealsToXlsx.mjs` | Export to CSV / XLSX. | — |
 
@@ -272,6 +273,33 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
     110 -> 120. This *improved* the plan: carb cap 6/7 -> 7/7, weekly protein
     100.4% -> 101.4%, runtime unchanged.
 
+- **User-added meals — shipped.** See `docs/USER_MEALS.md`. The tiering screen
+  let you say how often a dish should appear; this lets you say a dish exists.
+  - **A meal you type is not a meal the planner can see.** It is a *draft*,
+    stored apart in `meal-drafts`, and it becomes plannable only by acquiring
+    real `parts[]` and passing through `buildUserCatalogMeal`, which refuses
+    outright when the rollup is empty or zero-calorie. The optimizer enforces
+    the 20g per-meal and 714g weekly floors against catalog macros, so this is
+    the same hazard `buildPromotedCustomMeal` had, prevented structurally
+    rather than by care.
+  - **The ingredient estimator cannot invent an ingredient.** `ingredientId` is
+    an `enum` of the live `ingredients.js` keys — the `planService` per-slot
+    enum trick one level down. The model supplies *portions*, never macros;
+    `computeMacros` supplies macros. Anything it cannot map goes to `unmatched`
+    rather than being substituted, and that list is the ingredient backlog.
+  - **`buildMeal` moved from `mealDatabase.js` to
+    `mealDataLayer.buildCatalogMeal`**, so a user meal and a shipped meal come
+    out of one function. All 321 existing tests stayed green across the move;
+    `tests/userMeals.test.js` asserts the two paths agree field by field.
+  - **Handover is a clipboard paste**, not a sync: no local checkout, no admin
+    credentials. `scripts/ingestUserMeals.mjs` reads it and prints paste-ready
+    catalog entries — it never writes, because replacing an estimated portion
+    with a sourced one is a judgement call.
+  - **`meal_added` carries no learning signal**, deliberately. Crediting a dish
+    for being added rewards novelty over the dishes with a real record behind
+    them; the tier set on the same screen is the honest channel for "plan this
+    often".
+
 ## Next Priorities (updated)
 
 0. **Confirm the five Phase 2 decisions.** `docs/PHASE2_HANDOVER.md` §4 asked the founder five product questions before the work; they were not answered, so Phase 2 proceeded on stated assumptions (meals authored for review, additive only, fibre in grams now, unimplemented goals left throwing, protein floor unchanged). §9.7 and §9.8 record what to confirm — including the measurement for raising the weekly protein floor.
@@ -325,6 +353,7 @@ When hand-pushing plans: use `generateConsolePaste.mjs`, not `pushMealPlan.mjs`,
 | `docs/QUALITY_RUBRIC.md` | **The four scored rules (R1–R4)** layered on top of the `rules.js` hard gates. Implemented in `src/lib/planScorer.js`. **Not yet calibrated** — the calibration in its §Calibration needs `docs/rejections/` and the founder's ideal week, neither of which is in the repo. |
 | `docs/MEAL_TIERS.md` | **Tiers, ratings and templates.** The R1 change (the weekly cap is now per dish), the three wrong designs it took to make a staple actually recur and the ablation that settled it, how tiers are proposed from behaviour, the template system, and the known limits. **Read §3 before changing any tier number.** |
 | `docs/FEEDBACK_SYSTEM.md` | **The capture, review and learning system.** What each event records and why, how week reviews work, the attribute-level learning model and its three constants, the three guards that keep it from wrecking a plan, measured cost, and its known limits (exposure bias, chief among them). Read §4 before changing any learning threshold. |
+| `docs/USER_MEALS.md` | **Meals the user adds from the app.** Why a draft is inert and what the single door between a draft and a plannable meal checks, how the ingredient estimator is enum-constrained so it cannot invent an ingredient, the clipboard handover back into the repo, and the decisions not worth re-litigating. **Read §1 before touching `buildUserCatalogMeal`.** |
 | `docs/CONSISTENCY_AUDIT.md` | **Every fact with more than one home**, and every concept inferred by pattern-matching where structured data exists — 14 findings ranked by blast radius, each with file:line, current values, and the location that should become authoritative. Findings 1, 2, 5 and 6 are fixed and marked as such; the rest are open. |
 
 ---
@@ -342,6 +371,7 @@ src/
     PlanReviewModal.jsx  Week review sheet (verdict, rating, reasons, note)
     InsightsPanel.jsx    What the planner learned, and what it has not
     MealTieringPanel.jsx Rate and tier the database; accept tier suggestions
+    AddMealPanel.jsx     Add your own dishes; estimate their ingredients; approve
     AdminTools.jsx       Admin panel
     OnboardingFlow.jsx   First-run setup
   lib/
@@ -359,6 +389,10 @@ src/
     preferenceLearning.js  Dish- AND attribute-level learning (see docs/FEEDBACK_SYSTEM.md)
     feedbackAnalytics.js   Adherence, overrides, skips, most-rejected dishes
     mealTiers.js         Per-dish frequency tier, rating, pairing mode
+    userMeals.js         Draft lifecycle for user-added dishes + the one door
+                         between a draft and a plannable meal
+    mealIngestService.js Client wrapper for /api/generate-plan — turns a dish
+                         name into catalog ingredients (enum-constrained)
     tierProposals.js     Tiers suggested from behaviour (proposes, never applies)
     firebase.js          Firebase client init
   data/

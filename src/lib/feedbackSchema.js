@@ -53,6 +53,7 @@ export const EVENT_TYPE = Object.freeze({
   EDIT: 'edit',
   CUSTOM: 'custom',
   CUSTOM_PROMOTED: 'custom_promoted',
+  MEAL_ADDED: 'meal_added',
   UNDO: 'undo',
   REGEN: 'regen',
   PLAN_REVIEW: 'plan_review',
@@ -144,6 +145,28 @@ export const EVENT_DEFINITIONS = Object.freeze({
     required: ['customMealText', 'promotedMealName'],
     optional: ['dateKey', 'mealType'],
     describes: 'A repeatedly-logged custom meal was added to the catalog.',
+    signals: []
+  },
+
+  [EVENT_TYPE.MEAL_ADDED]: {
+    scope: EVENT_SCOPE.META,
+    required: ['mealName', 'mealType'],
+    optional: ['dateKey', 'cuisine', 'source', 'note'],
+    describes: 'The user added a dish of their own to the catalog.',
+    // No signal, deliberately.
+    //
+    // The tempting reading is "you added it, so you like it" — and it is even
+    // true. But the learner credits dishes you *ate*, weighted by how recently,
+    // and a brand-new dish with a positive prior would outrank dishes with a
+    // real record behind them the moment it is added. That is not learning
+    // your taste, it is rewarding novelty.
+    //
+    // The user already has a direct way to say "plan this often": the tier
+    // they set on the same screen, which is a hard cap and a Tier-3 affinity
+    // rather than a guess. This event is recorded so the history is complete
+    // and so `feedbackAnalytics` can answer "what have I added, and did I ever
+    // eat it?" — the honest question about an added meal, and the one that
+    // exposure bias (docs/FEEDBACK_SYSTEM.md §7) makes worth asking.
     signals: []
   },
 

@@ -545,6 +545,38 @@ export const enrichMealForDataLayer = (meal = {}, mealType = '') => {
   };
 };
 
+/**
+ * Assemble one meal object from `parts[]` — the single build pipeline.
+ *
+ * Macros are computed first because every derivation below reads them, then
+ * the derived tags, then `carb_type` (lunch/dinner only — R4 exempts
+ * breakfast, so carrying it elsewhere would be a field nothing reads), then
+ * the anchor ingredient. Hand-authored fields go on last and win, which is
+ * how `cuisine` — the one subjective tag left — overrides anything inferred.
+ *
+ * This lived as a private `buildMeal` inside `mealDatabase.js`. It moved here
+ * because it is no longer the catalog's private business: a meal the user
+ * adds from the app has to come out of the same pipeline, byte for byte, or
+ * it is a second class of meal with its own drift. `docs/CONSISTENCY_AUDIT.md`
+ * is a list of what happens when a fact gets a second home; this is that fact
+ * — "what a meal object is" — kept to one.
+ */
+export const buildCatalogMeal = (meal = {}, mealType = '', handAuthored = {}) => {
+  const withMacros = { ...meal, ...computeMacros(meal.parts) };
+  const normalizedType = normalizeMealTypeTag(mealType);
+
+  return enrichMealForDataLayer(
+    {
+      ...withMacros,
+      ...deriveMealTags(withMacros),
+      ...(normalizedType === 'lunch_dinner' ? { carb_type: deriveCarbType(withMacros) } : {}),
+      primary_ingredient: derivePrimaryIngredient(withMacros),
+      ...handAuthored
+    },
+    mealType
+  );
+};
+
 export const flattenMealDatabase = (mealDatabase = {}) => {
   const flat = [];
 
