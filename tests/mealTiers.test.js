@@ -95,6 +95,30 @@ test('a dish nobody has judged is distinguishable from one judged Occasional', (
   }
 });
 
+test('an unjudged dish is planned, not withheld', () => {
+  // The reading worth ruling out in a test rather than in a comment: making
+  // `tier` nullable must not make an unjudged dish invisible to the planner.
+  // It is planned as `occasional` — a real cap of one a week — exactly as it
+  // was before the field could be null.
+  //
+  // The catalog-wide version of this is `npm run audit:generation`, which runs
+  // against an entirely empty tier map (every dish unjudged) and still builds a
+  // full 21-dish week. If unjudged meant unplanned, that audit could not pass.
+  const tierMap = normalizeMealTierMap({ Rated: { rating: 5 } });
+
+  for (const name of ['Rated', 'Untouched', 'Not in the map']) {
+    assert.equal(hasExplicitTier(tierMap, name), false, `${name} is unjudged`);
+    assert.equal(getMealTier(tierMap, name), FREQUENCY_TIER.OCCASIONAL);
+    assert.equal(getMealWeeklyCap(tierMap, name), 1, 'one appearance a week, not zero');
+    assert.equal(isRetired(tierMap, name), false, 'unjudged is not retired');
+  }
+
+  // Retired is the only tier that withholds a dish, and it has to be chosen.
+  const retired = normalizeMealTierMap({ Gone: { tier: FREQUENCY_TIER.RETIRED } });
+  assert.equal(getMealWeeklyCap(retired, 'Gone'), 0);
+  assert.equal(isRetired(retired, 'Gone'), true);
+});
+
 test('a rating alone never switches the optimizer off its untiered path', () => {
   // `hasTierEffects` used to compare `entry.tier !== DEFAULT_TIER` on the raw
   // field. A nullable tier makes that comparison true for a rated-but-untiered

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 
 import {
+  DEFAULT_TIER,
   FREQUENCY_TIER,
   RATING_MAX,
   RATING_MIN,
@@ -51,6 +52,21 @@ const TIER_STYLES = {
   [FREQUENCY_TIER.RETIRED]: 'bg-red-600 border-red-600 text-white'
 };
 
+/**
+ * The third button state: what will happen, but not because you said so.
+ *
+ * A tier button has to show three things, not two. Solid means you chose it.
+ * Plain means you did not. But on a dish with no tier set, `Occasional` is
+ * *already in force* — it is the default the planner applies — and rendering
+ * it plain says the opposite, that nothing applies and the dish is in limbo.
+ *
+ * Dashed and muted is the honest middle: this is what your week will do if you
+ * never come back to this row. Nothing is waiting on you; the button is
+ * telling you the fallback, not asking for input.
+ */
+const DEFAULT_APPLIES_STYLE =
+  'bg-gray-100 border-gray-400 border-dashed text-gray-600 hover:border-gray-500';
+
 const LIST_CAP = 60;
 
 const DIRECTION_STYLES = {
@@ -58,6 +74,15 @@ const DIRECTION_STYLES = {
   demote: 'border-amber-200 bg-amber-50',
   retire: 'border-red-200 bg-red-50'
 };
+
+/**
+ * Is this the tier that already applies to a dish nobody has judged?
+ *
+ * Reads `DEFAULT_TIER` rather than naming `occasional`, so that moving the
+ * default in `mealTiers.js` moves the dashed button with it instead of leaving
+ * the screen quietly pointing at the wrong one.
+ */
+const isUnsetDefault = (bucket, option) => bucket === UNTIERED && option === DEFAULT_TIER;
 
 const MealTieringPanel = ({
   meals = [],
@@ -246,9 +271,13 @@ const MealTieringPanel = ({
                     <span className="text-[10px] text-gray-400">{group.meals.length}</span>
                   </div>
                   {group.bucket === UNTIERED && (
+                    // Leads with "already being planned", not with the ask.
+                    // The ordering puts this group on top precisely because it
+                    // needs attention, and a heading that only says "set these"
+                    // invites the reading that nothing below it counts yet.
                     <p className="text-[10px] text-indigo-700 mt-1">
-                      Set how often you want these. Until you do they are planned as Occasional —
-                      once a week at most.
+                      These <strong>are</strong> being planned — as Occasional, once a week at most
+                      (shown dashed below). Setting a tier just tells the planner you meant it.
                     </p>
                   )}
                 </div>
@@ -274,16 +303,31 @@ const MealTieringPanel = ({
                               key={option}
                               onClick={() => onSetTier(meal.name, option)}
                               disabled={disabled}
-                              title={TIER_DEFINITIONS[option].hint}
-                              // Nothing is highlighted while the bucket is
-                              // UNTIERED. Showing Occasional as selected —
-                              // which is what comparing the resolved tier did —
-                              // told the user they had already answered a
-                              // question they had not, on 120 rows at once.
+                              title={
+                                isUnsetDefault(bucket, option)
+                                  ? `Applies by default — ${TIER_DEFINITIONS[option].hint.toLowerCase()}. Tap to confirm it.`
+                                  : TIER_DEFINITIONS[option].hint
+                              }
+                              // Three states, not two.
+                              //
+                              // Solid: you chose this. Dashed: you chose
+                              // nothing and this is the default already in
+                              // force. Plain: neither.
+                              //
+                              // Filling Occasional solid on an unjudged row —
+                              // which is what comparing the *resolved* tier
+                              // did — claimed you had answered a question you
+                              // had not, on a hundred rows at once. Leaving it
+                              // plain overcorrected the other way and implied
+                              // the dish had no frequency at all, which is the
+                              // reading that makes people think an unmarked
+                              // dish is not planned. It is: at once a week.
                               className={`px-2 py-1 rounded-full text-[10px] font-semibold border transition-colors disabled:opacity-50 ${
                                 bucket === option
                                   ? TIER_STYLES[option]
-                                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
+                                  : isUnsetDefault(bucket, option)
+                                    ? DEFAULT_APPLIES_STYLE
+                                    : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
                               }`}
                             >
                               {TIER_DEFINITIONS[option].label}

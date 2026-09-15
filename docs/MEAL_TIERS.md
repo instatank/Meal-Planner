@@ -174,12 +174,25 @@ is browsed — you come here to find the dish you are thinking of, and a name is
 how you look for it. Ranking within a band by a macro would imply an ordering
 the tier does not have.
 
-Two details that are not cosmetic:
+**A tier button has three states, not two**, and the third is the one that
+matters: solid means you chose it, dashed-and-muted means you chose nothing and
+this is the default *already in force*, plain means neither. Only `Occasional`
+ever renders dashed, because only the default can apply without being chosen.
 
-- **An unjudged dish highlights no tier button.** Previously the row resolved
-  the tier for display, so every untouched dish showed `Occasional` as if
-  selected — telling the user they had already answered a question they had
-  not, on a hundred rows at once.
+Both simpler designs are wrong, and wrong in opposite directions. Filling
+`Occasional` solid on an unjudged row — which is what displaying the *resolved*
+tier did — claims you answered a question you did not, on a hundred rows at
+once. Leaving it plain implies the dish has no frequency at all, which invites
+the reading that **an unmarked dish is not planned**. It is planned: as
+`occasional`, at most once a week, exactly as it was before the field could be
+null. The group heading says so outright rather than only asking you to act.
+
+That reading is ruled out by a test rather than by this paragraph, and by
+`audit:generation`, which runs against an **entirely empty tier map** — every
+dish unjudged — and still builds a full 21-dish week. If unjudged meant
+unplanned, the audit could not pass.
+
+One more detail that is not cosmetic:
 - **The list is capped at 60 with a "Show N more".** Stated rather than silent,
   and the cap is applied *after* grouping so a heading never claims more than
   it shows. The ordering guarantees what is cut is the already-decided end of
